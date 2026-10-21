@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwiftDrop System Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: engineering spec sheet. One wide scrollable diagram, then reference sections in a two-column grid. Blue = our services, amber = async events, teal = external systems. */
+:root{
+  --bg:#F4F6F8;--surface:#FFFFFF;--ink:#141B24;--ink-2:#2B3542;--muted:#5A6676;--line:#D9DEE5;--line-strong:#A9B3C1;
+  --accent:#2350C8;--svc-bg:#EDF2FF;--svc-line:#8EA6E6;--edge-bg:#E6EEFB;--edge-line:#6E8FCF;
+  --mq-bg:#FFF6E6;--mq-line:#E0A447;--async:#B86E00;--sync:#4A5566;--ext:#0B7F72;--ext-bg:#E5F5F2;--ext-line:#5DB5A9;
+  --data-bg:#F1EFF8;--data-line:#A89ED0;--group-bg:#FAFBFC;--code-bg:#EEF1F5;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;--f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F141B;--surface:#161D27;--ink:#E8EDF3;--ink-2:#C9D2DD;--muted:#9AA6B5;--line:#2A3441;--line-strong:#465365;
+  --accent:#8FB0FF;--svc-bg:#18233A;--svc-line:#4A65A8;--edge-bg:#162238;--edge-line:#5577BB;
+  --mq-bg:#2A2214;--mq-line:#9A7030;--async:#F0A93A;--sync:#93A0B2;--ext:#4CC9B6;--ext-bg:#12302C;--ext-line:#2E8577;
+  --data-bg:#211E30;--data-line:#6E64A0;--group-bg:#131922;--code-bg:#1B2330;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F141B;--surface:#161D27;--ink:#E8EDF3;--ink-2:#C9D2DD;--muted:#9AA6B5;--line:#2A3441;--line-strong:#465365;
+  --accent:#8FB0FF;--svc-bg:#18233A;--svc-line:#4A65A8;--edge-bg:#162238;--edge-line:#5577BB;
+  --mq-bg:#2A2214;--mq-line:#9A7030;--async:#F0A93A;--sync:#93A0B2;--ext:#4CC9B6;--ext-bg:#12302C;--ext-line:#2E8577;
+  --data-bg:#211E30;--data-line:#6E64A0;--group-bg:#131922;--code-bg:#1B2330;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1440px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-direction:column;gap:10px;max-width:900px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:15px;margin:0}
+p{margin:0}
+.lede{color:var(--muted);max-width:68ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--f-mono);font-size:12px;padding:3px 10px;border:1px solid var(--line-strong);border-radius:999px;color:var(--ink-2);background:var(--surface)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.diagram-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.diagram-scroll svg{display:block;width:100%;min-width:1100px;height:auto}
+.hint{font-size:12.5px;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr));gap:20px}
+.table-scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 10px;border-bottom:1px solid var(--line)}
+th{font-family:var(--f-mono);font-weight:500;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+td code,li code,p code{font-family:var(--f-mono);font-size:12.5px;background:var(--code-bg);padding:1px 5px;border-radius:4px;color:var(--ink-2);white-space:nowrap}
+.svc-name{font-family:var(--f-mono);font-weight:600;color:var(--accent);white-space:nowrap}
+.endpoints{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);line-height:1.7}
+ol.flow{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+ol.flow li::marker{font-family:var(--f-mono);color:var(--muted)}
+ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+pre{margin:0;background:var(--code-bg);border-radius:8px;padding:14px 16px;overflow-x:auto;font-family:var(--f-mono);font-size:12.5px;line-height:1.6;color:var(--ink-2)}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:11px;padding:1px 7px;border-radius:4px;margin-right:4px}
+.tag.sync{background:var(--code-bg);color:var(--sync);border:1px solid var(--line-strong)}
+.tag.async{background:var(--mq-bg);color:var(--async);border:1px solid var(--mq-line)}
+.tag.ext{background:var(--ext-bg);color:var(--ext);border:1px solid var(--ext-line)}
+/* svg */
+.b-client{fill:var(--surface);stroke:var(--line-strong);stroke-width:1}
+.b-edge{fill:var(--edge-bg);stroke:var(--edge-line);stroke-width:1}
+.b-svc{fill:var(--svc-bg);stroke:var(--svc-line);stroke-width:1}
+.b-lib{fill:var(--surface);stroke:var(--line-strong);stroke-width:1;stroke-dasharray:5 4}
+.b-mq{fill:var(--mq-bg);stroke:var(--mq-line);stroke-width:1}
+.b-mqi{fill:var(--surface);stroke:var(--mq-line);stroke-width:1}
+.b-data{fill:var(--surface);stroke:var(--data-line);stroke-width:1}
+.b-dgroup{fill:var(--data-bg);stroke:var(--data-line);stroke-width:1}
+.b-ext{fill:var(--ext-bg);stroke:var(--ext-line);stroke-width:1}
+.b-group{fill:var(--group-bg);stroke:var(--line);stroke-width:1}
+.l-sync{stroke:var(--sync);fill:none;stroke-width:1.4}
+.l-async{stroke:var(--async);fill:none;stroke-width:1.6;stroke-dasharray:6 4}
+.l-ext{stroke:var(--ext);fill:none;stroke-width:1.6}
+.m-sync{fill:var(--sync)}.m-async{fill:var(--async)}.m-ext{fill:var(--ext)}
+.t-title{font-family:var(--f-display);font-weight:600;font-size:13.5px;fill:var(--ink)}
+.t-body{font-family:var(--f-body);font-size:11.5px;fill:var(--muted)}
+.t-mono{font-family:var(--f-mono);font-size:11px;fill:var(--ink-2)}
+.t-band{font-family:var(--f-mono);font-weight:600;font-size:10.5px;letter-spacing:.08em;fill:var(--muted)}
+.t-role{font-family:var(--f-mono);font-weight:600;font-size:10.5px;fill:var(--accent)}
+.t-async{font-family:var(--f-mono);font-size:10.5px;fill:var(--async)}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">SwiftDrop · Design documentation · Architecture v1 · 21 Oct 2026</span>
+  <h1>SwiftDrop system architecture</h1>
+  <p class="lede">Microservices behind a single API gateway. Services talk synchronously over REST when they need an answer now, and publish parcel status events to RabbitMQ when other parts of the system only need to react. Every service owns its own database.</p>
+  <div class="chips">
+    <span class="chip">React + Vite</span><span class="chip">Java 21 · Spring Boot 3</span><span class="chip">Spring Cloud Gateway</span><span class="chip">PostgreSQL 16</span><span class="chip">RabbitMQ</span><span class="chip">Redis</span><span class="chip">MinIO</span><span class="chip">Docker · Kubernetes · Helm</span><span class="chip">GitHub Actions</span>
+  </div>
+</header>
+
+<section class="card" aria-label="Architecture diagram">
+<div class="diagram-scroll">
+<svg viewBox="0 0 1360 1230" role="img" aria-labelledby="dg-t dg-d">
+<title id="dg-t">SwiftDrop architecture diagram</title>
+<desc id="dg-d">Clients reach a React frontend and a Spring Cloud API gateway. The gateway routes to seven Spring Boot services. Parcel service publishes status events to a RabbitMQ topic exchange consumed by notification, webhook, dispatch and tracking queues. Data layer: PostgreSQL, Redis, MinIO, Mailpit and mock SMS. External systems: Google OAuth, an LLM provider and merchant webhook URLs.</desc>
+<defs>
+<marker id="a-sync" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-sync"/></marker>
+<marker id="a-async" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-async"/></marker>
+<marker id="a-ext" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="m-ext"/></marker>
+</defs>
+
+<!-- clients -->
+<text class="t-band" x="1090" y="36" text-anchor="end">CLIENTS</text>
+<rect class="b-client" x="40" y="48" width="190" height="70" rx="8"/>
+<text class="t-title" x="56" y="70">Customer</text><text class="t-body" x="56" y="89">Web, signup, Google login</text><text class="t-body" x="56" y="105">Book, track, receipt PDF</text>
+<rect class="b-client" x="255" y="48" width="190" height="70" rx="8"/>
+<text class="t-title" x="271" y="70">Public tracking page</text><text class="t-body" x="271" y="89">Phone-first, no login</text><text class="t-body" x="271" y="105">Lookup by tracking number</text>
+<rect class="b-client" x="470" y="48" width="190" height="70" rx="8"/>
+<text class="t-title" x="486" y="70">Courier</text><text class="t-body" x="486" y="89">Phone view of today's list</text><text class="t-body" x="486" y="105">Status, note, photo proof</text>
+<rect class="b-client" x="685" y="48" width="190" height="70" rx="8"/>
+<text class="t-title" x="701" y="70">Dispatcher / Admin</text><text class="t-body" x="701" y="89">Assign, courier workloads</text><text class="t-body" x="701" y="105">Users, zones, reports</text>
+<rect class="b-client" x="900" y="48" width="190" height="70" rx="8"/>
+<text class="t-title" x="916" y="70">Merchant store</text><text class="t-body" x="916" y="89">Their e-commerce server</text><text class="t-body" x="916" y="105">API key in, webhooks out</text>
+
+<path class="l-sync" d="M135 118V148M350 118V148M565 118V148M780 118V148M995 118V148M135 148H995"/>
+<path class="l-sync" d="M185 148V182" marker-end="url(#a-sync)"/>
+<path class="l-sync" d="M730 148V182" marker-end="url(#a-sync)"/>
+
+<!-- edge -->
+<text class="t-band" x="1090" y="172" text-anchor="end">EDGE</text>
+<rect class="b-edge" x="40" y="185" width="290" height="105" rx="8"/>
+<text class="t-title" x="56" y="210">frontend</text><text class="t-role" x="314" y="210" text-anchor="end">ROLE 7 + ROLE 1</text>
+<text class="t-mono" x="56" y="231">React 18 · Vite · TS · nginx :80</text>
+<text class="t-body" x="56" y="251">Tailwind, Router, TanStack Query</text>
+<text class="t-body" x="56" y="269">EventSource (SSE) for live tracking</text>
+<path class="l-sync" d="M330 237H367" marker-end="url(#a-sync)"/>
+
+<rect class="b-edge" x="370" y="185" width="720" height="105" rx="8"/>
+<text class="t-title" x="390" y="210">api-gateway · Spring Cloud Gateway</text><text class="t-mono" x="660" y="210">:8080</text><text class="t-role" x="1074" y="210" text-anchor="end">ROLE 1</text>
+<text class="t-body" x="390" y="236">Verify JWT (RS256) against auth JWKS</text>
+<text class="t-body" x="390" y="256">Route /api/v1/{service}/** to services</text>
+<text class="t-body" x="390" y="276">Rate-limit merchant API keys (Redis)</text>
+<text class="t-body" x="740" y="236">CORS, X-Request-Id, PII-safe access logs</text>
+<text class="t-body" x="740" y="256">Pass-through for SSE /track/{no}/stream</text>
+<text class="t-body" x="740" y="276">Public routes: /auth/**, /track/{no}</text>
+
+<!-- gateway to services bus -->
+<path class="l-sync" d="M730 290V318M24 318H970M24 318V495H970"/>
+<path class="l-sync" d="M160 318V347M430 318V347M700 318V347M970 318V347" marker-end="url(#a-sync)"/>
+<path class="l-sync" d="M160 495V517M430 495V517M970 495V517" marker-end="url(#a-sync)"/>
+
+<!-- services -->
+<text class="t-band" x="1090" y="338" text-anchor="end">SERVICES</text>
+<rect class="b-svc" x="40" y="350" width="240" height="120" rx="8"/>
+<text class="t-title" x="56" y="374">pricing-service</text><text class="t-mono" x="264" y="374" text-anchor="end">:8082</text>
+<text class="t-body" x="56" y="396">Zones, pricing rules (Strategy)</text><text class="t-body" x="56" y="414">GET /pricing/estimate</text><text class="t-body" x="56" y="432">Admin CRUD for zones and rates</text>
+<text class="t-mono" x="56" y="456">db: pricing_db</text><text class="t-role" x="264" y="456" text-anchor="end">ROLE 1</text>
+
+<rect class="b-svc" x="310" y="350" width="240" height="120" rx="8"/>
+<text class="t-title" x="326" y="374">parcel-service</text><text class="t-mono" x="534" y="374" text-anchor="end">:8083</text>
+<text class="t-body" x="326" y="396">Create parcel, tracking number</text><text class="t-body" x="326" y="414">Status state machine + history</text><text class="t-body" x="326" y="432">Receipt PDF, SSE live stream</text>
+<text class="t-mono" x="326" y="456">db: parcel_db + outbox</text><text class="t-role" x="534" y="456" text-anchor="end">ROLE 3</text>
+
+<rect class="b-svc" x="580" y="350" width="240" height="120" rx="8"/>
+<text class="t-title" x="596" y="374">dispatch-service</text><text class="t-mono" x="804" y="374" text-anchor="end">:8084</text>
+<text class="t-body" x="596" y="396">Assign, workloads, today's list</text><text class="t-body" x="596" y="414">Photo proof upload to MinIO</text><text class="t-body" x="596" y="432">Reports: per day, success rate</text>
+<text class="t-mono" x="596" y="456">db: dispatch_db</text><text class="t-role" x="804" y="456" text-anchor="end">ROLE 4</text>
+
+<rect class="b-svc" x="850" y="350" width="240" height="120" rx="8"/>
+<text class="t-title" x="866" y="374">auth-service</text><text class="t-mono" x="1074" y="374" text-anchor="end">:8081</text>
+<text class="t-body" x="866" y="396">Signup, login, BCrypt hashing</text><text class="t-body" x="866" y="414">JWT RS256, JWKS endpoint</text><text class="t-body" x="866" y="432">Google OAuth 2.0, 5 roles</text>
+<text class="t-mono" x="866" y="456">db: auth_db</text><text class="t-role" x="1074" y="456" text-anchor="end">ROLE 2</text>
+
+<path class="l-sync" d="M310 410H284" marker-end="url(#a-sync)"/>
+<path class="l-sync" d="M580 430H554" marker-end="url(#a-sync)"/>
+<path class="l-sync" d="M380 520V474" marker-end="url(#a-sync)"/>
+
+<rect class="b-svc" x="40" y="520" width="240" height="120" rx="8"/>
+<text class="t-title" x="56" y="544">notification-service</text><text class="t-mono" x="264" y="544" text-anchor="end">:8086</text>
+<text class="t-body" x="56" y="566">Consumes status events</text><text class="t-body" x="56" y="584">Email via SMTP, mock SMS</text><text class="t-body" x="56" y="602">Webhooks: HMAC sign + retry</text>
+<text class="t-mono" x="56" y="626">db: notification_db</text><text class="t-role" x="264" y="626" text-anchor="end">ROLE 6</text>
+
+<rect class="b-svc" x="310" y="520" width="240" height="120" rx="8"/>
+<text class="t-title" x="326" y="544">merchant-service</text><text class="t-mono" x="534" y="544" text-anchor="end">:8085</text>
+<text class="t-body" x="326" y="566">Register, admin approval</text><text class="t-body" x="326" y="584">API keys (stored hashed)</text><text class="t-body" x="326" y="602">Order API, webhook settings</text>
+<text class="t-mono" x="326" y="626">db: merchant_db</text><text class="t-role" x="534" y="626" text-anchor="end">ROLE 5</text>
+
+<rect class="b-lib" x="580" y="520" width="240" height="120" rx="8"/>
+<text class="t-title" x="596" y="544">common (shared library)</text>
+<text class="t-body" x="596" y="566">ProblemDetail error handler</text><text class="t-body" x="596" y="584">JWT resource-server config</text><text class="t-body" x="596" y="602">Event DTOs, PII log masking</text>
+<text class="t-mono" x="596" y="626">Maven module, no runtime</text>
+
+<rect class="b-svc" x="850" y="520" width="240" height="120" rx="8"/>
+<text class="t-title" x="866" y="544">ai-assistant</text><text class="t-mono" x="1074" y="544" text-anchor="end">:8087</text>
+<text class="t-body" x="866" y="566">Spring AI chat endpoint</text><text class="t-body" x="866" y="584">MCP tools: track_parcel,</text><text class="t-body" x="866" y="602">estimate_fee, my_parcels</text>
+<text class="t-mono" x="866" y="626">calls APIs via gateway</text><text class="t-role" x="1074" y="626" text-anchor="end">ROLE 9</text>
+
+<!-- async + external paths -->
+<path class="l-async" d="M520 470V482H565V682" marker-end="url(#a-async)"/>
+<text class="t-async" x="574" y="677">publish ParcelStatusChanged</text>
+<path class="l-async" d="M100 685V644" marker-end="url(#a-async)"/>
+<text class="t-async" x="108" y="677">consume</text>
+<path class="l-ext" d="M240 640V657H1240V712" marker-end="url(#a-ext)"/>
+<path class="l-ext" d="M1090 400H1137" marker-end="url(#a-ext)"/>
+<path class="l-ext" d="M1090 580H1137" marker-end="url(#a-ext)"/>
+
+<!-- messaging -->
+<rect class="b-mq" x="40" y="685" width="1050" height="220" rx="10"/>
+<text class="t-title" x="60" y="710">RabbitMQ · topic exchange, durable queues, dead-letter retry</text><text class="t-role" x="1070" y="710" text-anchor="end">ROLE 6</text>
+<rect class="b-mqi" x="60" y="735" width="240" height="100" rx="8"/>
+<text class="t-title" x="76" y="758">parcel.events</text>
+<text class="t-body" x="76" y="778">Topic exchange</text>
+<text class="t-mono" x="76" y="798">key: parcel.status.&lt;status&gt;</text>
+<text class="t-mono" x="76" y="818">msg: ParcelStatusChanged</text>
+<path class="l-async" d="M300 785H330V745H982"/>
+<path class="l-async" d="M442 745V757M622 745V757M802 745V757M982 745V757" marker-end="url(#a-async)"/>
+<rect class="b-mqi" x="360" y="760" width="165" height="70" rx="8"/>
+<text class="t-mono" x="376" y="784">notification.q</text><text class="t-body" x="376" y="806">→ notification-service</text>
+<rect class="b-mqi" x="540" y="760" width="165" height="70" rx="8"/>
+<text class="t-mono" x="556" y="784">webhook.q</text><text class="t-body" x="556" y="806">→ webhook sender</text>
+<rect class="b-mqi" x="720" y="760" width="165" height="70" rx="8"/>
+<text class="t-mono" x="736" y="784">dispatch.q</text><text class="t-body" x="736" y="806">→ dispatch reports</text>
+<rect class="b-mqi" x="900" y="760" width="165" height="70" rx="8"/>
+<text class="t-mono" x="916" y="784">tracking.q</text><text class="t-body" x="916" y="806">→ parcel SSE push</text>
+<path class="l-async" d="M622 830V847" marker-end="url(#a-async)"/>
+<rect class="b-mqi" x="360" y="850" width="705" height="40" rx="8"/>
+<text class="t-body" x="376" y="875">Failed webhook → retry.10s → retry.1m → retry.5m (TTL + DLX) → webhook.parking for admin replay</text>
+
+<!-- data -->
+<rect class="b-dgroup" x="40" y="930" width="1050" height="130" rx="10"/>
+<text class="t-title" x="60" y="955">Data and infrastructure</text>
+<rect class="b-data" x="60" y="970" width="185" height="75" rx="8"/>
+<text class="t-title" x="76" y="995">PostgreSQL 16</text><text class="t-body" x="76" y="1015">One database per service</text><text class="t-body" x="76" y="1032">Flyway migrations</text>
+<rect class="b-data" x="265" y="970" width="185" height="75" rx="8"/>
+<text class="t-title" x="281" y="995">Redis 7</text><text class="t-body" x="281" y="1015">Gateway rate limits</text><text class="t-body" x="281" y="1032">Fee estimate cache</text>
+<rect class="b-data" x="470" y="970" width="185" height="75" rx="8"/>
+<text class="t-title" x="486" y="995">MinIO (S3 API)</text><text class="t-body" x="486" y="1015">Bucket: delivery-proofs</text><text class="t-body" x="486" y="1032">Courier photo proof</text>
+<rect class="b-data" x="675" y="970" width="185" height="75" rx="8"/>
+<text class="t-title" x="691" y="995">Mailpit (SMTP)</text><text class="t-body" x="691" y="1015">Catches all dev email</text><text class="t-body" x="691" y="1032">Web inbox for the demo</text>
+<rect class="b-data" x="880" y="970" width="185" height="75" rx="8"/>
+<text class="t-title" x="896" y="995">Mock SMS</text><text class="t-body" x="896" y="1015">Logs masked messages</text><text class="t-body" x="896" y="1032">Swappable adapter</text>
+
+<!-- platform -->
+<rect class="b-group" x="40" y="1085" width="1050" height="125" rx="10"/>
+<text class="t-title" x="60" y="1110">Build, deploy and run</text><text class="t-role" x="1070" y="1110" text-anchor="end">ROLE 8</text>
+<rect class="b-client" x="60" y="1125" width="240" height="68" rx="8"/>
+<text class="t-title" x="76" y="1150">Docker Compose</text><text class="t-body" x="76" y="1170">Local: one command, all services</text><text class="t-body" x="76" y="1186">Healthchecks, .env config</text>
+<rect class="b-client" x="315" y="1125" width="240" height="68" rx="8"/>
+<text class="t-title" x="331" y="1150">Kubernetes + Helm</text><text class="t-body" x="331" y="1170">ConfigMaps, Secrets, Services</text><text class="t-body" x="331" y="1186">ingress-nginx routes / and /api</text>
+<rect class="b-client" x="570" y="1125" width="240" height="68" rx="8"/>
+<text class="t-title" x="586" y="1150">GitHub Actions</text><text class="t-body" x="586" y="1170">Build, test, JaCoCo on every PR</text><text class="t-body" x="586" y="1186">Push images to GHCR</text>
+<rect class="b-client" x="825" y="1125" width="240" height="68" rx="8"/>
+<text class="t-title" x="841" y="1150">Observability</text><text class="t-body" x="841" y="1170">Actuator health and metrics</text><text class="t-body" x="841" y="1186">JSON logs with request ID</text>
+
+<!-- right column -->
+<rect class="b-client" x="1140" y="48" width="200" height="110" rx="8"/>
+<text class="t-band" x="1156" y="70">LEGEND</text>
+<path class="l-sync" d="M1156 92H1196" marker-end="url(#a-sync)"/><text class="t-body" x="1206" y="96">Sync REST call</text>
+<path class="l-async" d="M1156 116H1196" marker-end="url(#a-async)"/><text class="t-body" x="1206" y="120">Async event</text>
+<path class="l-ext" d="M1156 140H1196" marker-end="url(#a-ext)"/><text class="t-body" x="1206" y="144">External call</text>
+
+<text class="t-band" x="1140" y="355">EXTERNAL SYSTEMS</text>
+<rect class="b-ext" x="1140" y="370" width="200" height="62" rx="8"/>
+<text class="t-title" x="1156" y="395">Google OAuth 2.0</text><text class="t-body" x="1156" y="415">"Login with Google"</text>
+<rect class="b-ext" x="1140" y="550" width="200" height="62" rx="8"/>
+<text class="t-title" x="1156" y="575">LLM provider</text><text class="t-body" x="1156" y="595">Gemini, Claude or Ollama</text>
+<rect class="b-ext" x="1140" y="715" width="200" height="82" rx="8"/>
+<text class="t-title" x="1156" y="740">Merchant webhook URL</text><text class="t-body" x="1156" y="760">HTTPS POST, HMAC signed</text><text class="t-body" x="1156" y="778">2xx response = delivered</text>
+</svg>
+</div>
+<p class="hint">Scroll sideways on a phone. Short arrows between services: parcel calls pricing for the fee, dispatch calls parcel to change status, merchant calls parcel to create an order.</p>
+</section>
+
+<div class="grid">
+<section class="card">
+  <h2>Layers</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Layer</th><th>What lives there</th></tr></thead>
+    <tbody>
+      <tr><td>Presentation</td><td>React SPA for all roles, mobile-first public tracking page. Talks only to the gateway.</td></tr>
+      <tr><td>Edge</td><td>Ingress (Kubernetes) and api-gateway: auth check, routing, rate limits, CORS.</td></tr>
+      <tr><td>Business logic</td><td>Seven Spring Boot services, each layered as Controller → Service → Repository, with DTO validation at the controller.</td></tr>
+      <tr><td>Integration</td><td>RabbitMQ topic exchange, notification consumer, webhook sender with retry.</td></tr>
+      <tr><td>Data</td><td>PostgreSQL (database per service), Redis, MinIO object storage.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Integration patterns</h2>
+  <ul class="plain">
+    <li><span class="tag sync">request/reply</span> Gateway to services, parcel to pricing, merchant to parcel, dispatch to parcel. Used when the caller needs the answer before it can respond.</li>
+    <li><span class="tag async">publish/subscribe</span> Parcel publishes one event per status change; four queues react independently, so adding a consumer never touches parcel-service.</li>
+    <li><span class="tag async">message broker + DLX</span> Durable queues and dead-letter retry give at-least-once delivery for notifications and webhooks.</li>
+    <li><span class="tag async">transactional outbox</span> Event is written in the same DB transaction as the status change, then relayed to RabbitMQ, so no event is lost if the broker is down.</li>
+    <li><span class="tag ext">webhook</span> Outbound HTTP callback to merchants, signed with HMAC-SHA256, retried with backoff.</li>
+    <li><span class="tag ext">server-sent events</span> One-way live stream from parcel-service to browsers through the gateway.</li>
+  </ul>
+</section>
+</div>
+
+<section class="card">
+  <h2>Service catalogue</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Service</th><th>Owner</th><th>Database tables</th><th>Main endpoints (prefix /api/v1)</th><th>Events</th></tr></thead>
+    <tbody>
+      <tr><td class="svc-name">api-gateway :8080</td><td>Role 1</td><td>None (Redis for rate limits)</td><td class="endpoints">Routes all /api/v1/** · public /auth/**, /track/**</td><td>None</td></tr>
+      <tr><td class="svc-name">auth-service :8081</td><td>Role 2</td><td>users, roles, user_roles, refresh_tokens, oauth_accounts</td><td class="endpoints">POST /auth/register · POST /auth/login · POST /auth/refresh<br>GET /oauth2/authorization/google · GET /.well-known/jwks.json<br>GET, PATCH /admin/users</td><td>None</td></tr>
+      <tr><td class="svc-name">pricing-service :8082</td><td>Role 1</td><td>zones, zone_districts, pricing_rules</td><td class="endpoints">GET /pricing/estimate?from&amp;to&amp;weightKg&amp;size<br>CRUD /admin/zones · CRUD /admin/pricing-rules</td><td>None</td></tr>
+      <tr><td class="svc-name">parcel-service :8083</td><td>Role 3</td><td>parcels, parcel_status_history, outbox_events</td><td class="endpoints">POST /parcels · GET /parcels · GET /parcels/{id}<br>GET /parcels/{id}/receipt (PDF)<br>GET /track/{trackingNo} · GET /track/{trackingNo}/stream (SSE)<br>internal: PATCH /internal/parcels/{id}/status</td><td>Publishes ParcelStatusChanged · consumes tracking.q</td></tr>
+      <tr><td class="svc-name">dispatch-service :8084</td><td>Role 4</td><td>couriers, assignments, delivery_proofs, daily_stats</td><td class="endpoints">GET /dispatch/unassigned · POST /dispatch/assignments<br>GET /dispatch/workload · GET /reports/daily<br>GET /courier/deliveries/today · POST /courier/deliveries/{id}/status (multipart photo)</td><td>Consumes dispatch.q</td></tr>
+      <tr><td class="svc-name">merchant-service :8085</td><td>Role 5</td><td>merchants, api_keys, webhook_endpoints</td><td class="endpoints">POST /merchants/register · PATCH /admin/merchants/{id}/approve<br>POST /merchants/me/api-keys · PUT /merchants/me/webhook<br>POST /merchant-api/orders (X-API-Key) · GET /merchants/me/orders</td><td>None</td></tr>
+      <tr><td class="svc-name">notification-service :8086</td><td>Role 6</td><td>notifications, webhook_deliveries</td><td class="endpoints">GET /admin/webhook-deliveries · POST /admin/webhook-deliveries/{id}/replay</td><td>Consumes notification.q, webhook.q, retry queues</td></tr>
+      <tr><td class="svc-name">ai-assistant :8087</td><td>Role 9</td><td>None (stateless)</td><td class="endpoints">POST /assistant/chat · /mcp (MCP server: track_parcel, estimate_fee, my_parcels)</td><td>None</td></tr>
+      <tr><td class="svc-name">frontend :80</td><td>Role 7 + Role 1</td><td>None</td><td class="endpoints">Routes: /, /track/:no, /customer/*, /merchant/*, /courier/*, /dispatch/*, /admin/*</td><td>Listens to SSE</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<div class="grid">
+<section class="card">
+  <h2>Key flows</h2>
+  <h3>1. Customer creates a delivery</h3>
+  <ol class="flow">
+    <li>SPA calls <code>GET /pricing/estimate</code> and shows the fee.</li>
+    <li>Customer confirms; SPA sends <code>POST /parcels</code> with the JWT.</li>
+    <li>Gateway verifies the token and routes to parcel-service.</li>
+    <li>Parcel-service re-checks the fee with pricing, saves the parcel as CREATED with a history row and an outbox row in one transaction.</li>
+    <li>Outbox relay publishes <code>parcel.status.created</code>; API returns 201 with the tracking number.</li>
+  </ol>
+  <h3>2. Merchant creates an order through the API</h3>
+  <ol class="flow">
+    <li>Store server sends <code>POST /merchant-api/orders</code> with <code>X-API-Key</code>.</li>
+    <li>Gateway applies the per-key rate limit; merchant-service checks the key hash and that the merchant is approved.</li>
+    <li>Merchant-service calls parcel-service to create the parcel with its merchantId.</li>
+    <li>CREATED event flows to webhook.q; the webhook sender POSTs to the merchant URL.</li>
+  </ol>
+  <h3>3. Courier updates status</h3>
+  <ol class="flow">
+    <li>Courier sends <code>POST /courier/deliveries/{id}/status</code> with a note or photo.</li>
+    <li>Dispatch checks the delivery is assigned to this courier (403 otherwise) and stores the photo in MinIO.</li>
+    <li>Dispatch calls parcel-service; parcel validates the transition (State pattern) and saves history and outbox.</li>
+    <li>One event fans out: email/SMS, merchant webhook, report counters, and an SSE push to every open tracking page.</li>
+  </ol>
+  <h3>4. Login with Google</h3>
+  <ol class="flow">
+    <li>SPA redirects to <code>/oauth2/authorization/google</code> on auth-service.</li>
+    <li>User signs in at Google; Google redirects back with an authorization code.</li>
+    <li>Auth-service exchanges the code, finds or creates the user as CUSTOMER, and issues our own JWT and refresh token.</li>
+    <li>SPA receives a one-time code on <code>/auth/callback</code> and swaps it for the tokens.</li>
+  </ol>
+</section>
+
+<section class="card">
+  <h2>Status event contract</h2>
+  <p class="hint">Routing key <code>parcel.status.&lt;status&gt;</code>. Contains IDs only, no addresses or phone numbers; consumers look up contact details through internal APIs.</p>
+<pre>{
+  "eventId": "8f2c1e0a-…",
+  "type": "ParcelStatusChanged",
+  "version": 1,
+  "occurredAt": "2026-10-21T09:15:00Z",
+  "parcelId": "c41d…",
+  "trackingNo": "SD-7K3Q-9P2M",
+  "customerId": "a9e0…",
+  "merchantId": "5b17…",      // null for customer bookings
+  "courierId": "e3f8…",       // null before assignment
+  "fromStatus": "IN_TRANSIT",
+  "toStatus": "OUT_FOR_DELIVERY",
+  "note": "Left Kandy hub",
+  "failureReason": null
+}</pre>
+  <h3>Status machine</h3>
+  <p><code>CREATED</code> → <code>PICKED_UP</code> → <code>IN_TRANSIT</code> → <code>OUT_FOR_DELIVERY</code> → <code>DELIVERED</code> or <code>FAILED</code>. Any other transition returns 409.</p>
+  <h3>Consumers</h3>
+  <ul class="plain">
+    <li><code>notification.q</code>: email on every status, SMS on OUT_FOR_DELIVERY, DELIVERED, FAILED.</li>
+    <li><code>webhook.q</code>: only events with a merchantId.</li>
+    <li><code>dispatch.q</code>: daily counters for reports.</li>
+    <li><code>tracking.q</code>: SSE push to open tracking pages.</li>
+  </ul>
+  <p>Consumers are idempotent: <code>eventId</code> is stored, and duplicates are skipped.</p>
+</section>
+</div>
+
+<div class="grid">
+<section class="card">
+  <h2>Security</h2>
+  <ul class="plain">
+    <li>Passwords hashed with BCrypt; Google users have no password.</li>
+    <li>Access token: JWT RS256, 15 minutes. Refresh token: 7 days, rotated, stored hashed.</li>
+    <li>Gateway and every service verify tokens with the public key from JWKS, so no shared secret is copied around.</li>
+    <li>Roles: <code>CUSTOMER</code>, <code>MERCHANT</code>, <code>COURIER</code>, <code>DISPATCHER</code>, <code>ADMIN</code>, enforced with <code>@PreAuthorize</code>.</li>
+    <li>Ownership checks in services: a courier sees only their assignments, a customer only their parcels, a merchant only their orders.</li>
+    <li>Internal endpoints (<code>/internal/**</code>) are not exposed by the gateway.</li>
+    <li>Merchant API keys shown once, stored as SHA-256 hashes, rate-limited per key.</li>
+    <li>Bean Validation on every request DTO; one shared handler returns RFC 7807 ProblemDetail with no stack traces or personal data.</li>
+    <li>Logback masking for phone numbers, emails and addresses.</li>
+    <li>All secrets from environment variables (.env locally, Kubernetes Secrets in the cluster).</li>
+  </ul>
+</section>
+<section class="card">
+  <h2>Design patterns</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Pattern</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>Strategy</td><td>Pricing rules: weight-based, zone-based, express surcharge</td></tr>
+      <tr><td>State</td><td>Parcel status transitions</td></tr>
+      <tr><td>Observer / pub-sub</td><td>Status events to four consumers</td></tr>
+      <tr><td>Repository</td><td>Spring Data JPA in every service</td></tr>
+      <tr><td>Adapter</td><td>EmailChannel, SmsChannel behind NotificationChannel</td></tr>
+      <tr><td>Facade / gateway</td><td>api-gateway as the single entry point</td></tr>
+      <tr><td>Outbox</td><td>Reliable event publishing in parcel-service</td></tr>
+      <tr><td>Template method</td><td>Retry handling for webhook delivery</td></tr>
+      <tr><td>DRY, SOLID</td><td>Shared common library; small single-purpose services</td></tr>
+    </tbody>
+  </table></div>
+</section>
+</div>
+
+<div class="grid">
+<section class="card">
+  <h2>Runtime containers</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Container</th><th>Ports</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>frontend</code></td><td>3000 → 80</td><td>nginx serving the Vite build</td></tr>
+      <tr><td><code>api-gateway</code></td><td>8080</td><td>Only backend port exposed outside</td></tr>
+      <tr><td><code>*-service</code></td><td>8081–8087</td><td>Internal network only</td></tr>
+      <tr><td><code>postgres</code></td><td>5432</td><td>Init script creates 6 databases and users</td></tr>
+      <tr><td><code>rabbitmq</code></td><td>5672, 15672</td><td>Management UI for the demo</td></tr>
+      <tr><td><code>redis</code></td><td>6379</td><td>Rate limit buckets, cache</td></tr>
+      <tr><td><code>minio</code></td><td>9000, 9001</td><td>Proof photos, console UI</td></tr>
+      <tr><td><code>mailpit</code></td><td>1025, 8025</td><td>SMTP and web inbox</td></tr>
+    </tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Tech stack</h2>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Area</th><th>Choice</th></tr></thead>
+    <tbody>
+      <tr><td>Frontend</td><td>React 18, Vite, TypeScript, Tailwind, React Router, TanStack Query, react-hook-form + zod, Recharts</td></tr>
+      <tr><td>Backend</td><td>Java 21, Spring Boot 3, Spring Security (OAuth2 client + resource server), Spring Cloud Gateway, Spring Data JPA, Spring AMQP, Flyway, OpenPDF, springdoc OpenAPI</td></tr>
+      <tr><td>AI</td><td>Spring AI with MCP server support</td></tr>
+      <tr><td>Data</td><td>PostgreSQL 16, Redis 7, MinIO</td></tr>
+      <tr><td>Testing</td><td>JUnit 5, Mockito, Testcontainers (Postgres, RabbitMQ), WireMock, Awaitility, JaCoCo, Vitest</td></tr>
+      <tr><td>DevOps</td><td>Docker multi-stage builds, Docker Compose, Kubernetes, Helm, ingress-nginx, GitHub Actions, GHCR</td></tr>
+      <tr><td>Build</td><td>Maven multi-module monorepo: services/, common/, frontend/, deploy/, docs/</td></tr>
+    </tbody>
+  </table></div>
+</section>
+</div>
+</div>
+
+</html>

@@ -1,0 +1,22 @@
+# Replace the @role-N placeholders with real GitHub usernames once roles are confirmed.
+# Later rules win over earlier ones.
+
+*                                   @Sachintha-dilshan49
+
+/common/                            @Sachintha-dilshan49
+/services/api-gateway/              @Sachintha-dilshan49
+/services/pricing-service/          @Sachintha-dilshan49
+/docs/                              @Sachintha-dilshan49
+
+/services/auth-service/             @role-2
+/services/parcel-service/           @role-3
+/services/dispatch-service/         @role-4
+/services/merchant-service/         @role-5
+/services/notification-service/     @role-6
+/frontend/                          @role-7 @Sachintha-dilshan49
+/deploy/                            @role-8
+/.github/workflows/                 @role-8
+/services/ai-assistant/             @role-9
+
+# Event contract changes need both the publisher and the consumer owner
+/common/src/main/java/lk/swiftdrop/common/event/   @role-3 @role-6
