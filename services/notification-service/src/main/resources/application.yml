@@ -5,16 +5,62 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          # auth-service JWKS, called directly (not through the gateway)
           jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+
+  datasource:
+    url: ${NOTIFICATION_DB_URL:jdbc:postgresql://localhost:5432/notification_db}
+    username: ${NOTIFICATION_DB_USERNAME:swiftdrop}
+    password: ${NOTIFICATION_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
 server:
   port: 8086
 
 swiftdrop:
   security:
-    # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
     public-paths: []
+  notification:
+    from-email: ${NOTIFICATION_FROM_EMAIL:noreply@swiftdrop.lk}
+    tracking-base-url: ${TRACKING_BASE_URL:http://localhost:3000/track}
+  services:
+    auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+    merchant-url: ${MERCHANT_SERVICE_URL:http://localhost:8085}
+
+rabbitmq:
+  queues:
+    notification: notification.q
+    webhook: webhook.q
+    webhook-retry-10s: webhook.retry.10s
+    webhook-retry-1m: webhook.retry.1m
+    webhook-retry-5m: webhook.retry.5m
+    webhook-parking: webhook.parking
+  dlx:
+    webhook: webhook.dlx
 
 management:
   endpoints:
