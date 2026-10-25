@@ -24,6 +24,7 @@
         <module>services/auth-service</module>
         <module>services/pricing-service</module>
         <module>services/parcel-service</module>
+        <module>services/dispatch-service</module>
     </modules>
 
     <properties>
