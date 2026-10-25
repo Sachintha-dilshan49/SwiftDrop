@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Shared console logging for every SwiftDrop service. Include it from the service's
+  src/main/resources/logback-spring.xml:
+
+    <configuration>
+        <include resource="lk/swiftdrop/common/logging/swiftdrop-logback.xml"/>
+    </configuration>
+
+  Every line carries the service name and request ID; messages and stack traces go through
+  PiiMasker. Change levels with logging.level.* in application.yml, not here.
+-->
+<included>
+    <conversionRule conversionWord="maskedMsg" class="lk.swiftdrop.common.logging.MaskingMessageConverter"/>
+    <conversionRule conversionWord="maskedEx" class="lk.swiftdrop.common.logging.MaskingThrowableConverter"/>
+
+    <springProperty scope="context" name="SWIFTDROP_SERVICE" source="spring.application.name" defaultValue="swiftdrop"/>
+
+    <property name="SWIFTDROP_LOG_PATTERN"
+              value="%d{yyyy-MM-dd'T'HH:mm:ss.SSS'Z',UTC} %5level [${SWIFTDROP_SERVICE},%X{requestId:-}] [%thread] %logger{40} : %maskedMsg%n%maskedEx"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${SWIFTDROP_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</included>

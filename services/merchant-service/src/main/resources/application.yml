@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: merchant-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # auth-service JWKS, called directly (not through the gateway)
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+
+server:
+  port: 8085
+
+swiftdrop:
+  security:
+    # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
+    public-paths: []
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
