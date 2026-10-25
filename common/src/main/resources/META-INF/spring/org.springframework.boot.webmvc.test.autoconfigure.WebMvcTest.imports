@@ -1,1 +1,2 @@
 lk.swiftdrop.common.autoconfigure.SwiftDropWebAutoConfiguration
+lk.swiftdrop.common.autoconfigure.SwiftDropSecurityAutoConfiguration
