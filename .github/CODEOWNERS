@@ -1,4 +1,6 @@
-# Replace the @role-N placeholders with real GitHub usernames once roles are confirmed.
+# Replace the @role-N placeholders with GitHub usernames:
+# role-2 Thulani, role-3 Sanduni, role-4 Tharuki, role-5 Sudari, role-6 Thisaru,
+# role-7 Supuni, role-8 Kevinda, role-9 Devmith
 # Later rules win over earlier ones.
 
 *                                   @Sachintha-dilshan49
@@ -17,6 +19,15 @@
 /deploy/                            @role-8
 /.github/workflows/                 @role-8
 /services/ai-assistant/             @role-9
+
+# Database migrations need the service owner AND the team lead (ADR-008).
+# These lines come after the service rules because the last matching rule wins.
+/services/pricing-service/src/main/resources/db/migration/        @Sachintha-dilshan49
+/services/auth-service/src/main/resources/db/migration/           @role-2 @Sachintha-dilshan49
+/services/parcel-service/src/main/resources/db/migration/         @role-3 @Sachintha-dilshan49
+/services/dispatch-service/src/main/resources/db/migration/       @role-4 @Sachintha-dilshan49
+/services/merchant-service/src/main/resources/db/migration/       @role-5 @Sachintha-dilshan49
+/services/notification-service/src/main/resources/db/migration/   @role-6 @Sachintha-dilshan49
 
 # Event contract changes need both the publisher and the consumer owner
 /common/src/main/java/lk/swiftdrop/common/event/   @role-3 @role-6

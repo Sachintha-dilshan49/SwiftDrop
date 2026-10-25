@@ -63,13 +63,71 @@ Never include stack traces, SQL, tokens, emails, phone numbers or addresses.
 - Logging with SLF4J, parameterised (`log.info("Parcel {} moved to {}", id, status)`), never string concatenation, never personal data.
 - No `System.out.println`, no commented-out code in PRs.
 
-## 3. Database
+## 3. Database and migrations
 
-- Flyway migrations in `src/main/resources/db/migration`, named `V1__create_parcels.sql`, `V2__add_status_history.sql`.
-- Tables and columns in snake_case; tables plural.
-- Every table has `id uuid primary key`, `created_at timestamptz not null`, `updated_at timestamptz`.
-- Foreign keys and indexes declared explicitly. Index every column used in a `WHERE` on a hot path (e.g. `tracking_no`, `courier_id`).
-- Never edit a migration that is already on `dev`.
+### Ownership
+
+- **Database per service** (ADR-008): `auth_db`, `pricing_db`, `parcel_db`, `dispatch_db`, `merchant_db`, `notification_db` on one PostgreSQL server. `api-gateway` and `ai-assistant` have no database.
+- A service connects **only** to its own database, with its own DB user. Data from another service comes through that service's API or events.
+- The **service owner writes their own migrations**. The **team lead reviews every migration** (CODEOWNERS on `db/migration/`).
+- Role 8 creates the empty databases and users in the Postgres init script. Flyway creates the tables.
+
+### Flyway
+
+- Files in `services/<service>/src/main/resources/db/migration/`.
+- Name: `V<number>__<what>.sql` (two underscores), e.g. `V1__create_parcels.sql`, `V4__add_failure_reason_to_parcels.sql`.
+- `spring.jpa.hibernate.ddl-auto: validate`. Hibernate never creates or changes tables.
+- **Never edit a migration that is merged to `dev`.** Add a new one. Editing breaks everyone's database with a checksum error.
+- Two open branches in the same service both using the next number → whoever merges second renumbers before merging.
+- Reference data the system needs (zones, rates, roles) = a normal versioned migration. Demo users and parcels = a separate seed script that runs only with the `local` profile.
+
+### Table rules
+
+- snake_case names; tables plural.
+- Every table: `id uuid primary key`, `created_at timestamptz not null default now()`, `updated_at timestamptz`.
+- Foreign keys **inside** your database: always declared. **No foreign keys to another service's data**: store the other ID as a plain `uuid` column (e.g. `parcels.customer_id`).
+- Enum-like columns as `varchar` with a `check` constraint, mapped with `@Enumerated(EnumType.STRING)`.
+- Money: `numeric(10,2)` + `char(3)` currency. Weights: `numeric(6,2)`.
+- Index every column used for lookups or filters (`tracking_no`, `courier_id`, `status`, foreign keys).
+- No personal data in columns that end up in logs or events (events carry IDs only).
+
+### Example
+
+```sql
+-- services/parcel-service/src/main/resources/db/migration/V1__create_parcels.sql
+create table parcels (
+    id               uuid primary key,
+    tracking_no      varchar(20)   not null unique,
+    customer_id      uuid,                         -- user in auth_db, no FK
+    merchant_id      uuid,                         -- merchant in merchant_db, no FK
+    pickup_address   varchar(500)  not null,
+    dropoff_address  varchar(500)  not null,
+    recipient_name   varchar(150)  not null,
+    recipient_phone  varchar(20)   not null,
+    size             varchar(10)   not null check (size in ('SMALL','MEDIUM','LARGE')),
+    weight_kg        numeric(6,2)  not null check (weight_kg > 0),
+    fee_amount       numeric(10,2) not null,
+    fee_currency     char(3)       not null default 'LKR',
+    status           varchar(20)   not null default 'CREATED',
+    created_at       timestamptz   not null default now(),
+    updated_at       timestamptz
+);
+
+create index idx_parcels_customer on parcels (customer_id);
+create index idx_parcels_merchant on parcels (merchant_id);
+create index idx_parcels_status   on parcels (status);
+```
+
+### Local reset
+
+Only for migrations that are **not** merged yet:
+
+```bash
+docker compose -f deploy/compose/docker-compose.yml down -v
+docker compose -f deploy/compose/docker-compose.yml up -d postgres
+```
+
+Integration tests use Testcontainers, so every CI run applies all migrations to a fresh database.
 
 ## 4. Configuration
 

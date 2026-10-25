@@ -62,7 +62,7 @@ Run the relevant tests before saying a task is done.
 7. **Consumers must be idempotent.** Store processed `eventId`s and skip duplicates.
 8. **Each service talks only to its own database.** No cross-database queries or shared tables; call the owning service's API instead.
 9. **Authorization is checked in the service**, not only at the gateway: role checks with `@PreAuthorize`, ownership checks (courier owns the assignment, customer owns the parcel, merchant owns the order) in the service layer.
-10. **Database changes are Flyway migrations** (`V<n>__<description>.sql`). Never edit a migration that has been merged to `dev`; add a new one.
+10. **Database changes are Flyway migrations** (`V<n>__<description>.sql`) in the owning service only, following `docs/conventions.md` §3. Never edit a migration that has been merged to `dev`; add a new one. `ddl-auto` is always `validate`. No foreign keys or queries to another service's database.
 11. **No new dependencies or infrastructure** without noting it in the PR description. No new services without a decision in `docs/decisions.md`.
 
 ## 6. Code conventions (summary)

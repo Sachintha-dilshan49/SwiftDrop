@@ -14,6 +14,8 @@ Format: **ID · title · status · date**, then context, decision, consequences.
 
 **Consequences.** Clear ownership and real integration boundaries. More moving parts to run locally, so Docker Compose must start everything with one command and services need timeouts on remote calls.
 
+**Alternatives considered (2026-10-25).** The brief also allows a layered architecture or a modular monolith with a BFF. A modular monolith (one Spring Boot app, a schema per module, separate notification and AI services) would be simpler to run and debug. The team chose microservices because each member owns and demonstrates an independent service, the broker and webhook integration cross real service boundaries, and the Kubernetes bonus deploys several independent workloads. Reconfirmed by the team on 2026-10-25.
+
 ## ADR-002 · RabbitMQ for status events · Accepted · 2026-10-21
 
 **Context.** Status changes must trigger notifications and merchant webhooks asynchronously, with retry.
@@ -61,3 +63,11 @@ Format: **ID · title · status · date**, then context, decision, consequences.
 **Decision.** Use Spring Boot 4.0.x, Spring Cloud 2025.1.x, Spring AI 2.x, pinned in the root `pom.xml`.
 
 **Consequences.** Supported versions and a single compatible set. Some starters and package names differ from older tutorials (e.g. Jackson 3, the Gateway server starter name); the team lead documents fixes in this repo as they come up.
+
+## ADR-008 · Database per service, migrations reviewed by the team lead · Accepted · 2026-10-25
+
+**Context.** The team considered one shared database with a single person writing all migrations, to keep the schema consistent.
+
+**Decision.** Keep a database per service (one PostgreSQL server, separate databases and users). Each service owner writes their own Flyway migrations; the team lead reviews every migration through CODEOWNERS. No foreign keys or queries across service databases.
+
+**Consequences.** Services stay independent, which is the point of ADR-001; a shared database would couple them and invite cross-service joins. Owners can explain their own tables in the viva. No single person blocks seven others. Consistency comes from `docs/conventions.md` §3 and the lead's review rather than from one author.

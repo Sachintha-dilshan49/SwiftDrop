@@ -1,20 +1,20 @@
 # Team and Ownership
 
-Fill in names and GitHub usernames once roles are confirmed. Keep `.github/CODEOWNERS` in sync with this table.
+Roles confirmed 25 October 2026. GitHub usernames still to be added. Keep `.github/CODEOWNERS` in sync with this table.
 
 ## Roles
 
 | # | Role | Member | GitHub | Owns | Demo part |
 |---|---|---|---|---|---|
 | 1 | Team lead, architecture, gateway, pricing (+ frontend support) | N.L. Sachintha Dilshan | @Sachintha-dilshan49 | `services/api-gateway`, `services/pricing-service`, `common/`, `docs/`, dispatcher/admin and pricing screens | Architecture walkthrough, fee estimate |
-| 2 | Authentication and user management | | | `services/auth-service`, security config in `common/` | Google login, how the system is secured |
-| 3 | Parcel and live tracking | | | `services/parcel-service` | Creating a delivery, live tracking |
-| 4 | Dispatch and courier | | | `services/dispatch-service` | Dispatcher assigning, courier updating status |
-| 5 | Merchant platform | | | `services/merchant-service` | Order through the API, merchant dashboard |
-| 6 | Events, notifications and webhooks | | | `services/notification-service`, RabbitMQ topology | Notification on status change, webhook with retry |
-| 7 | Frontend and real-time UI | | | `frontend/` | UI flow, responsiveness |
-| 8 | DevOps: Docker, Kubernetes, CI/CD | | | `deploy/`, `.github/workflows/`, Dockerfiles | Running system, CI pipeline |
-| 9 | AI assistant and testing coordinator | | | `services/ai-assistant`, shared test setup, coverage report | Chatbot, test and coverage results |
+| 2 | Authentication and user management | Thulani | | `services/auth-service`, security config in `common/` | Google login, how the system is secured |
+| 3 | Parcel and live tracking | Sanduni | | `services/parcel-service` | Creating a delivery, live tracking |
+| 4 | Dispatch and courier | Tharuki | | `services/dispatch-service` | Dispatcher assigning, courier updating status |
+| 5 | Merchant platform | Sudari | | `services/merchant-service` | Order through the API, merchant dashboard |
+| 6 | Events, notifications and webhooks | Thisaru | | `services/notification-service`, RabbitMQ topology | Notification on status change, webhook with retry |
+| 7 | Frontend and real-time UI | Supuni | | `frontend/` | UI flow, responsiveness |
+| 8 | DevOps: Docker, Kubernetes, CI/CD | Kevinda | | `deploy/`, `.github/workflows/`, Dockerfiles | Running system, CI pipeline |
+| 9 | AI assistant and testing coordinator | Devmith | | `services/ai-assistant`, shared test setup, coverage report | Chatbot, test and coverage results |
 
 ## Backup buddies (PR reviewers)
 
@@ -22,15 +22,15 @@ Each person reviews one teammate's PRs and can explain their part if needed.
 
 | Author | Reviewer |
 |---|---|
-| 1 Lead | 8 DevOps |
-| 2 Auth | 5 Merchant |
-| 3 Parcel | 6 Events |
-| 4 Dispatch | 3 Parcel |
-| 5 Merchant | 2 Auth |
-| 6 Events | 4 Dispatch |
-| 7 Frontend | 1 Lead |
-| 8 DevOps | 9 AI/Test |
-| 9 AI/Test | 7 Frontend |
+| Sachintha (Role 1) | Kevinda (Role 8) |
+| Thulani (Role 2) | Sudari (Role 5) |
+| Sanduni (Role 3) | Thisaru (Role 6) |
+| Tharuki (Role 4) | Sanduni (Role 3) |
+| Sudari (Role 5) | Thulani (Role 2) |
+| Thisaru (Role 6) | Tharuki (Role 4) |
+| Supuni (Role 7) | Sachintha (Role 1) |
+| Kevinda (Role 8) | Devmith (Role 9) |
+| Devmith (Role 9) | Supuni (Role 7) |
 
 ## Shared responsibilities (everyone)
 
