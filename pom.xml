@@ -25,6 +25,7 @@
         <module>services/pricing-service</module>
         <module>services/parcel-service</module>
         <module>services/dispatch-service</module>
+        <module>services/merchant-service</module>
     </modules>
 
     <properties>
