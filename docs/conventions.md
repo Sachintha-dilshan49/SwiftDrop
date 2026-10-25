@@ -129,11 +129,108 @@ docker compose -f deploy/compose/docker-compose.yml up -d postgres
 
 Integration tests use Testcontainers, so every CI run applies all migrations to a fresh database.
 
+### Adding the database to your service
+
+The skeletons start without persistence so they boot with no database. Add it in the PR that brings your first migration (`auth`, `pricing`, `parcel`, `dispatch`, `merchant`, `notification`; the `db/migration/` folder is already there). Versions come from the root `pom.xml`; never add `<version>`.
+
+1. Dependencies in `services/<service>/pom.xml` (Spring Boot 4 needs `spring-boot-starter-flyway`; `flyway-core` alone no longer triggers auto-configuration):
+
+   ```xml
+   <dependency>
+       <groupId>org.springframework.boot</groupId>
+       <artifactId>spring-boot-starter-data-jpa</artifactId>
+   </dependency>
+   <dependency>
+       <groupId>org.springframework.boot</groupId>
+       <artifactId>spring-boot-starter-flyway</artifactId>
+   </dependency>
+   <dependency>
+       <groupId>org.flywaydb</groupId>
+       <artifactId>flyway-database-postgresql</artifactId>
+   </dependency>
+   <dependency>
+       <groupId>org.postgresql</groupId>
+       <artifactId>postgresql</artifactId>
+       <scope>runtime</scope>
+   </dependency>
+
+   <dependency>
+       <groupId>org.springframework.boot</groupId>
+       <artifactId>spring-boot-testcontainers</artifactId>
+       <scope>test</scope>
+   </dependency>
+   <dependency>
+       <groupId>org.testcontainers</groupId>
+       <artifactId>testcontainers-junit-jupiter</artifactId>
+       <scope>test</scope>
+   </dependency>
+   <dependency>
+       <groupId>org.testcontainers</groupId>
+       <artifactId>testcontainers-postgresql</artifactId>
+       <scope>test</scope>
+   </dependency>
+   ```
+
+2. `application.yml` (replace `PARCEL`/`parcel` with your service; the password has no default):
+
+   ```yaml
+   spring:
+     datasource:
+       url: ${PARCEL_DB_URL:jdbc:postgresql://localhost:5432/parcel_db}
+       username: ${PARCEL_DB_USER:parcel}
+       password: ${PARCEL_DB_PASSWORD}
+     jpa:
+       hibernate:
+         ddl-auto: validate
+       open-in-view: false
+   ```
+
+3. Add `PARCEL_DB_URL`, `PARCEL_DB_USER` and `PARCEL_DB_PASSWORD` to `deploy/compose/.env.example` and the Helm values, and tell Role 8 so the init script creates the database and user.
+
+4. From now on the context needs a database, so replace the skeleton's `<Name>ApplicationTests` with an integration test. `@ServiceConnection` points the datasource at the container, so no URL or password is needed in tests. Docker must be running (it is in CI).
+
+   ```java
+   // services/parcel-service/src/test/java/lk/swiftdrop/parcel/ParcelApplicationIT.java
+   package lk.swiftdrop.parcel;
+
+   import static org.assertj.core.api.Assertions.assertThat;
+
+   import org.junit.jupiter.api.Test;
+   import org.springframework.beans.factory.annotation.Autowired;
+   import org.springframework.boot.test.context.SpringBootTest;
+   import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+   import org.springframework.jdbc.core.JdbcTemplate;
+   import org.testcontainers.junit.jupiter.Container;
+   import org.testcontainers.junit.jupiter.Testcontainers;
+   import org.testcontainers.postgresql.PostgreSQLContainer;
+
+   @SpringBootTest
+   @Testcontainers
+   class ParcelApplicationIT {
+
+       @Container
+       @ServiceConnection
+       static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
+
+       @Autowired
+       private JdbcTemplate jdbcTemplate;
+
+       @Test
+       void appliesFlywayMigrationsOnStartup() {
+           Integer applied = jdbcTemplate.queryForObject(
+                   "select count(*) from flyway_schema_history where success", Integer.class);
+           assertThat(applied).isPositive();
+       }
+   }
+   ```
+
+   `*IT` classes run in the `integration-test` phase (failsafe), so `./mvnw -pl services/parcel-service -am verify` runs them and counts them towards coverage.
+
 ## 4. Configuration
 
 - `application.yml` uses placeholders: `spring.datasource.url: ${PARCEL_DB_URL:jdbc:postgresql://localhost:5432/parcel_db}`.
 - Defaults only for non-secret local values. Secrets have no default.
-- Env var names: `<SERVICE>_<THING>` in upper snake case, e.g. `PARCEL_DB_PASSWORD`, `AUTH_GOOGLE_CLIENT_ID`, `JWT_PUBLIC_KEY_URI`.
+- Env var names: `<SERVICE>_<THING>` in upper snake case, e.g. `PARCEL_DB_PASSWORD`, `AUTH_GOOGLE_CLIENT_ID`, `JWT_JWK_SET_URI`.
 - Every variable listed in `deploy/compose/.env.example` with a dummy value and a comment.
 - Profiles: `local` (default), `docker`, `k8s`, `test`.
 

@@ -138,7 +138,7 @@ All public routes are prefixed `/api/v1` and go through the gateway. `/internal/
 
 | Service | Endpoints |
 |---|---|
-| auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` · `POST /auth/token` (exchange one-time code) · `GET /.well-known/jwks.json` · `GET, PATCH /admin/users` |
+| auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) |
 | pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` |
 | parcel | `POST /parcels` · `GET /parcels` (mine) · `GET /parcels/{id}` · `GET /parcels/{id}/receipt` (PDF) · `GET /track/{trackingNo}` (public) · `GET /track/{trackingNo}/stream` (SSE, public) · internal `PATCH /internal/parcels/{id}/status` · internal `POST /internal/parcels` |
 | dispatch | `GET /dispatch/unassigned` · `POST /dispatch/assignments` · `GET /dispatch/workload` · `GET /reports/daily?from&to` · `GET /courier/deliveries/today` · `POST /courier/deliveries/{id}/status` (multipart, optional photo) |
@@ -234,7 +234,7 @@ CREATED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
 |---|---|
 | Passwords | BCrypt (strength 12). Google users have no password. |
 | Tokens | Access JWT signed with RS256, 15 min. Refresh token 7 days, rotated on use, stored hashed. |
-| Token verification | Gateway and every service verify with the public key from `auth-service` JWKS. No shared secret. |
+| Token verification | Gateway and every service verify with the public key from `auth-service` JWKS. No shared secret. The JWKS endpoint `GET /.well-known/jwks.json` is internal: services call auth-service directly (`JWT_JWK_SET_URI`, e.g. `http://auth-service:8081/.well-known/jwks.json` in Docker, `http://localhost:8081/...` locally); the gateway does not route it. |
 | Roles | `CUSTOMER`, `MERCHANT`, `COURIER`, `DISPATCHER`, `ADMIN` in the `roles` claim; `@PreAuthorize` on endpoints. |
 | Ownership | Checked in the service layer: courier ↔ assignment, customer ↔ parcel, merchant ↔ order. |
 | Merchant API | `X-API-Key`, shown once, stored as SHA-256 hash, prefix kept for lookup, rate-limited per key in the gateway. Merchant must be APPROVED. |

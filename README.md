@@ -41,7 +41,21 @@ swiftdrop/
 └── .github/                  # CI workflows, PR and issue templates, CODEOWNERS
 ```
 
-## Quick start (once services exist)
+## Build and run a service
+
+Needs JDK 21 or newer (code is compiled for Java 21). No Maven install needed; use the wrapper (`mvnw.cmd` on Windows).
+
+```bash
+./mvnw verify                                          # build + all tests + 70% coverage gate, every module
+./mvnw -pl services/parcel-service -am verify          # one service and what it depends on (common)
+./mvnw -pl services/parcel-service -am install -DskipTests && \
+  ./mvnw -pl services/parcel-service spring-boot:run   # run one service on its port (8083)
+curl http://localhost:8083/actuator/health             # {"status":"UP"}
+```
+
+Every service gets error handling, request IDs, JWT security and masked logging from `common` automatically. Versions are pinned in the root `pom.xml` (Spring Boot 4.1, ADR-009).
+
+## Quick start with Docker Compose (once the compose file exists)
 
 ```bash
 git clone https://github.com/<org-or-owner>/swiftdrop.git
