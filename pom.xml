@@ -27,6 +27,7 @@
         <module>services/dispatch-service</module>
         <module>services/merchant-service</module>
         <module>services/notification-service</module>
+        <module>services/ai-assistant</module>
     </modules>
 
     <properties>
