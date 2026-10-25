@@ -56,7 +56,7 @@ Format: **ID · title · status · date**, then context, decision, consequences.
 
 **Consequences.** The auth owner has real code to explain and test, which the demo and viva require. Lighter local setup (Keycloak needs ~1 GB RAM and its own database). More code to write and secure ourselves.
 
-## ADR-007 · Spring Boot 4.0 line · Proposed · 2026-10-21
+## ADR-007 · Spring Boot 4.0 line · Superseded by ADR-009 · 2026-10-21
 
 **Context.** Spring Boot 4.0 is the current generation, with Spring Cloud 2025.1 and Spring AI 2.x built for it. Many tutorials still show Boot 3.
 
@@ -71,3 +71,19 @@ Format: **ID · title · status · date**, then context, decision, consequences.
 **Decision.** Keep a database per service (one PostgreSQL server, separate databases and users). Each service owner writes their own Flyway migrations; the team lead reviews every migration through CODEOWNERS. No foreign keys or queries across service databases.
 
 **Consequences.** Services stay independent, which is the point of ADR-001; a shared database would couple them and invite cross-service joins. Owners can explain their own tables in the viva. No single person blocks seven others. Consistency comes from `docs/conventions.md` §3 and the lead's review rather than from one author.
+
+## ADR-009 · Spring Boot 4.1 line · Accepted · 2026-10-25
+
+Supersedes ADR-007 (the version line only; the rest of ADR-007 still applies).
+
+**Context.** When the Maven build was set up, Spring Boot 4.1.2 was the current release. Open-source support for Boot 4.0 ends on 31 December 2026, before the project ends. Spring AI 2.0.x and springdoc-openapi 3.2 are built against Boot 4.1. start.spring.io lists Spring Cloud 2025.1.4 and Spring AI 2.0.x as compatible with Boot 4.0 and 4.1.
+
+**Decision.** Use Spring Boot 4.1.x, Spring Cloud 2025.1.x, Spring AI 2.0.x, Testcontainers 2.0.x, pinned in the root `pom.xml`. Code targets Java 21 (`maven.compiler.release=21`), so a newer local JDK still produces Java 21 bytecode.
+
+**Consequences.** Supported until mid-2027 without a mid-project upgrade. Spring Cloud and Spring AI versions are unchanged from ADR-007. Boot 4 differences to know about (also in `docs/conventions.md`):
+
+- Starters are modular: `spring-boot-starter-webmvc` (not `-web`), `spring-boot-starter-flyway` is needed for Flyway auto-configuration, test slices need `spring-boot-starter-webmvc-test`, and `@WebMvcTest` lives in `org.springframework.boot.webmvc.test.autoconfigure`.
+- Jackson 3: `tools.jackson.databind.json.JsonMapper`; annotations stay in `com.fasterxml.jackson.annotation`.
+- Spring Security 7 adds a `FACTOR_BEARER` authority to JWT logins and a `resource_metadata` parameter to the `WWW-Authenticate` header.
+- The gateway uses `spring-cloud-starter-gateway-server-webflux`.
+- Testcontainers 2 modules are named `testcontainers-<module>` and containers moved to module packages, e.g. `org.testcontainers.postgresql.PostgreSQLContainer`.

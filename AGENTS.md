@@ -28,7 +28,7 @@ Stay inside the module you were asked to change. If a task needs a change in ano
 
 ## 3. Tech stack and versions
 
-- Java 21, Spring Boot 4.0.x, Spring Cloud 2025.1.x, Spring AI 2.x. Exact versions are pinned in the root `pom.xml`; never override them in a module.
+- Java 21, Spring Boot 4.1.x, Spring Cloud 2025.1.x, Spring AI 2.x (ADR-009). Exact versions are pinned in the root `pom.xml`; never override them in a module.
 - Maven multi-module build. Use the wrapper: `./mvnw`.
 - PostgreSQL 16 + Flyway, RabbitMQ (Spring AMQP), Redis 7, MinIO (S3 API).
 - Frontend: React 18, Vite, TypeScript (strict), Tailwind, React Router, TanStack Query, react-hook-form + zod, Recharts.

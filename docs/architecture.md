@@ -323,7 +323,7 @@ All containers have health checks; services wait for their dependencies to be he
 | Area | Choice |
 |---|---|
 | Frontend | React 18, Vite, TypeScript, Tailwind, React Router, TanStack Query, react-hook-form + zod, Recharts |
-| Backend | Java 21, Spring Boot 4.0.x, Spring Security, Spring Cloud Gateway (2025.1.x), Spring Data JPA, Spring AMQP, Flyway, OpenPDF, springdoc-openapi |
+| Backend | Java 21, Spring Boot 4.1.x, Spring Security, Spring Cloud Gateway (2025.1.x), Spring Data JPA, Spring AMQP, Flyway, OpenPDF, springdoc-openapi |
 | AI | Spring AI 2.x with MCP server |
 | Data | PostgreSQL 16, Redis 7, MinIO |
 | Testing | JUnit 5, Mockito, Testcontainers, WireMock, Awaitility, JaCoCo, Vitest, React Testing Library |
