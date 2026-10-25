@@ -23,6 +23,7 @@
         <module>services/api-gateway</module>
         <module>services/auth-service</module>
         <module>services/pricing-service</module>
+        <module>services/parcel-service</module>
     </modules>
 
     <properties>
