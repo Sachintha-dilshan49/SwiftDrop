@@ -13,7 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import lk.swiftdrop.common.web.RequestIds;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -21,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = ProblemTestController.class)
 @WithMockUser
+@ExtendWith(OutputCaptureExtension.class)
 class GlobalExceptionHandlerTest {
 
     @Autowired
@@ -111,8 +115,8 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void hidesMessageAndStackTraceOfUnexpectedExceptions() throws Exception {
-        String body = mockMvc.perform(get("/test/boom"))
+    void hidesMessageAndStackTraceOfUnexpectedExceptionsAndLogsThemMasked(CapturedOutput output) throws Exception {
+        String body = mockMvc.perform(get("/test/boom").header(RequestIds.HEADER, "req-500"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/internal-error"))
                 .andExpect(jsonPath("$.detail").value(GlobalExceptionHandler.INTERNAL_DETAIL))
@@ -121,5 +125,9 @@ class GlobalExceptionHandlerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(body).doesNotContain("jane.doe", "+94", "IllegalStateException");
+        // logged through lk/swiftdrop/common/logging/swiftdrop-logback.xml (see src/test/resources/logback-spring.xml)
+        assertThat(output.getOut())
+                .contains(",req-500]", "IllegalStateException: Lookup failed for [EMAIL] on [PHONE]")
+                .doesNotContain("jane.doe@example.com");
     }
 }
