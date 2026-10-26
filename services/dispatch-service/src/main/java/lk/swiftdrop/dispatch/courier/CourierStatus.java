@@ -1,4 +1,4 @@
-package lk.swiftdrop.dispatch.entity;
+package lk.swiftdrop.dispatch.courier;
 
 public enum CourierStatus {
     AVAILABLE,

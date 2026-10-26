@@ -1,4 +1,4 @@
-package lk.swiftdrop.dispatch.entity;
+package lk.swiftdrop.dispatch.courier;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -51,10 +51,6 @@ public class Courier {
         return id;
     }
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
     public UUID getUserId() {
         return userId;
     }
@@ -69,21 +65,5 @@ public class Courier {
 
     public void setStatus(CourierStatus status) {
         this.status = status;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }

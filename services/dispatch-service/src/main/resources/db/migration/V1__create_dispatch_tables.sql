@@ -29,6 +29,9 @@ CREATE TABLE IF NOT EXISTS assignments (
 CREATE INDEX IF NOT EXISTS idx_assignments_parcel_id ON assignments (parcel_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_courier_id ON assignments (courier_id);
 CREATE INDEX IF NOT EXISTS idx_assignments_status ON assignments (status);
+-- A parcel has at most one active assignment; a FAILED or COMPLETED one does not block reassignment.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_assignments_active_parcel ON assignments (parcel_id)
+    WHERE status IN ('ASSIGNED', 'IN_PROGRESS');
 
 CREATE TABLE IF NOT EXISTS delivery_proofs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

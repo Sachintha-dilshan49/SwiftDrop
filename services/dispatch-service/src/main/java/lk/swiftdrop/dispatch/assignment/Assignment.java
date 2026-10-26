@@ -1,4 +1,4 @@
-package lk.swiftdrop.dispatch.entity;
+package lk.swiftdrop.dispatch.assignment;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -61,10 +61,6 @@ public class Assignment {
         return id;
     }
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
     public UUID getParcelId() {
         return parcelId;
     }
@@ -99,25 +95,5 @@ public class Assignment {
 
     public Instant getAssignedAt() {
         return assignedAt;
-    }
-
-    public void setAssignedAt(Instant assignedAt) {
-        this.assignedAt = assignedAt;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }
