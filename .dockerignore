@@ -1,0 +1,12 @@
+.git
+.github
+target/
+**/target/
+deploy/
+docs/
+diagrams/
+*.md
+.idea/
+.vscode/
+frontend/node_modules/
+frontend/dist/
