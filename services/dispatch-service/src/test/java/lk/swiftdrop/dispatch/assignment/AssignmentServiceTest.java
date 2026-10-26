@@ -85,7 +85,7 @@ class AssignmentServiceTest {
     void rejectsParcelThatAlreadyHasAnActiveAssignment() {
         Courier courier = courier(CourierStatus.AVAILABLE);
         given(courierRepository.findById(courier.getId())).willReturn(Optional.of(courier));
-        given(assignmentRepository.existsByParcelIdAndStatusIn(PARCEL_ID, AssignmentService.ACTIVE)).willReturn(true);
+        given(assignmentRepository.existsByParcelIdAndStatusIn(PARCEL_ID, AssignmentStatus.ACTIVE)).willReturn(true);
 
         assertThatThrownBy(() -> assignmentService.assign(PARCEL_ID, courier.getId(), DISPATCHER_ID))
                 .isInstanceOf(ConflictException.class)

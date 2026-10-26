@@ -49,7 +49,7 @@ class AssignParcelIT {
         mockMvc.perform(assign(parcelId, courier.getId())).andExpect(status().isCreated());
         mockMvc.perform(assign(parcelId, courier.getId())).andExpect(status().isConflict());
 
-        assertThat(assignmentRepository.existsByParcelIdAndStatusIn(parcelId, AssignmentService.ACTIVE)).isTrue();
+        assertThat(assignmentRepository.existsByParcelIdAndStatusIn(parcelId, AssignmentStatus.ACTIVE)).isTrue();
         assertThat(assignmentRepository.count()).isEqualTo(1);
     }
 

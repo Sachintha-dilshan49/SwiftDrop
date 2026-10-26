@@ -1,7 +1,5 @@
 package lk.swiftdrop.dispatch.assignment;
 
-import java.util.EnumSet;
-import java.util.Set;
 import java.util.UUID;
 import lk.swiftdrop.common.error.ConflictException;
 import lk.swiftdrop.common.error.NotFoundException;
@@ -16,8 +14,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AssignmentService {
-
-    static final Set<AssignmentStatus> ACTIVE = EnumSet.of(AssignmentStatus.ASSIGNED, AssignmentStatus.IN_PROGRESS);
 
     private static final Logger log = LoggerFactory.getLogger(AssignmentService.class);
 
@@ -39,7 +35,7 @@ public class AssignmentService {
             throw new ConflictException("courier-unavailable", "Courier unavailable",
                     "Courier " + courierId + " is offline and cannot take new deliveries.");
         }
-        if (assignmentRepository.existsByParcelIdAndStatusIn(parcelId, ACTIVE)) {
+        if (assignmentRepository.existsByParcelIdAndStatusIn(parcelId, AssignmentStatus.ACTIVE)) {
             throw alreadyAssigned(parcelId);
         }
 
