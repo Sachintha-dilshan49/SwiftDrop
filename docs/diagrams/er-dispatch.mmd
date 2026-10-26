@@ -1,0 +1,55 @@
+---
+title: SwiftDrop - dispatch_db ER diagram (Role 4)
+---
+erDiagram
+    COURIERS {
+        uuid id PK
+        uuid user_id UK "auth-service user, no FK"
+        varchar status "AVAILABLE | BUSY | OFFLINE"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    ASSIGNMENTS {
+        uuid id PK
+        uuid parcel_id "parcel-service parcel, no FK"
+        uuid courier_id FK
+        uuid assigned_by_user_id "dispatcher or admin"
+        varchar status "ASSIGNED | IN_PROGRESS | COMPLETED | FAILED"
+        timestamptz assigned_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    DELIVERY_PROOFS {
+        uuid id PK
+        uuid assignment_id FK
+        varchar object_key "MinIO delivery-proofs key"
+        varchar file_name
+        timestamptz uploaded_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    DAILY_STATS {
+        uuid id PK
+        date date UK "unique with courier_id"
+        uuid courier_id FK
+        integer assigned_count
+        integer completed_count
+        integer failed_count
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    PROCESSED_EVENTS {
+        uuid id PK
+        varchar event_id UK "ParcelStatusChanged eventId"
+        varchar source
+        timestamptz processed_at
+        timestamptz created_at
+    }
+
+    COURIERS ||--o{ ASSIGNMENTS : "receives"
+    ASSIGNMENTS ||--o{ DELIVERY_PROOFS : "has proof"
+    COURIERS ||--o{ DAILY_STATS : "counted in"
