@@ -11,7 +11,7 @@ import java.time.Duration;
 public class RestClientConfig {
 
     @Bean
-    public RestClient authServiceClient(
+    public RestClient authServiceRestClient(
             @Value("${swiftdrop.services.auth-url}") String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
@@ -20,7 +20,7 @@ public class RestClientConfig {
     }
 
     @Bean
-    public RestClient merchantServiceClient(
+    public RestClient merchantServiceRestClient(
             @Value("${swiftdrop.services.merchant-url}") String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
