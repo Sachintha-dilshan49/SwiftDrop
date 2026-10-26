@@ -1,6 +1,14 @@
 spring:
   application:
     name: dispatch-service
+  datasource:
+    url: ${DISPATCH_DB_URL:jdbc:postgresql://localhost:5432/dispatch_db}
+    username: ${DISPATCH_DB_USER:dispatch}
+    password: ${DISPATCH_DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
   security:
     oauth2:
       resourceserver:
