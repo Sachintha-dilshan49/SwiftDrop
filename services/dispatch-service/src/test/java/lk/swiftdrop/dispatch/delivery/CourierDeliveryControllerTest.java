@@ -4,6 +4,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -11,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lk.swiftdrop.common.error.ForbiddenException;
+import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.dispatch.assignment.AssignmentStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class CourierDeliveryControllerTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
+    private static final String TOKEN = "courier-token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -90,8 +93,48 @@ class CourierDeliveryControllerTest {
         verifyNoInteractions(courierDeliveryService);
     }
 
+    @Test
+    void courierUpdatesOwnDeliveryStatus() throws Exception {
+        UUID assignmentId = UUID.randomUUID();
+        UpdateDeliveryStatusRequest request =
+                new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, "At the gate", "Nimali", null);
+        given(courierDeliveryService.updateStatus(USER_ID, TOKEN, assignmentId, request)).willReturn(
+                new CourierDeliveryResponse(assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now()));
+
+        mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", assignmentId)
+                        .param("status", "DELIVERED").param("note", "At the gate").param("recipientName", "Nimali")
+                        .with(user("COURIER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    void rejectsStatusUpdateWithoutStatusWith400() throws Exception {
+        mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", UUID.randomUUID())
+                        .param("note", "no status").with(user("COURIER")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("status"));
+        verifyNoInteractions(courierDeliveryService);
+    }
+
+    @Test
+    void rejectsUnknownStatusValueWith400() throws Exception {
+        mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", UUID.randomUUID())
+                        .param("status", "TELEPORTED").with(user("COURIER")))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(courierDeliveryService);
+    }
+
+    @Test
+    void dispatcherCannotUpdateCourierDeliveryStatus() throws Exception {
+        mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", UUID.randomUUID())
+                        .param("status", "PICKED_UP").with(user("DISPATCHER")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(courierDeliveryService);
+    }
+
     private static RequestPostProcessor user(String role) {
-        return jwt().jwt(token -> token.subject(USER_ID.toString()))
+        return jwt().jwt(token -> token.subject(USER_ID.toString()).tokenValue(TOKEN))
                 .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }

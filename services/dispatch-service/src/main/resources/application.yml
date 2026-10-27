@@ -23,6 +23,9 @@ swiftdrop:
   security:
     # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
     public-paths: []
+  services:
+    # parcel-service owns parcel status; dispatch calls its /internal API directly
+    parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
 
 management:
   endpoints:
