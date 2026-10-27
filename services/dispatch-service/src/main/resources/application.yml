@@ -9,6 +9,11 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  servlet:
+    multipart:
+      # proof photos; phones produce 2-4 MB JPEGs
+      max-file-size: 5MB
+      max-request-size: 6MB
   security:
     oauth2:
       resourceserver:
@@ -26,6 +31,12 @@ swiftdrop:
   services:
     # parcel-service owns parcel status; dispatch calls its /internal API directly
     parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
+  storage:
+    # MinIO (S3 API) for proof-of-delivery photos; the bucket is created by Role 8's minio-init
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY}
+    secret-key: ${MINIO_SECRET_KEY}
+    bucket: ${MINIO_BUCKET_DELIVERY_PROOFS:delivery-proofs}
 
 management:
   endpoints:

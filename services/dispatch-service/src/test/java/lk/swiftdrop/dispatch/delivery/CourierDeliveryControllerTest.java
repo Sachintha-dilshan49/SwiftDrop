@@ -1,6 +1,10 @@
 package lk.swiftdrop.dispatch.delivery;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,9 +18,12 @@ import java.util.UUID;
 import lk.swiftdrop.common.error.ForbiddenException;
 import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.dispatch.assignment.AssignmentStatus;
+import lk.swiftdrop.dispatch.proof.ProofPhoto;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -98,7 +105,7 @@ class CourierDeliveryControllerTest {
         UUID assignmentId = UUID.randomUUID();
         UpdateDeliveryStatusRequest request =
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, "At the gate", "Nimali", null);
-        given(courierDeliveryService.updateStatus(USER_ID, TOKEN, assignmentId, request)).willReturn(
+        given(courierDeliveryService.updateStatus(USER_ID, TOKEN, assignmentId, request, null)).willReturn(
                 new CourierDeliveryResponse(assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now()));
 
         mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", assignmentId)
@@ -106,6 +113,24 @@ class CourierDeliveryControllerTest {
                         .with(user("COURIER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    @Test
+    void photoIsPassedToTheServiceAsProof() throws Exception {
+        UUID assignmentId = UUID.randomUUID();
+        byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01};
+        given(courierDeliveryService.updateStatus(eq(USER_ID), eq(TOKEN), eq(assignmentId), any(), any()))
+                .willReturn(new CourierDeliveryResponse(
+                        assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now()));
+
+        mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", assignmentId)
+                        .file(new MockMultipartFile("photo", "door.jpg", "image/jpeg", jpeg))
+                        .param("status", "DELIVERED").with(user("COURIER")))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ProofPhoto> photo = ArgumentCaptor.forClass(ProofPhoto.class);
+        verify(courierDeliveryService).updateStatus(eq(USER_ID), eq(TOKEN), eq(assignmentId), any(), photo.capture());
+        assertThat(photo.getValue().content()).isEqualTo(jpeg);
     }
 
     @Test

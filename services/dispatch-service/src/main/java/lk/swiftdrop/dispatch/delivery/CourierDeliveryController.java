@@ -1,8 +1,10 @@
 package lk.swiftdrop.dispatch.delivery;
 
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import lk.swiftdrop.dispatch.proof.ProofPhoto;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -11,8 +13,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/courier/deliveries")
@@ -37,8 +41,10 @@ public class CourierDeliveryController {
 
     @PostMapping(path = "/{assignmentId}/status", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public CourierDeliveryResponse updateStatus(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID assignmentId,
-            @Valid @ModelAttribute UpdateDeliveryStatusRequest request) {
+            @Valid @ModelAttribute UpdateDeliveryStatusRequest request,
+            @RequestPart(name = "photo", required = false) MultipartFile photo) throws IOException {
+        ProofPhoto proof = photo == null || photo.isEmpty() ? null : new ProofPhoto(photo.getBytes());
         return courierDeliveryService.updateStatus(
-                UUID.fromString(jwt.getSubject()), jwt.getTokenValue(), assignmentId, request);
+                UUID.fromString(jwt.getSubject()), jwt.getTokenValue(), assignmentId, request, proof);
     }
 }
