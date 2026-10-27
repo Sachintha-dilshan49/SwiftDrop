@@ -1,5 +1,6 @@
 package lk.swiftdrop.notification.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +21,7 @@ public class RestClientConfig {
     }
 
     @Bean
+    @Qualifier("merchantServiceClient")
     public RestClient merchantServiceRestClient(
             @Value("${swiftdrop.services.merchant-url}") String baseUrl) {
         return RestClient.builder()
