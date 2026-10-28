@@ -1,0 +1,41 @@
+%% Sequence Diagram — Email and SMS notification flow (Role 6)
+%% Paste at https://mermaid.live to render
+
+sequenceDiagram
+    participant RMQ as RabbitMQ
+    participant NC as StatusChangeNotificationConsumer
+    participant IS as IdempotencyService
+    participant NS as NotificationService
+    participant AUTH as auth-service
+    participant EC as EmailChannel
+    participant SC as SmsChannel
+    participant DB as notification_db
+
+    RMQ->>NC: ParcelStatusChanged (notification.q)
+    NC->>IS: isAlreadyProcessed(eventId, "notification")
+    IS->>DB: SELECT FROM processed_events
+    alt Already processed
+        IS-->>NC: true
+        NC-->>RMQ: ACK (silent skip)
+    else New event
+        IS-->>NC: false
+        NC->>NS: processStatusChange(event)
+        NS->>AUTH: GET /internal/users/{customerId}/contact
+        AUTH-->>NS: UserContactResponse (firstName, email, phone)
+        alt Contact not found
+            NS-->>NC: return (no PII logged)
+        else Contact found
+            NS->>EC: send(email, subject, body)
+            EC-->>NS: ok / NotificationSendException
+            NS->>DB: save Notification (EMAIL, SENT or FAILED)
+            alt toStatus in OUT_FOR_DELIVERY · DELIVERED · FAILED AND phone exists
+                NS->>SC: send(phone, null, smsBody)
+                SC-->>NS: ok / NotificationSendException
+                NS->>DB: save Notification (SMS, SENT or FAILED)
+            end
+        end
+        NC->>IS: markProcessed(eventId, "notification")
+        IS->>DB: INSERT INTO processed_events
+        NC-->>RMQ: ACK
+    end
+

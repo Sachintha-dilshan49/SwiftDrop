@@ -1,0 +1,61 @@
+%% Architecture Diagram — notification-service (Role 6)
+%% Paste at https://mermaid.live to render
+
+graph LR
+    subgraph Inbound
+        GW["api-gateway :8080\n(JWT-secured admin routes)"]
+        RMQ["RabbitMQ\nparcel.events topic exchange"]
+    end
+
+    subgraph NS ["notification-service :8086"]
+        direction TB
+        NC["StatusChangeNotificationConsumer\nnotification.q"]
+        WC["WebhookConsumer\nwebhook.q"]
+        NS_SVC["NotificationService"]
+        EC["EmailChannel"]
+        SC["SmsChannel"]
+        WS["WebhookSender"]
+        WSign["WebhookSigningService\nHMAC-SHA256"]
+        IS["IdempotencyService"]
+        CTRL["AdminWebhookDeliveryController\nGET · POST /admin/webhook-deliveries"]
+        DB[("notification_db\nPostgreSQL")]
+    end
+
+    subgraph RetryQueues["Retry Queues"]
+        R10["webhook.retry.10s\nTTL 10 000 ms"]
+        R1M["webhook.retry.1m\nTTL 60 000 ms"]
+        R5M["webhook.retry.5m\nTTL 300 000 ms"]
+        PKG["webhook.parking"]
+    end
+
+    subgraph External
+        AUTH["auth-service :8081\nGET /internal/users/{id}/contact"]
+        MERCH["merchant-service :8085\nGET /internal/merchants/{id}/webhook"]
+        MAIL["SMTP / Mailpit"]
+        SMS["SMS Provider (mocked)"]
+        MWH["Merchant Webhook URL"]
+    end
+
+    RMQ -- "notification.q" --> NC
+    RMQ -- "webhook.q" --> WC
+    GW --> CTRL
+
+    NC --> IS
+    NC --> NS_SVC
+    NS_SVC --> EC & SC & AUTH
+    EC --> MAIL
+    SC --> SMS
+
+    WC --> IS & MERCH & WS
+    WS --> WSign
+    WS --> MWH
+
+    WC -- "attempt 1 fails" --> R10
+    R10 -- "TTL → DLX → webhook.q" --> WC
+    R1M -- "TTL → DLX → webhook.q" --> WC
+    R5M -- "TTL → DLX → webhook.q" --> WC
+    WC -- "attempt 4 fails" --> PKG
+
+    NS_SVC & WC & IS & CTRL --> DB
+    CTRL --> MERCH & WS
+
