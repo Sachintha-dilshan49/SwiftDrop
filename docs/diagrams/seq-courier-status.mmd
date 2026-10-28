@@ -1,0 +1,61 @@
+%% Sequence Diagram — Courier status update triggers notification (Role 4 + Role 6)
+%% Paste at https://mermaid.live to render
+%% This is the shared cross-role diagram. Role 4 owns Part 1; Role 6 owns Part 2.
+
+sequenceDiagram
+    actor Courier
+    participant GW as api-gateway
+    participant DS as dispatch-service
+    participant PS as parcel-service
+    participant RMQ as RabbitMQ parcel.events
+
+    box Role 6 — notification-service :8086
+    participant NC as StatusChangeNotificationConsumer
+    participant WC as WebhookConsumer
+    participant NS as NotificationService
+    participant WS as WebhookSender
+    end
+
+    participant AUTH as auth-service
+    participant MERCH as merchant-service
+    participant MAIL as SMTP / Mailpit
+    participant MWH as Merchant Webhook
+
+    Note over Courier,RMQ: Part 1 — Courier request (Role 4 + Role 3)
+    Courier->>GW: POST /api/v1/courier/deliveries/{id}/status  +JWT
+    GW->>DS: forward (JWT verified)
+    DS->>DS: check COURIER role and assignment ownership
+    DS->>PS: PATCH /internal/parcels/{parcelId}/status
+    PS->>PS: validate transition (returns 409 if invalid)
+    PS->>PS: save status + history + outbox row (1 transaction)
+    PS-->>DS: 200 OK
+    DS-->>GW: 200 OK
+    GW-->>Courier: 200 OK
+
+    Note over RMQ,MWH: Part 2 — Event fan-out (Role 6 owns the notification paths)
+    PS->>RMQ: publish ParcelStatusChanged v1 (parcel.events, parcel.status.*)
+
+    RMQ-->>NC: notification.q
+    NC->>NC: check idempotency (eventId + "notification")
+    NC->>NS: processStatusChange(event)
+    NS->>AUTH: GET /internal/users/{customerId}/contact
+    AUTH-->>NS: UserContactResponse (email, phone, firstName)
+    NS->>MAIL: send email (every status)
+    opt toStatus in OUT_FOR_DELIVERY · DELIVERED · FAILED AND phone exists
+        NS->>NS: send SMS (mocked)
+    end
+
+    RMQ-->>WC: webhook.q
+    WC->>WC: check merchantId != null
+    WC->>MERCH: GET /internal/merchants/{merchantId}/webhook
+    MERCH-->>WC: MerchantWebhookResponse (url, secret)
+    WC->>WS: send(url, body, secret, eventId)
+    WS->>WS: HMAC-SHA256 sign body
+    WS->>MWH: POST  X-SwiftDrop-Signature · X-SwiftDrop-Event-Id · X-SwiftDrop-Timestamp
+    alt 2xx
+        MWH-->>WC: 200 OK
+    else Non-2xx or timeout
+        MWH-->>WC: 5xx / timeout
+        WC->>RMQ: retry.10s → retry.1m → retry.5m → webhook.parking
+    end
+

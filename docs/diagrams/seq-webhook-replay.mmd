@@ -1,0 +1,49 @@
+%% Sequence Diagram — Admin webhook replay (Role 6)
+%% Paste at https://mermaid.live to render
+
+sequenceDiagram
+    actor Admin
+    participant GW as api-gateway
+    participant CTRL as AdminWebhookDeliveryController
+    participant WDS as WebhookDeliveryService
+    participant MERCH as merchant-service
+    participant WS as WebhookSender
+    participant MWH as Merchant Webhook URL
+    participant DB as notification_db
+
+    Admin->>GW: POST /api/v1/admin/webhook-deliveries/{id}/replay  +JWT
+    GW->>CTRL: forward (JWT validated)
+    CTRL->>CTRL: @PreAuthorize hasRole(ADMIN or DISPATCHER)
+    CTRL->>WDS: findById(id)
+    WDS->>DB: SELECT webhook_delivery WHERE id = ?
+    alt Not found
+        DB-->>WDS: empty
+        WDS-->>CTRL: Optional.empty()
+        CTRL-->>Admin: 404 Not Found
+    else Found
+        DB-->>WDS: WebhookDelivery
+        WDS-->>CTRL: Optional(delivery)
+        CTRL->>MERCH: getWebhookConfig(merchantId)
+        alt No config found
+            MERCH-->>CTRL: 404
+            CTRL-->>Admin: 404 Not Found
+        else Config present
+            MERCH-->>CTRL: MerchantWebhookResponse
+            CTRL->>WS: send(url, body, secret, eventId)
+            WS->>MWH: POST with X-SwiftDrop-Signature
+            alt 2xx response
+                MWH-->>WS: 200 OK
+                WS-->>CTRL: WebhookSendResult(success=true)
+                CTRL->>WDS: recordSuccess(...)
+                WDS->>DB: save replayed WebhookDelivery (SUCCESS)
+                CTRL-->>Admin: 200 WebhookDeliveryResponse (status=SUCCESS)
+            else Non-2xx
+                MWH-->>WS: 5xx
+                WS-->>CTRL: WebhookSendResult(success=false)
+                CTRL->>WDS: recordFailure(...)
+                WDS->>DB: save replayed WebhookDelivery (FAILED)
+                CTRL-->>Admin: 200 WebhookDeliveryResponse (status=FAILED)
+            end
+        end
+    end
+
