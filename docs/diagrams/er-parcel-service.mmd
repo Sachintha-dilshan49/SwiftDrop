@@ -1,0 +1,60 @@
+erDiagram
+    PARCELS ||--o{ PARCEL_STATUS_HISTORY : "has status history"
+
+    PARCELS {
+        uuid id PK "Primary key"
+        varchar_20 tracking_no UK "Unique tracking number (SD-XXXX-XXXX)"
+        uuid customer_id "Customer user ID (auth_db, no FK)"
+        uuid merchant_id "Merchant ID (merchant_db, no FK)"
+        uuid courier_id "Assigned courier ID (dispatch_db, no FK)"
+        varchar_500 pickup_address "Sender pickup address"
+        varchar_500 dropoff_address "Recipient delivery address"
+        varchar_150 recipient_name "Recipient contact name"
+        varchar_20 recipient_phone "Recipient contact phone"
+        varchar_10 size "SMALL, MEDIUM, LARGE"
+        numeric_6_2 weight_kg "Weight in kilograms (> 0)"
+        numeric_10_2 fee_amount "Fee from pricing-service (>= 0)"
+        varchar_3 fee_currency "Currency code (default LKR)"
+        varchar_20 status "CHECK: CREATED, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, FAILED"
+        varchar_500 failure_reason "Required when status is FAILED (CHECK)"
+        timestamptz created_at "Creation timestamp UTC"
+        timestamptz updated_at "Last update timestamp UTC"
+    }
+
+    PARCEL_STATUS_HISTORY {
+        uuid id PK "Primary key"
+        uuid parcel_id FK "References PARCELS(id) ON DELETE CASCADE"
+        varchar_20 status "Recorded status (same CHECK as parcels.status)"
+        uuid changed_by "User ID who triggered change"
+        varchar_50 changed_by_role "Role of user (CUSTOMER, COURIER, DISPATCHER, ADMIN, MERCHANT)"
+        varchar_500 note "Courier note or operational comment (never shown publicly)"
+        varchar_255 proof_reference "MinIO delivery proof photo key/URL"
+        timestamptz created_at "Timestamp of status change"
+        timestamptz updated_at "Last update timestamp UTC"
+    }
+
+    OUTBOX_EVENTS {
+        uuid id PK "Primary key"
+        uuid event_id UK "Unique event ID (deduplication key, AMQP messageId)"
+        uuid aggregate_id "Parcel the event belongs to (no FK)"
+        bigint seq UK "Identity; orders a parcel's events"
+        varchar_100 event_type "ParcelStatusChanged"
+        varchar_100 routing_key "parcel.status.<status>"
+        text payload "Full JSON event contract"
+        varchar_20 status "CHECK: PENDING, SENT, PARKED"
+        int retry_count "Failed publish attempts so far"
+        timestamptz next_attempt_at "Earliest next publish attempt (backoff)"
+        varchar_500 last_error "Why the last attempt failed"
+        timestamptz created_at "Recorded timestamp"
+        timestamptz updated_at "Last update timestamp UTC"
+        timestamptz sent_at "Confirmed by RabbitMQ"
+    }
+
+    PROCESSED_EVENTS {
+        uuid id PK "Primary key"
+        uuid event_id "Consumed event ID (unique with consumer_name)"
+        varchar_50 consumer_name "Consumer queue name (tracking.q)"
+        timestamptz processed_at "Processing timestamp"
+        timestamptz created_at "Record creation timestamp"
+        timestamptz updated_at "Last update timestamp UTC"
+    }

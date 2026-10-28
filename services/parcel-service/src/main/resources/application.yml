@@ -8,13 +8,62 @@ spring:
           # auth-service JWKS, called directly (not through the gateway)
           jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
 
+  datasource:
+    url: ${PARCEL_DB_URL:jdbc:postgresql://localhost:5432/parcel_db}
+    username: ${PARCEL_DB_USER:parcel}
+    password: ${PARCEL_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    open-in-view: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # The outbox relay marks an event sent only after the broker confirms it and did not return it
+    publisher-confirm-type: correlated
+    publisher-returns: true
+
 server:
   port: 8083
 
 swiftdrop:
   security:
-    # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
-    public-paths: []
+    # /internal/** stays closed until the service-to-service token contract is agreed (Roles 2, 4, 5)
+    public-paths:
+      - /api/v1/track/**
+  services:
+    pricing-url: ${PRICING_SERVICE_URL:http://localhost:8082}
+  tracking-base-url: ${TRACKING_BASE_URL:http://localhost:3000/track}
+  outbox:
+    poll-interval-ms: 1000
+    batch-size: 50
+    confirm-timeout: 5s
+    initial-backoff: 1s
+    max-backoff: 60s
+  tracking:
+    sse:
+      max-per-tracking-no: 10
+      max-total: 500
+      timeout: 30m
+      heartbeat-interval-ms: 20000
+
+rabbitmq:
+  queues:
+    tracking: tracking.q
+
+springdoc:
+  # Service-to-service endpoints stay out of the public API docs (the gateway aggregates /v3/api-docs)
+  paths-to-exclude: /internal/**
 
 management:
   endpoints:
