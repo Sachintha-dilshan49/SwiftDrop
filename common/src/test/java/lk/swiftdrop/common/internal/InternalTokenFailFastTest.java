@@ -36,6 +36,7 @@ class InternalTokenFailFastTest {
         runner.withPropertyValues("swiftdrop.internal.token=0123456789abcdef")
                 .run(context -> assertThat(context).hasNotFailed()
                         .hasBean("swiftDropInternalFilterChain")
+                        .hasSingleBean(InternalRestClientFactory.class)
                         .getBeans(SecurityFilterChain.class).isNotEmpty());
     }
 

@@ -1,5 +1,6 @@
 package lk.swiftdrop.common.autoconfigure;
 
+import lk.swiftdrop.common.internal.InternalRestClientFactory;
 import lk.swiftdrop.common.internal.InternalTokenAuthenticationEntryPoint;
 import lk.swiftdrop.common.internal.InternalTokenAuthenticationFilter;
 import lk.swiftdrop.common.internal.SwiftDropInternalProperties;
@@ -31,6 +32,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  *   <li>{@code /internal/**} has its own filter chain, ordered before the JWT chain: it needs
  *       {@code X-Internal-Token} = {@code swiftdrop.internal.token} and grants {@code ROLE_INTERNAL_SERVICE}.
  *       A user JWT does not open it, and the internal token does not open any other path.</li>
+ *   <li>{@link InternalRestClientFactory} for outgoing calls.</li>
  *   <li>Startup fails when the token is not set.</li>
  * </ul>
  */
@@ -63,5 +65,11 @@ public class SwiftDropInternalSecurityAutoConfiguration {
                 .authorizeHttpRequests(requests -> requests.anyRequest().hasRole("INTERNAL_SERVICE"))
                 .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(entryPoint));
         return http.build();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public InternalRestClientFactory internalRestClientFactory(SwiftDropInternalProperties properties) {
+        return new InternalRestClientFactory(properties.requiredToken());
     }
 }
