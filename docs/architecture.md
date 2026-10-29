@@ -143,7 +143,7 @@ All public routes are prefixed `/api/v1` and go through the gateway. `/internal/
 | Service | Endpoints |
 |---|---|
 | auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) · internal `GET /internal/users/{id}/contact` |
-| pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size&speed&promoCode` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` (rules in [§8](#8-pricing)) |
+| pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size&speed&promoCode` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` · internal `POST /internal/pricing/quote` (rules in [§8](#8-pricing)) |
 | parcel | `POST /parcels` · `GET /parcels` (mine) · `GET /parcels/{id}` · `GET /parcels/{id}/receipt` (PDF) · `GET /track/{trackingNo}` (public) · `GET /track/{trackingNo}/stream` (SSE, public) · internal `POST /internal/parcels` · internal `PATCH /internal/parcels/{id}/status` · internal `GET /internal/parcels/{id}/contacts` |
 | dispatch | `GET /dispatch/unassigned` · `POST /dispatch/assignments` · `GET /dispatch/workload` · `GET /reports/daily?from&to` · `GET /courier/deliveries/today` · `POST /courier/deliveries/{id}/status` (multipart, optional photo) |
 | merchant | `POST /merchants/register` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `POST /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key) · `GET /merchants/me/orders` · internal `GET /internal/merchants/{id}/webhook` |
@@ -175,7 +175,7 @@ The gateway does:
 - **Rate limiting** with Redis for `/api/v1/merchant-api/**`, per API key.
 - **SSE pass-through** for `/api/v1/track/{trackingNo}/stream` without response buffering.
 - **Public routes** (no JWT): `POST /api/v1/auth/login`, `/register`, `/refresh`, the Google OAuth routes (`/api/v1/oauth2/**` and `POST /api/v1/auth/token`), and `/api/v1/track/**`.
-- **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT; the gateway rate-limits it and merchant-service verifies the key.
+- **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT. The gateway rejects requests without an `X-API-Key` header (`401`) and rate-limits per key; merchant-service verifies the key itself. (Built in the gateway task.)
 
 The gateway does **not** contain business logic or ownership checks (those are in the services, see §9), and it **never routes `/internal/**`**.
 
@@ -200,7 +200,7 @@ Used when the caller needs the answer before it can respond. Services call each 
 
 | Caller | Callee | Why |
 |---|---|---|
-| parcel | pricing | Calculate the fee when a parcel is created (never trust the client's price) |
+| parcel | pricing | `POST /internal/pricing/quote`: the fee and its breakdown when a parcel is created, for customer bookings and merchant orders (never trust the client's price) |
 | merchant | parcel | Create a parcel for a merchant order |
 | dispatch | parcel | Change parcel status (parcel owns the rules) |
 | notification | auth, merchant, parcel | Look up contact details and webhook URL/secret (events carry IDs only) |
@@ -215,6 +215,7 @@ Used when the caller needs the answer before it can respond. Services call each 
 | `GET` | `/internal/parcels/{id}/contacts` | parcel-service | notification |
 | `POST` | `/internal/parcels` | parcel-service | merchant |
 | `PATCH` | `/internal/parcels/{id}/status` | parcel-service | dispatch |
+| `POST` | `/internal/pricing/quote` | pricing-service | parcel |
 
 All of them require the header `X-Internal-Token` equal to the environment variable `INTERNAL_API_TOKEN`; missing or wrong → `401` ProblemDetail. A user's JWT does not open them. `common` enforces this for every servlet service (ADR-010). Internal endpoints are left out of the public OpenAPI docs.
 
@@ -297,7 +298,26 @@ CREATED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
 fee = route base fee + extra weight + size surcharge + express surcharge − promo
 ```
 
-The fee is calculated **only in pricing-service**. The SPA shows `GET /pricing/estimate`, but parcel-service asks pricing again when the parcel is created; a price sent by the browser is never trusted. All amounts are LKR.
+The fee is calculated **only in pricing-service**. A price sent by the browser or a merchant is never trusted. All amounts are LKR.
+
+| Endpoint | Who calls it | Purpose |
+|---|---|---|
+| `GET /api/v1/pricing/estimate` (public, through the gateway) | Booking screen, AI assistant (`estimate_fee`) | Show the expected fee before booking |
+| `POST /internal/pricing/quote` (internal, `X-Internal-Token`) | parcel-service, for customer bookings and merchant orders | The binding fee when the parcel is created |
+
+Both use the same rules below. parcel-service stores the quote's `total` **and** its breakdown with the parcel, so the receipt shows how the fee was made up even if the rules change later.
+
+```json
+// POST /internal/pricing/quote
+{ "pickupZone": "COLOMBO_SOUTH", "dropoffZone": "COLOMBO_CENTRAL", "weightKg": 1.2,
+  "size": "SMALL", "speed": "EXPRESS", "promoCode": "DROP100" }
+
+// 200 OK
+{ "routeType": "NEIGHBOURING", "baseFee": 350.00, "weightFee": 40.00, "sizeFee": 0.00,
+  "expressFee": 100.00, "discount": 100.00, "total": 390.00, "currency": "LKR" }
+```
+
+`promoCode` is optional. An unknown or expired promo code, or a weight that does not fit the size, returns `400` ProblemDetail.
 
 ### Zones
 
@@ -348,7 +368,7 @@ The weight must fit the size; otherwise the request fails with `400` (validation
 
 ### Promo codes
 
-A promo code in `promo_codes` takes a fixed amount off, e.g. `DROP100` = −100. The fee never goes below 0.
+A promo code in `promo_codes` takes a fixed amount off, e.g. `DROP100` = −100. The fee never goes below 0: the `discount` is at most the fee before the promo.
 
 ### Worked example
 
@@ -390,13 +410,13 @@ Sequence diagrams for these go in the design PDF.
 1. SPA calls `GET /pricing/estimate` and shows the fee.
 2. Customer confirms → `POST /parcels` with JWT.
 3. Gateway verifies the token and routes to parcel-service.
-4. parcel-service asks pricing for the fee again (never trusts the client), then in one transaction saves the parcel (CREATED), a history row and an outbox row.
+4. parcel-service gets the binding fee from pricing (`POST /internal/pricing/quote`, never trusts the client), then in one transaction saves the parcel (CREATED) with the fee breakdown, a history row and an outbox row.
 5. Relay publishes `parcel.status.created`; API returns `201` with the tracking number.
 
 ### 10.2 Merchant creates an order through the API
 1. Store server → `POST /merchant-api/orders` with `X-API-Key`.
 2. Gateway applies the per-key rate limit; merchant-service verifies the key and that the merchant is APPROVED.
-3. merchant-service calls `POST /internal/parcels` with the merchantId.
+3. merchant-service calls `POST /internal/parcels` with the merchantId; parcel-service gets the fee from `POST /internal/pricing/quote` as in 10.1.
 4. CREATED event → `webhook.q` → notification-service POSTs the signed webhook to the merchant.
 
 ### 10.3 Courier updates status (triggers notifications)
