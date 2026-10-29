@@ -58,8 +58,8 @@ Every service gets error handling, request IDs, JWT security and masked logging 
 ## Quick start with Docker Compose (once the compose file exists)
 
 ```bash
-git clone https://github.com/<org-or-owner>/swiftdrop.git
-cd swiftdrop
+git clone https://github.com/Sachintha-dilshan49/SwiftDrop.git
+cd SwiftDrop
 cp deploy/compose/.env.example deploy/compose/.env   # fill in values, never commit .env
 docker compose -f deploy/compose/docker-compose.yml up --build
 ```

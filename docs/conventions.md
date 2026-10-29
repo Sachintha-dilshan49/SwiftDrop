@@ -27,6 +27,7 @@ Shared rules so nine people write code that looks like one team wrote it.
 | 409 | Conflict, e.g. invalid status transition, duplicate email |
 | 429 | Rate limit exceeded |
 | 500 | Unexpected error (generic message only) |
+| 503 | A service this request depends on timed out, is unreachable or failed (`ServiceUnavailableException`) |
 
 ### Error body (RFC 7807, produced by `common`)
 
@@ -62,6 +63,39 @@ Never include stack traces, SQL, tokens, emails, phone numbers or addresses.
 - Throw exceptions from `common` (`NotFoundException`, `ConflictException`, `ForbiddenException`, `ValidationException`); the shared `@RestControllerAdvice` maps them.
 - Logging with SLF4J, parameterised (`log.info("Parcel {} moved to {}", id, status)`), never string concatenation, never personal data.
 - No `System.out.println`, no commented-out code in PRs.
+
+### Calling another service
+
+Direct REST calls between services go through `InternalRestClientFactory` from `common` (ADR-010, `docs/architecture.md` §6.2). It adds `X-Internal-Token` and `X-Request-Id`, sets 2 s connect / 5 s read timeouts and maps errors.
+
+```java
+// config/ClientConfig.java
+@Bean
+RestClient authClient(InternalRestClientFactory clients,
+                      @Value("${swiftdrop.services.auth-url}") String authUrl) {   // AUTH_SERVICE_URL
+    return clients.create("auth-service", authUrl);
+}
+
+// in a service class
+UserContact contact = authClient.get()
+        .uri("/internal/users/{id}/contact", customerId)
+        .retrieve()
+        .body(UserContact.class);
+```
+
+| Callee answers | You get | Your client gets |
+|---|---|---|
+| 404 | `NotFoundException` (callee's type and detail) | 404, unless you catch it |
+| 409 | `ConflictException` (callee's type and detail) | 409, e.g. parcel's invalid status transition |
+| 5xx, timeout, connection refused | `ServiceUnavailableException` | 503 |
+| other 4xx | Spring's `HttpClientErrorException` | 500: your request was wrong, fix the caller |
+
+Serving `/internal/**`:
+
+- `common` already protects every `/internal/**` path: the caller needs `X-Internal-Token`, gets `ROLE_INTERNAL_SERVICE`, and a user JWT is not accepted. No `@PreAuthorize` needed for that, but request DTOs are still validated.
+- Keep internal endpoints out of the public API docs: `springdoc.paths-to-exclude: /internal/**`.
+- Each servlet service's `application.yml` has `swiftdrop.internal.token: ${INTERNAL_API_TOKEN:}`; without the variable the service does not start.
+- In tests a token is supplied automatically. Call your own internal endpoints with `header("X-Internal-Token", InternalTokenTestContextCustomizerFactory.TEST_TOKEN)`; test calls to other services with `MockRestServiceServer` bound to `clients.builder(...)` or WireMock.
 
 ## 3. Database and migrations
 

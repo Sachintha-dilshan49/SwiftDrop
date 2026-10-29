@@ -43,6 +43,7 @@ server:
   port: 8086
 
 swiftdrop:
+  internal.token: ${INTERNAL_API_TOKEN:}   # shared /internal/** token, ADR-010; startup fails if unset
   security:
     public-paths: []
   notification:

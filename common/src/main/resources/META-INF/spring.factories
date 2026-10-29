@@ -1,0 +1,3 @@
+# Read only by spring-test: supplies an internal token to Spring test contexts (see the class Javadoc)
+org.springframework.test.context.ContextCustomizerFactory=\
+lk.swiftdrop.common.internal.InternalTokenTestContextCustomizerFactory
