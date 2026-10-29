@@ -1,6 +1,6 @@
 # SwiftDrop Architecture
 
-Version 1 · 21 October 2026 · Owner: Role 1 (team lead)
+Version 1.1 · 29 October 2026 · Owner: Role 1 (team lead)
 
 This is the source of truth for how the system is built. Changes to anything here need a PR and, for big changes, an entry in [`decisions.md`](decisions.md).
 
@@ -17,6 +17,10 @@ From the assignment brief:
 - Merchant webhooks retried on failure.
 - Everything containerized and runnable with Docker Compose; Kubernetes is a bonus.
 - Secure handling of personal data: validation, hashed passwords, nothing sensitive in errors or logs.
+
+### Wording
+
+The person who picks up and delivers parcels is always a **Courier**: in the UI, API paths, code, database names, events and docs. Never "rider" or "driver". The role is `COURIER`, the service is `dispatch-service` and the courier screens live under `/courier`.
 
 ## 2. Architecture style
 
@@ -124,7 +128,7 @@ A detailed visual version is in [`diagrams/architecture-overview.html`](diagrams
 | Database | Tables |
 |---|---|
 | `auth_db` | `users`, `roles`, `user_roles`, `refresh_tokens`, `oauth_accounts` |
-| `pricing_db` | `zones`, `zone_districts`, `pricing_rules` |
+| `pricing_db` | `zones`, `zone_districts`, `pricing_rules`, `promo_codes` |
 | `parcel_db` | `parcels`, `parcel_status_history`, `outbox_events`, `processed_events` |
 | `dispatch_db` | `couriers`, `assignments`, `delivery_proofs`, `daily_stats`, `processed_events` |
 | `merchant_db` | `merchants`, `api_keys`, `webhook_endpoints` |
@@ -138,11 +142,11 @@ All public routes are prefixed `/api/v1` and go through the gateway. `/internal/
 
 | Service | Endpoints |
 |---|---|
-| auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) |
-| pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` |
-| parcel | `POST /parcels` · `GET /parcels` (mine) · `GET /parcels/{id}` · `GET /parcels/{id}/receipt` (PDF) · `GET /track/{trackingNo}` (public) · `GET /track/{trackingNo}/stream` (SSE, public) · internal `PATCH /internal/parcels/{id}/status` · internal `POST /internal/parcels` |
+| auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) · internal `GET /internal/users/{id}/contact` |
+| pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size&speed&promoCode` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` (rules in [§8](#8-pricing)) |
+| parcel | `POST /parcels` · `GET /parcels` (mine) · `GET /parcels/{id}` · `GET /parcels/{id}/receipt` (PDF) · `GET /track/{trackingNo}` (public) · `GET /track/{trackingNo}/stream` (SSE, public) · internal `POST /internal/parcels` · internal `PATCH /internal/parcels/{id}/status` · internal `GET /internal/parcels/{id}/contacts` |
 | dispatch | `GET /dispatch/unassigned` · `POST /dispatch/assignments` · `GET /dispatch/workload` · `GET /reports/daily?from&to` · `GET /courier/deliveries/today` · `POST /courier/deliveries/{id}/status` (multipart, optional photo) |
-| merchant | `POST /merchants/register` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `POST /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key) · `GET /merchants/me/orders` |
+| merchant | `POST /merchants/register` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `POST /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key) · `GET /merchants/me/orders` · internal `GET /internal/merchants/{id}/webhook` |
 | notification | `GET /admin/webhook-deliveries` · `POST /admin/webhook-deliveries/{id}/replay` |
 | ai-assistant | `POST /assistant/chat` · MCP endpoint `/mcp` (tools: `track_parcel`, `estimate_fee`, `my_parcels`) |
 
@@ -150,22 +154,71 @@ Each service publishes its OpenAPI spec at `/v3/api-docs`; the gateway aggregate
 
 ## 6. Communication
 
-### Synchronous (request/reply over REST)
+There are three ways traffic moves, and each has one job:
 
-Used when the caller needs the answer before it can respond.
+| From → to | How | Pattern |
+|---|---|---|
+| Browser, merchant server → system | HTTPS through the **API gateway only** | Facade / single entry point |
+| Service → service, answer needed now | Direct REST/HTTP + JSON on the private network | Request/reply |
+| Service → services, "this happened" | RabbitMQ `parcel.events` | Publish/subscribe |
+
+### 6.1 External clients → API gateway
+
+External clients (the SPA in a browser, merchant store servers) reach the system **only** through `api-gateway`. Service ports are not exposed outside the private network.
+
+The gateway does:
+
+- **Routing** by path prefix (table below). The `/api/v1` prefix is kept; services see the full path.
+- **JWT check** on every non-public route, using auth-service's JWKS (fetched once and cached, refreshed on unknown key IDs).
+- **CORS** for the SPA origin.
+- **`X-Request-Id`**: creates one if the client did not send it and forwards it; every service logs it.
+- **Rate limiting** with Redis for `/api/v1/merchant-api/**`, per API key.
+- **SSE pass-through** for `/api/v1/track/{trackingNo}/stream` without response buffering.
+- **Public routes** (no JWT): `POST /api/v1/auth/login`, `/register`, `/refresh`, the Google OAuth routes (`/api/v1/oauth2/**` and `POST /api/v1/auth/token`), and `/api/v1/track/**`.
+- **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT; the gateway rate-limits it and merchant-service verifies the key.
+
+The gateway does **not** contain business logic or ownership checks (those are in the services, see §9), and it **never routes `/internal/**`**.
+
+| Path | Service |
+|---|---|
+| `/api/v1/auth/**`, `/api/v1/oauth2/**`, `/api/v1/admin/users/**` | `auth-service:8081` |
+| `/api/v1/pricing/**`, `/api/v1/admin/zones/**`, `/api/v1/admin/pricing-rules/**` | `pricing-service:8082` |
+| `/api/v1/parcels/**`, `/api/v1/track/**` | `parcel-service:8083` |
+| `/api/v1/dispatch/**`, `/api/v1/courier/**`, `/api/v1/reports/**` | `dispatch-service:8084` |
+| `/api/v1/merchants/**`, `/api/v1/merchant-api/**`, `/api/v1/admin/merchants/**` | `merchant-service:8085` |
+| `/api/v1/admin/webhook-deliveries/**` | `notification-service:8086` |
+| `/api/v1/assistant/**` | `ai-assistant:8087` |
+| `/internal/**` | not routed |
+
+### 6.2 Service-to-service (request/reply over REST)
+
+Used when the caller needs the answer before it can respond. Services call each other **directly** with Spring `RestClient`, HTTP + JSON, on the private network by service name (e.g. `http://pricing-service:8082`). Not through the gateway, not gRPC.
+
+- Base URLs come from environment variables: `AUTH_SERVICE_URL`, `PRICING_SERVICE_URL`, `PARCEL_SERVICE_URL`, `MERCHANT_SERVICE_URL`.
+- Timeouts: 2 s connect, 5 s read. A timeout or 5xx from the callee becomes `503 Service Unavailable` for the caller's client.
+- Calls to `/internal/**` carry `X-Internal-Token` (see below). The shared `InternalRestClientFactory` in `common` sets it up (`docs/conventions.md`, "Calling another service").
 
 | Caller | Callee | Why |
 |---|---|---|
-| Gateway | All services | Routing of client requests |
-| parcel | pricing | Calculate the fee when a parcel is created |
+| parcel | pricing | Calculate the fee when a parcel is created (never trust the client's price) |
 | merchant | parcel | Create a parcel for a merchant order |
 | dispatch | parcel | Change parcel status (parcel owns the rules) |
-| notification | auth, merchant | Look up contact details and webhook URL/secret |
+| notification | auth, merchant, parcel | Look up contact details and webhook URL/secret (events carry IDs only) |
 | ai-assistant | gateway | Call public APIs with the user's token |
 
-Service-to-service calls use Spring `RestClient` with timeouts (2 s connect, 5 s read) and forward the caller's JWT or a service token.
+#### Internal endpoints
 
-### Asynchronous (publish/subscribe over RabbitMQ)
+| Method | Path | Service | Used by |
+|---|---|---|---|
+| `GET` | `/internal/users/{id}/contact` | auth-service | notification |
+| `GET` | `/internal/merchants/{id}/webhook` | merchant-service | notification |
+| `GET` | `/internal/parcels/{id}/contacts` | parcel-service | notification |
+| `POST` | `/internal/parcels` | parcel-service | merchant |
+| `PATCH` | `/internal/parcels/{id}/status` | parcel-service | dispatch |
+
+All of them require the header `X-Internal-Token` equal to the environment variable `INTERNAL_API_TOKEN`; missing or wrong → `401` ProblemDetail. A user's JWT does not open them. `common` enforces this for every servlet service (ADR-010). Internal endpoints are left out of the public OpenAPI docs.
+
+### 6.3 Asynchronous (publish/subscribe over RabbitMQ)
 
 - Exchange `parcel.events`, type **topic**, durable.
 - Routing key: `parcel.status.<status>` in lower case, e.g. `parcel.status.out_for_delivery`.
@@ -177,6 +230,16 @@ Service-to-service calls use Spring `RestClient` with timeouts (2 s connect, 5 s
 | `webhook.q` | `parcel.status.#` | notification-service | POST to merchant webhook if `merchantId` is set |
 | `dispatch.q` | `parcel.status.#` | dispatch-service | Update daily counters for reports |
 | `tracking.q` | `parcel.status.#` | parcel-service | Push the change to open SSE connections |
+
+### Who is notified
+
+| Parcel booked by | Email | SMS | Webhook |
+|---|---|---|---|
+| Customer (`merchantId` is null) | the customer | the recipient | — |
+| Merchant (`merchantId` set) | the recipient | the recipient | signed POST to the merchant's webhook URL |
+
+- Email on every status change; SMS on `OUT_FOR_DELIVERY`, `DELIVERED` and `FAILED`.
+- Events carry IDs only, so notification-service looks up contacts at send time: the customer from auth-service (`/internal/users/{id}/contact`), the recipient from parcel-service (`/internal/parcels/{id}/contacts`), the webhook URL and secret from merchant-service (`/internal/merchants/{id}/webhook`).
 
 ### Webhook retry
 
@@ -228,15 +291,89 @@ CREATED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
 - Only the assigned courier (or a dispatcher/admin) can move a parcel past CREATED.
 - Every change writes a row to `parcel_status_history` with who, when, note and optional proof reference.
 
-## 8. Security
+## 8. Pricing
+
+```
+fee = route base fee + extra weight + size surcharge + express surcharge − promo
+```
+
+The fee is calculated **only in pricing-service**. The SPA shows `GET /pricing/estimate`, but parcel-service asks pricing again when the parcel is created; a price sent by the browser is never trusted. All amounts are LKR.
+
+### Zones
+
+| Zone | Areas | Group |
+|---|---|---|
+| Colombo Central | Colombo 01–03 | `COLOMBO` |
+| Colombo South | Colombo 04–06 | `COLOMBO` |
+| Colombo North | Colombo 07–15 | `COLOMBO` |
+| Kotte & Rajagiriya | | `SUBURBS` |
+| Nugegoda & Maharagama | | `SUBURBS` |
+| Dehiwala & Mt Lavinia | | `SUBURBS` |
+| Inter-city | Kandy, Galle, Negombo | `INTER_CITY` |
+
+### Route base fee
+
+The route type comes from the pickup and drop-off zones, checked in this order:
+
+| Route type | When | Base fee |
+|---|---|---|
+| `INTER_CITY` | either end is in the `INTER_CITY` group | 650 |
+| `SAME_ZONE` | both ends in the same zone | 300 |
+| `NEIGHBOURING` | different zones in the same group (e.g. Colombo South → Colombo Central) | 350 |
+| `COLOMBO_SUBURBS` | one end `COLOMBO`, the other `SUBURBS` | 400 |
+
+### Weight
+
+- The first kg is included; each extra kg costs 40, rounded **up** to the next whole kg (1.2 kg → 1 extra kg → 40).
+- Maximum 40 kg.
+
+### Size
+
+| Size | Surcharge | Max weight |
+|---|---|---|
+| `SMALL` | +0 | 5 kg |
+| `MEDIUM` | +100 | 10 kg |
+| `LARGE` | +250 | 20 kg |
+| `EXTRA_LARGE` | +500 | 40 kg |
+
+The weight must fit the size; otherwise the request fails with `400` (validation error).
+
+### Speed
+
+| Speed | Promise | Surcharge |
+|---|---|---|
+| `EXPRESS` | within 3 hours | +100 |
+| `STANDARD` | today by 8 PM | +0 |
+| `NEXT_DAY` | tomorrow by 6 PM | +0 |
+
+### Promo codes
+
+A promo code in `promo_codes` takes a fixed amount off, e.g. `DROP100` = −100. The fee never goes below 0.
+
+### Worked example
+
+Colombo South → Colombo Central, 1.2 kg, `SMALL`, `EXPRESS`:
+
+| Part | Amount |
+|---|---|
+| Base fee (`NEIGHBOURING`) | 350 |
+| Extra weight (1 kg) | 40 |
+| Size (`SMALL`) | 0 |
+| Express | 100 |
+| **Fee** | **490** |
+| Promo `DROP100` | −100 |
+| **Fee with promo** | **390** |
+
+## 9. Security
 
 | Concern | Decision |
 |---|---|
 | Passwords | BCrypt (strength 12). Google users have no password. |
 | Tokens | Access JWT signed with RS256, 15 min. Refresh token 7 days, rotated on use, stored hashed. |
-| Token verification | Gateway and every service verify with the public key from `auth-service` JWKS. No shared secret. The JWKS endpoint `GET /.well-known/jwks.json` is internal: services call auth-service directly (`JWT_JWK_SET_URI`, e.g. `http://auth-service:8081/.well-known/jwks.json` in Docker, `http://localhost:8081/...` locally); the gateway does not route it. |
+| Token verification | Gateway and every service verify user JWTs with the public key from `auth-service` JWKS; no shared secret for user tokens. The JWKS endpoint `GET /.well-known/jwks.json` is internal: services call auth-service directly (`JWT_JWK_SET_URI`, e.g. `http://auth-service:8081/.well-known/jwks.json` in Docker, `http://localhost:8081/...` locally); the gateway does not route it. |
 | Roles | `CUSTOMER`, `MERCHANT`, `COURIER`, `DISPATCHER`, `ADMIN` in the `roles` claim; `@PreAuthorize` on endpoints. |
 | Ownership | Checked in the service layer: courier ↔ assignment, customer ↔ parcel, merchant ↔ order. |
+| Service-to-service | `/internal/**` requires `X-Internal-Token` = `INTERNAL_API_TOKEN`, compared in constant time; callers get `ROLE_INTERNAL_SERVICE`. A user JWT does not open it. Services refuse to start without the token (ADR-010). |
 | Merchant API | `X-API-Key`, shown once, stored as SHA-256 hash, prefix kept for lookup, rate-limited per key in the gateway. Merchant must be APPROVED. |
 | Google login | Authorization Code flow handled by auth-service; SPA receives a one-time code and exchanges it for our tokens. |
 | Input | Bean Validation on all DTOs; frontend validates with zod too. |
@@ -245,40 +382,40 @@ CREATED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED
 | Secrets | Environment variables (`.env` locally, Kubernetes Secrets in the cluster). Nothing in Git. |
 | Transport | HTTPS at the Ingress in Kubernetes; services on an internal network only. |
 
-## 9. Key flows
+## 10. Key flows
 
 Sequence diagrams for these go in the design PDF.
 
-### 9.1 Customer creates a delivery
+### 10.1 Customer creates a delivery
 1. SPA calls `GET /pricing/estimate` and shows the fee.
 2. Customer confirms → `POST /parcels` with JWT.
 3. Gateway verifies the token and routes to parcel-service.
 4. parcel-service asks pricing for the fee again (never trusts the client), then in one transaction saves the parcel (CREATED), a history row and an outbox row.
 5. Relay publishes `parcel.status.created`; API returns `201` with the tracking number.
 
-### 9.2 Merchant creates an order through the API
+### 10.2 Merchant creates an order through the API
 1. Store server → `POST /merchant-api/orders` with `X-API-Key`.
 2. Gateway applies the per-key rate limit; merchant-service verifies the key and that the merchant is APPROVED.
 3. merchant-service calls `POST /internal/parcels` with the merchantId.
 4. CREATED event → `webhook.q` → notification-service POSTs the signed webhook to the merchant.
 
-### 9.3 Courier updates status (triggers notifications)
+### 10.3 Courier updates status (triggers notifications)
 1. Courier → `POST /courier/deliveries/{id}/status` with note and optional photo.
 2. dispatch-service checks the assignment belongs to this courier (403 otherwise) and stores the photo in MinIO.
 3. dispatch calls `PATCH /internal/parcels/{id}/status`; parcel-service validates the transition and writes history + outbox.
 4. The event fans out: email/SMS, merchant webhook, report counters, and SSE push to open tracking pages.
 
-### 9.4 Login with Google (OAuth 2.0)
+### 10.4 Login with Google (OAuth 2.0)
 1. SPA redirects to `/oauth2/authorization/google` (auth-service).
 2. User signs in with Google; Google redirects back with an authorization code.
 3. auth-service exchanges the code, finds or creates the user (role CUSTOMER), and creates a one-time code.
 4. Browser is redirected to `/auth/callback?code=…`; SPA calls `POST /auth/token` to get our JWT and refresh token.
 
-## 10. Design patterns
+## 11. Design patterns
 
 | Pattern | Where |
 |---|---|
-| Strategy | Pricing rules (weight-based, zone-based, express surcharge) |
+| Strategy | Pricing components: route base fee, extra weight, size, speed, promo ([§8](#8-pricing)) |
 | State | Parcel status transitions |
 | Observer / publish-subscribe | Status events to four consumers |
 | Repository | Spring Data JPA in every service |
@@ -288,7 +425,7 @@ Sequence diagrams for these go in the design PDF.
 | Template method | Webhook retry handling |
 | DRY / SOLID | Shared `common` library; single-purpose services; constructor injection |
 
-## 11. Deployment
+## 12. Deployment
 
 ### Local (Docker Compose)
 
@@ -318,7 +455,7 @@ All containers have health checks; services wait for their dependencies to be he
 - On every PR to `dev`: build, unit + integration tests (Testcontainers), JaCoCo coverage report, frontend lint + test, Docker build check.
 - On merge to `main`: build and push images to GHCR tagged with the version and commit SHA.
 
-## 12. Tech stack
+## 13. Tech stack
 
 | Area | Choice |
 |---|---|

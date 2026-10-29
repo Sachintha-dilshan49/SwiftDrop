@@ -72,6 +72,8 @@ Format: **ID · title · status · date**, then context, decision, consequences.
 
 **Consequences.** Services stay independent, which is the point of ADR-001; a shared database would couple them and invite cross-service joins. Owners can explain their own tables in the viva. No single person blocks seven others. Consistency comes from `docs/conventions.md` §3 and the lead's review rather than from one author.
 
+**Reconfirmed** by the team on 2026-10-29; one database with a schema per service was considered and rejected.
+
 ## ADR-009 · Spring Boot 4.1 line · Accepted · 2026-10-25
 
 Supersedes ADR-007 (the version line only; the rest of ADR-007 still applies).
