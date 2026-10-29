@@ -89,3 +89,11 @@ Supersedes ADR-007 (the version line only; the rest of ADR-007 still applies).
 - Spring Security 7 adds a `FACTOR_BEARER` authority to JWT logins and a `resource_metadata` parameter to the `WWW-Authenticate` header.
 - The gateway uses `spring-cloud-starter-gateway-server-webflux`.
 - Testcontainers 2 modules are named `testcontainers-<module>` and containers moved to module packages, e.g. `org.testcontainers.postgresql.PostgreSQLContainer`.
+
+## ADR-010 · Shared internal token for service-to-service calls · Accepted · 2026-10-29
+
+**Context.** Services call each other's `/internal/**` endpoints directly on the private network (contacts for notifications, webhook settings, parcel creation and status changes). The gateway never routes `/internal/**`, but anything on the network could still call them, and some calls (notification consumers, outbox relays) have no user JWT to forward. A user's JWT would also be the wrong credential: it would let a customer's token reach service-only endpoints.
+
+**Decision.** Every `/internal/**` request carries `X-Internal-Token`, equal to the environment variable `INTERNAL_API_TOKEN` (same value in all services). `common` enforces it in every servlet service with a dedicated security filter chain ordered before the JWT chain: constant-time comparison, `ROLE_INTERNAL_SERVICE` for the caller, 401 ProblemDetail otherwise; a JWT alone does not open `/internal/**`, and the internal token opens nothing else. Services refuse to start without the token. Outgoing calls use `InternalRestClientFactory`, which adds the token and request ID, applies the 2 s / 5 s timeouts and maps errors (404, 409, 503). Spring test contexts get a fixed test token automatically.
+
+**Consequences.** One small, testable mechanism the whole team can use now, with no extra infrastructure. It is coarse: every service can call every internal endpoint, there is no per-caller identity, and rotating the token means restarting all services together. The token is a secret (`.env` locally, a Kubernetes Secret in the cluster) and is never logged. A later upgrade is OAuth 2.0 client credentials: auth-service issues short-lived service tokens with per-service scopes, and the internal chain verifies them like user JWTs; callers would change only inside `InternalRestClientFactory`.
