@@ -8,14 +8,36 @@ spring:
           # auth-service JWKS, called directly (not through the gateway)
           jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
 
+  datasource:
+    url: ${MERCHANT_DB_URL:jdbc:postgresql://localhost:5432/merchant_db}
+    username: ${MERCHANT_DB_USER:merchant}
+    password: ${MERCHANT_DB_PASSWORD:merchant_pass}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    open-in-view: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
 server:
   port: 8085
 
 swiftdrop:
   internal.token: ${INTERNAL_API_TOKEN:}   # shared /internal/** token, ADR-010; startup fails if unset
   security:
-    # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
-    public-paths: []
+    # Public paths that do not require JWT
+    public-paths:
+      - /api/v1/merchants/register
+      - /merchants/register
+      - /internal/**
+      - /merchant-api/**
+  services:
+    parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
 
 management:
   endpoints:
