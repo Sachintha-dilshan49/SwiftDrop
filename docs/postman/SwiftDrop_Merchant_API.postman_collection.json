@@ -1,0 +1,149 @@
+{
+  "info": {
+    "_postman_id": "8f3b2d10-4e2a-4c8a-9f5b-112233445566",
+    "name": "SwiftDrop Merchant Platform API",
+    "description": "Collection for testing SwiftDrop Role 5: Merchant Service endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Public - Register Merchant",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"businessName\": \"Apex Technologies (Pvt) Ltd\",\n  \"businessRegNo\": \"PV-998877\",\n  \"contactName\": \"Nimal Jayasinghe\",\n  \"email\": \"orders@apextech.lk\",\n  \"phone\": \"+94771234567\",\n  \"address\": \"No. 45, Galle Road, Colombo 03\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/merchants/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "merchants", "register"]
+        }
+      }
+    },
+    {
+      "name": "2. Admin - List Pending Merchants",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/merchants?status=PENDING",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "admin", "merchants"],
+          "query": [
+            { "key": "status", "value": "PENDING" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Admin - Approve Merchant",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/admin/merchants/{{merchantId}}/approve",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "admin", "merchants", "{{merchantId}}", "approve"]
+        }
+      }
+    },
+    {
+      "name": "4. Merchant - Create API Key",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{merchantToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Shopify Store Integration\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/merchants/me/api-keys",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "merchants", "me", "api-keys"]
+        }
+      }
+    },
+    {
+      "name": "5. External - Create Order (X-API-Key)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-API-Key", "value": "{{apiKey}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"recipientName\": \"Kasun Perera\",\n  \"recipientPhone\": \"+94719876543\",\n  \"pickupAddress\": \"No. 45, Galle Road, Colombo 03\",\n  \"dropoffAddress\": \"No. 88, Kandy Road, Kiribathgoda\",\n  \"weightKg\": 2.50,\n  \"size\": \"MEDIUM\",\n  \"idempotencyKey\": \"shopify-order-10029\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/merchant-api/orders",
+          "host": ["{{baseUrl}}"],
+          "path": ["merchant-api", "orders"]
+        }
+      }
+    },
+    {
+      "name": "6. Merchant - View Order Dashboard",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{merchantToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/merchants/me/orders",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "merchants", "me", "orders"]
+        }
+      }
+    },
+    {
+      "name": "7. Merchant - Configure Webhook",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{merchantToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"webhookUrl\": \"https://apextech.lk/api/swiftdrop/webhook\",\n  \"rotateSecret\": false\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/merchants/me/webhook",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "merchants", "me", "webhook"]
+        }
+      }
+    },
+    {
+      "name": "8. Internal (Role 6) - Get Webhook & Secret",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/internal/merchants/{{merchantId}}/webhook",
+          "host": ["{{baseUrl}}"],
+          "path": ["internal", "merchants", "{{merchantId}}", "webhook"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8085" },
+    { "key": "merchantToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "apiKey", "value": "" },
+    { "key": "merchantId", "value": "" }
+  ]
+}
