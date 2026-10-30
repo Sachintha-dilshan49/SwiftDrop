@@ -48,9 +48,12 @@ package "parcel_db (parcel-service)" {
     merchant_id : UUID → merchants
     courier_id : UUID → couriers
     * pickup_address : VARCHAR(500)
+    * pickup_zone : VARCHAR(30)
     * dropoff_address : VARCHAR(500)
+    * dropoff_zone : VARCHAR(30)
     * recipient_name : VARCHAR(150)
     * recipient_phone : VARCHAR(20)
+    recipient_email : VARCHAR(254)
     * size : VARCHAR(20)
     * weight_kg : NUMERIC(6,2)
     * speed : VARCHAR(10)
@@ -139,6 +142,7 @@ note top of parcels
   tracking_no matches
      ^SD-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$
   customer_id or merchant_id must be set
+  recipient_email required when merchant_id is set
   failure_reason required when status = FAILED
   weight_kg > 0, fee_amount >= 0
 end note
@@ -159,9 +163,18 @@ service's API).
 route_type to discount are copied
 from pricing-service's quote;
 fee_amount is the quote total.
+pickup_zone and dropoff_zone are
+the zones sent to the quote.
 The receipt shows how the fee was
 made up even if the pricing rules
 change later.
+
+<b>Recipient details</b>
+Personal data: shown only to the
+parcel's owner, dispatchers and
+admins, and to notification-service
+(/internal/parcels/{id}/contacts);
+never in events or public tracking.
 ]
 couriers -[hidden]down- N1
 

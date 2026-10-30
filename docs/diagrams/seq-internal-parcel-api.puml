@@ -1,0 +1,131 @@
+@startuml
+' newpage splits the diagram so each page fits landscape A4: PlantUML exports
+' seq-internal-parcel-api.png, seq-internal-parcel-api_001.png, ... (one file per page).
+title Sequence Diagram - Internal Parcel API (1 of 4)
+caption SwiftDrop parcel-service (Role 3)
+
+hide footbox
+autonumber
+skinparam dpi 200
+skinparam shadowing false
+skinparam maxMessageSize 110
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam BoxPadding 6
+skinparam sequence {
+  ArrowColor black
+  LifeLineBorderColor #555555
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+  BoxBorderColor black
+  BoxBackgroundColor #F2F2F2
+  GroupBorderColor black
+  GroupBackgroundColor #E8E8E8
+  DividerBorderColor black
+  DividerBackgroundColor #E8E8E8
+}
+skinparam database {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+participant "merchant-service\n:8085" as MS
+participant "notification-service\n:8086" as NS
+box "parcel-service :8083" #F2F2F2
+  participant "Internal-token\nfilter (common)" as SEC
+  participant "InternalParcel\nController" as ICTRL
+  participant "ParcelService" as SVC
+  participant "PricingService\nClient" as PC
+end box
+participant "pricing-service\n:8082" as PR
+database "parcel_db" as DB
+
+== 1. Merchant order creates a parcel ==
+note over MS
+  merchant-service has already checked
+  the X-API-Key and that the merchant
+  is APPROVED (seq-merchant-order, Role 5).
+end note
+MS -> SEC : POST /internal/parcels\nX-Internal-Token\n(InternalRestClientFactory)\n{merchantId, pickupAddress,\npickupZone, dropoffAddress,\ndropoffZone, recipientName,\nrecipientPhone, recipientEmail,\nsize, weightKg, speed}
+SEC -> SEC : compare with\nINTERNAL_API_TOKEN\n(constant time)
+alt missing or wrong token
+  SEC --> MS : 401 ProblemDetail
+end
+SEC -> ICTRL : forward\n(ROLE_INTERNAL_SERVICE)
+ICTRL -> ICTRL : @Valid request\n(no fee field is accepted)
+alt invalid or missing fields
+  ICTRL --> MS : 400 ProblemDetail\nwith field errors
+end
+ICTRL -> SVC : createMerchantParcel(\nrequest)
+newpage Sequence Diagram - Internal Parcel API (2 of 4)
+== 1. Merchant order creates a parcel (continued) ==
+SVC -> PC : getQuote(pickupZone,\ndropoffZone, weightKg,\nsize, speed)
+PC -> PR : POST /internal/pricing/quote\n(X-Internal-Token)
+alt valid quote
+  PR --> PC : 200 {routeType, baseFee,\nweightFee, sizeFee, expressFee,\ndiscount, total, currency}
+  PC --> SVC : quote
+else weight does not fit the size
+  PR --> PC : 400 ProblemDetail
+  PC --> MS : 400 validation error\n(via SVC, ICTRL), nothing saved
+else pricing down, slow or unreachable
+  PR --> PC : 5xx / timeout
+  PC --> MS : 503 Service Unavailable\n(via SVC, ICTRL), nothing saved
+end
+
+newpage Sequence Diagram - Internal Parcel API (3 of 4)
+== 1. Merchant order creates a parcel (continued) ==
+SVC -> DB : generate tracking number\nSD-XXXX-XXXX and check\nit is not already used
+group One transaction (@Transactional)
+  SVC -> DB : INSERT parcels\n(merchant_id, customer_id = null,\nzones, recipient_email,\nfee breakdown, status CREATED)
+  SVC -> DB : INSERT parcel_status_history\n(CREATED, changed_by = merchantId,\nrole MERCHANT,\nnote "Merchant order created")
+  SVC -> DB : INSERT outbox_events\n(ParcelStatusChanged v1 with\nmerchantId, routing key\nparcel.status.created)
+  SVC -> DB : COMMIT
+end
+SVC --> MS : 201 Created\nLocation: /internal/parcels/{id}\n{id, trackingNo, status: CREATED,\nfeeAmount, feeCurrency}\n(via ICTRL)
+note over SVC, DB
+  The fee always comes from the pricing quote; a fee sent by
+  a merchant is never used (architecture section 8). The outbox
+  relay then publishes parcel.status.created, and webhook.q leads
+  notification-service to send the signed webhook to the merchant.
+end note
+
+newpage Sequence Diagram - Internal Parcel API (4 of 4)
+== 2. notification-service looks up the recipient ==
+note over NS
+  Runs for each ParcelStatusChanged
+  event. Events carry IDs only, so the
+  contact details are fetched here.
+end note
+NS -> SEC : GET /internal/parcels/\n{parcelId}/contacts\nX-Internal-Token
+SEC -> SEC : compare with\nINTERNAL_API_TOKEN
+alt missing or wrong token
+  SEC --> NS : 401 ProblemDetail
+end
+SEC -> ICTRL : forward\n(ROLE_INTERNAL_SERVICE)
+ICTRL -> SVC : getContacts(parcelId)
+SVC -> DB : SELECT recipient_name,\nrecipient_phone, recipient_email\nWHERE id = parcelId
+alt unknown parcel
+  SVC --> NS : 404 Not Found (via ICTRL)
+end
+SVC --> NS : 200 {recipientName,\nrecipientPhone, recipientEmail}\n(via ICTRL)
+note over NS
+  Who is notified (architecture 6.3):
+  customer booking: email to the customer
+  (from auth-service), SMS to the recipient;
+  merchant order: email and SMS to the
+  recipient. SMS only on OUT_FOR_DELIVERY,
+  DELIVERED and FAILED.
+end note
+note over SEC, DB
+  The reply is personal data: private network only, internal token
+  required, never logged (masked) and never put into events.
+  recipientEmail is null for customer bookings.
+  Status changes from dispatch-service use PATCH
+  /internal/parcels/{id}/status: see activity-parcel-status-update.
+end note
+
+@enduml
