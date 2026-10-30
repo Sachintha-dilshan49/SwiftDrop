@@ -1,0 +1,124 @@
+@startuml
+' newpage splits the diagram so each page fits landscape A4: PlantUML exports
+' seq-live-tracking.png, seq-live-tracking_001.png, ... (one file per page).
+title Sequence Diagram - Real-Time Parcel Tracking (SSE) (1 of 4)
+caption SwiftDrop parcel-service (Role 3)
+
+hide footbox
+autonumber
+skinparam dpi 200
+skinparam shadowing false
+skinparam maxMessageSize 110
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam BoxPadding 6
+skinparam sequence {
+  ArrowColor black
+  LifeLineBorderColor #555555
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+  ActorBorderColor black
+  ActorBackgroundColor white
+  BoxBorderColor black
+  BoxBackgroundColor #F2F2F2
+  GroupBorderColor black
+  GroupBackgroundColor #E8E8E8
+  DividerBorderColor black
+  DividerBackgroundColor #E8E8E8
+}
+skinparam database {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam queue {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+actor "Visitor\n(phone,\nno login)" as V
+participant "Tracking page\n(React,\nEventSource)" as FE
+participant "API Gateway\n:8080" as GW
+box "parcel-service :8083" #F2F2F2
+  participant "PublicTracking\nController" as CTRL
+  participant "ParcelService" as SVC
+  participant "TrackingService\n(open SSE streams)" as TS
+  participant "OutboxRelay" as RELAY
+  participant "TrackingEvent\nConsumer" as CONS
+end box
+database "parcel_db" as DB
+queue "RabbitMQ\nparcel.events\n-> tracking.q" as MQ
+participant "dispatch-service\n:8084" as DS
+
+== 1. Open the live stream ==
+V -> FE : open /track/SD-7K3Q-9P2M
+FE -> GW : GET /api/v1/track/\nSD-7K3Q-9P2M/stream\n(Accept: text/event-stream, no JWT, public route)
+GW -> CTRL : forward (response buffering off so events are not delayed)
+CTRL -> CTRL : check tracking number format
+alt malformed tracking number
+  CTRL --> FE : 400 Bad Request (via GW)
+end
+CTRL -> SVC : getPublicTracking(\ntrackingNo)
+SVC -> DB : load parcel and status history
+DB --> SVC : parcel + history
+alt unknown tracking number
+  SVC --> FE : 404 Not Found (via CTRL, GW)
+end
+newpage Sequence Diagram - Real-Time Parcel Tracking (SSE) (2 of 4)
+== 1. Open the live stream (continued) ==
+SVC --> CTRL : public snapshot
+CTRL -> TS : subscribe(snapshot)
+alt over connection limit (10 per tracking number, 500 per instance)
+  CTRL --> FE : 429 Too Many Requests (via GW)
+end
+TS --> FE : SSE event "SNAPSHOT"\n{trackingNo, status, size, weightKg, createdAt, history[status, time]}
+FE --> V : show current status and timeline
+note over CTRL, TS
+  Public data only: no names, phone numbers,
+  addresses, internal IDs, notes or failure
+  reasons are sent to the tracking page.
+end note
+loop every 20 s
+  TS --> FE : heartbeat comment (keeps proxies from closing the connection)
+end
+
+newpage Sequence Diagram - Real-Time Parcel Tracking (SSE) (3 of 4)
+== 2. Courier changes the status ==
+DS -> SVC : PATCH /internal/parcels/{id}/status\nX-Internal-Token\n{status: OUT_FOR_DELIVERY} (after the courier's update)
+group One transaction (@Transactional)
+  SVC -> DB : update status + insert history row\n+ insert outbox event (PENDING)
+end
+SVC --> DS : 200 OK
+
+== 3. Event reaches the open page ==
+RELAY -> DB : pick the PENDING event
+RELAY -> MQ : publish ParcelStatusChanged\n(routing key parcel.status.out_for_delivery)
+MQ --> RELAY : publisher confirm
+RELAY -> DB : mark SENT
+newpage Sequence Diagram - Real-Time Parcel Tracking (SSE) (4 of 4)
+== 3. Event reaches the open page (continued) ==
+MQ -> CONS : deliver from tracking.q
+CONS -> DB : already in processed_events (eventId, "tracking.q")?
+alt duplicate eventId (idempotent consumer)
+  CONS -> CONS : skip
+else new event
+  CONS -> DB : INSERT processed_events
+  CONS -> TS : sendUpdate(event)
+  TS --> FE : SSE event "STATUS_CHANGE" (id = eventId)\n{trackingNo, status: OUT_FOR_DELIVERY, previousStatus: IN_TRANSIT, occurredAt}
+  FE --> V : timeline updates instantly, no page reload
+end
+
+== 4. End of stream ==
+opt status is DELIVERED or FAILED
+  TS --> FE : close the stream (no more updates can follow)
+end
+note over V, GW
+  If the connection drops, EventSource reconnects
+  automatically and receives a fresh SNAPSHOT.
+  Missed events are not replayed.
+end note
+
+@enduml

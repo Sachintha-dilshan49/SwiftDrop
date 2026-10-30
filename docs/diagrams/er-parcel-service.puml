@@ -1,0 +1,168 @@
+@startuml
+title ER Diagram - Parcel Service (parcel_db)
+caption SwiftDrop parcel-service (Role 3)
+
+allowmixing
+hide circle
+hide empty members
+skinparam dpi 200
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam nodesep 60
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor white
+  BorderColor black
+  ArrowColor black
+  HeaderBackgroundColor #EEEEEE
+}
+skinparam package {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+package "Other services (reference only)" {
+  entity "users\n(auth_db)" as users #DDDDDD {
+    id : UUID <<PK>>
+  }
+  entity "merchants\n(merchant_db)" as merchants #DDDDDD {
+    id : UUID <<PK>>
+  }
+  entity "couriers\n(dispatch_db)" as couriers #DDDDDD {
+    id : UUID <<PK>>
+  }
+}
+
+package "parcel_db (parcel-service)" {
+  entity "parcels" as parcels {
+    id : UUID <<PK>>
+    --
+    * tracking_no : VARCHAR(20) <<UK>>
+    customer_id : UUID → users
+    merchant_id : UUID → merchants
+    courier_id : UUID → couriers
+    * pickup_address : VARCHAR(500)
+    * dropoff_address : VARCHAR(500)
+    * recipient_name : VARCHAR(150)
+    * recipient_phone : VARCHAR(20)
+    * size : VARCHAR(20)
+    * weight_kg : NUMERIC(6,2)
+    * speed : VARCHAR(10)
+    promo_code : VARCHAR(30)
+    * route_type : VARCHAR(20)
+    * base_fee : NUMERIC(10,2)
+    * weight_fee : NUMERIC(10,2)
+    * size_fee : NUMERIC(10,2)
+    * express_fee : NUMERIC(10,2)
+    * discount : NUMERIC(10,2)
+    * fee_amount : NUMERIC(10,2)
+    * fee_currency : VARCHAR(3)
+    * status : VARCHAR(20)
+    failure_reason : VARCHAR(500)
+    * created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+  }
+
+  entity "parcel_status_history" as history {
+    id : UUID <<PK>>
+    --
+    * parcel_id : UUID <<FK>>
+    * status : VARCHAR(20)
+    changed_by : UUID → users
+    changed_by_role : VARCHAR(50)
+    note : VARCHAR(500)
+    proof_reference : VARCHAR(255)
+    * created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+  }
+
+  entity "outbox_events" as outbox {
+    id : UUID <<PK>>
+    --
+    * event_id : UUID <<UK>>
+    * aggregate_id : UUID → parcels
+    * seq : BIGINT <<UK>>
+    * event_type : VARCHAR(100)
+    * routing_key : VARCHAR(100)
+    * payload : TEXT
+    * status : VARCHAR(20)
+    * retry_count : INT
+    * next_attempt_at : TIMESTAMPTZ
+    last_error : VARCHAR(500)
+    * created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+    sent_at : TIMESTAMPTZ
+  }
+
+  entity "processed_events\n(idempotent consumer, tracking.q)" as processed {
+    id : UUID <<PK>>
+    --
+    * event_id : UUID
+    * consumer_name : VARCHAR(50)
+    * processed_at : TIMESTAMPTZ
+    * created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+    ..
+    UNIQUE (event_id, consumer_name)
+  }
+}
+
+' layout helpers
+users -[hidden]down- merchants
+merchants -[hidden]down- couriers
+outbox -[hidden]right- processed
+
+' relationships inside parcel_db
+parcels ||-right-|{ history : "has"
+parcels ||.down.o{ outbox
+
+' logical references to other services
+users |o.right.o{ parcels
+merchants |o.right.o{ parcels
+couriers |o.right.o{ parcels
+users |o..o{ history
+
+note top of parcels
+  <b>CHECK constraints</b>
+  status IN (CREATED, PICKED_UP, IN_TRANSIT,
+     OUT_FOR_DELIVERY, DELIVERED, FAILED)
+  size IN (SMALL, MEDIUM, LARGE, EXTRA_LARGE)
+  speed IN (EXPRESS, STANDARD, NEXT_DAY)
+  route_type IN (SAME_ZONE, NEIGHBOURING,
+     COLOMBO_SUBURBS, INTER_CITY)
+  tracking_no matches
+     ^SD-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$
+  customer_id or merchant_id must be set
+  failure_reason required when status = FAILED
+  weight_kg > 0, fee_amount >= 0
+end note
+
+' legend is a rectangle, not a note: a hidden link to a note is still drawn
+rectangle N1 #white [
+<b>Lines</b>
+Solid: foreign key
+(parcel_status_history.parcel_id,
+ON DELETE CASCADE).
+Dashed: logical reference, the ID
+is stored without a foreign key
+(database per service; the data is
+fetched through the owning
+service's API).
+
+<b>Fee breakdown</b>
+route_type to discount are copied
+from pricing-service's quote;
+fee_amount is the quote total.
+The receipt shows how the fee was
+made up even if the pricing rules
+change later.
+]
+couriers -[hidden]down- N1
+
+@enduml
