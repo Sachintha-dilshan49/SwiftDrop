@@ -37,15 +37,25 @@ Repository: <https://github.com/Sachintha-dilshan49/SwiftDrop> (design state: br
 
 # 1. Introduction and scope
 
-SwiftDrop is a parcel delivery and courier management platform for Colombo and nearby cities. Customers book and track deliveries, merchants send orders from their online stores through an API, couriers update deliveries from their phones, and dispatchers and admins run daily operations. Anyone with a tracking number can follow a parcel live without logging in.
+SwiftDrop is a parcel delivery and courier management platform for Colombo and nearby cities. Customers book and track deliveries. Merchants send orders from their online stores through an API. Couriers update deliveries from their phones, and dispatchers and admins run the day's operations. Anyone with a tracking number can follow a parcel live without logging in.
 
-The system is a set of Spring Boot microservices behind a Spring Cloud Gateway, with a React single-page app, PostgreSQL (one database per service), RabbitMQ for status events, Redis for rate limits and MinIO for delivery photos. It runs with one Docker Compose command; a Helm chart for Kubernetes is the bonus target.
+The system is a set of Spring Boot microservices behind a Spring Cloud Gateway. It uses a React single-page app, PostgreSQL (one database per service), RabbitMQ for status events, Redis for rate limits and MinIO for delivery photos. One Docker Compose command starts everything; a Helm chart for Kubernetes is the bonus target.
 
-**In scope:** four user types plus guests with role-based access; JWT authentication and Google login (OAuth 2.0); booking with a server-side fee; a strict parcel status lifecycle; real-time tracking with Server-Sent Events; asynchronous status events that trigger email, SMS and signed merchant webhooks with retry; dispatcher assignment and daily reports; an AI assistant with tools that call our own APIs; containerised deployment and CI.
+**In scope:**
+
+- four user types plus guests, with role-based access
+- JWT authentication and Google login (OAuth 2.0)
+- booking with a fee calculated on the server
+- a strict parcel status lifecycle
+- real-time tracking with Server-Sent Events
+- status events that trigger email, SMS and signed merchant webhooks, with retry
+- dispatcher assignment and daily reports
+- an AI assistant whose tools call our own APIs
+- containerised deployment and CI
 
 **Out of scope:** online payment, route optimisation, real SMS gateways (SMS is mocked) and native mobile apps (the SPA is mobile-first).
 
-This report describes the design that the team agreed and records the implementation state on 01 November 2026. `docs/architecture.md` v1.2 in the repository is the source of truth; every diagram in this report was checked against it.
+This report describes the design the team agreed on and the implementation state on 01 November 2026. `docs/architecture.md` v1.2 in the repository is the source of truth, and every diagram here was checked against it.
 
 # 2. Requirements
 
@@ -102,7 +112,7 @@ This report describes the design that the team agreed and records the implementa
 
 # 3. Use case diagrams
 
-The overview shows every actor and its main use cases; the per-actor diagrams add the detail. «include» marks a step that always happens; «extend» marks an optional one with its condition.
+The overview shows every actor and its main use cases. The per-actor diagrams add the detail. «include» marks a step that always happens; «extend» marks an optional step and its condition.
 
 ![Figure 1. All actors and their main use cases](../diagrams/usecase/uc-system-overview.png)
 
@@ -114,7 +124,7 @@ The overview shows every actor and its main use cases; the per-actor diagrams ad
 
 ![Figure 4. Customer tracking, history, receipts and notifications](../diagrams/usecase/uc-customer-tracking.png)
 
-**Customer (Figures 3–4).** Booking always includes the address, recipient, parcel and fee-estimate steps. Only the owner, a dispatcher or an admin can see a parcel; anyone else gets `404`, so parcel IDs cannot be probed. Both figures were recreated from Supuni's originals (Role 7) to match the pricing model and notification rules. Supuni's other customer diagrams are in the repository: the overview `UC-00_customer_overview`, account and sign-in `UC-01_customer_account`, and the AI assistant `UC-04_customer_ai_assistant`.
+**Customer (Figures 3–4).** Booking always includes the address, recipient, parcel and fee-estimate steps. Only the owner, a dispatcher or an admin can see a parcel. Anyone else gets `404`, so parcel IDs cannot be probed. Both figures are redrawn from Supuni's originals (Role 7) to match the pricing model and notification rules. Her other customer diagrams are in the repository: `UC-00_customer_overview`, `UC-01_customer_account` (account and sign-in) and `UC-04_customer_ai_assistant`.
 
 ![Figure 5. Merchant, merchant store server and admin approval](../diagrams/usecase/uc-merchant.png)
 
@@ -124,13 +134,13 @@ The overview shows every actor and its main use cases; the per-actor diagrams ad
 
 ![Figure 7. Dispatcher and Admin](../diagrams/usecase/uc-dispatcher-admin.png)
 
-**Courier, Dispatcher and Admin (Figures 6–7).** A courier can only update deliveries assigned to them. Admin generalises Dispatcher, so the admin-only use cases (merchants, users, zones and pricing) sit on top of the dispatcher's operational ones.
+**Courier, Dispatcher and Admin (Figures 6–7).** A courier can only update deliveries assigned to them. Admin generalises Dispatcher: an admin can do everything a dispatcher can, plus the admin-only use cases (merchants, users, zones and pricing).
 
 # 4. Architecture
 
 ## 4.1 Overview and layers
 
-SwiftDrop is a set of **microservices behind an API gateway**. External traffic enters only through the gateway; services call each other with REST when they need an answer, and publish events to RabbitMQ when something happened.
+SwiftDrop is a set of microservices behind an API gateway. External traffic enters only through the gateway. Services call each other with REST when they need an answer, and publish an event to RabbitMQ when something has happened.
 
 ![Figure 8. System by layer: presentation, edge, business logic, integration and data](../diagrams/architecture/arch-system-overview.png)
 
@@ -142,7 +152,7 @@ SwiftDrop is a set of **microservices behind an API gateway**. External traffic 
 | Integration | RabbitMQ exchange and queues | Asynchronous status events, webhook retry |
 | Data | PostgreSQL (one database per service), Redis, MinIO | Persistence, rate-limit counters, proof photos |
 
-Inside each service the same three layers repeat (Figure 9). Controllers validate requests and check roles, services hold the business rules and transactions, and repositories are the only code that touches the database. The shared `common` library adds the security filter chains, the RFC 7807 error handler and log masking to every service automatically.
+Each service repeats the same three layers inside (Figure 9). Controllers validate requests and check roles. Services hold the business rules and transactions. Repositories are the only code that touches the database. The shared `common` library adds the security filter chains, the RFC 7807 error handler and log masking to every service without extra code.
 
 ![Figure 9. Presentation, business logic and data layers inside one request (parcel-service)](../diagrams/architecture/arch-layered-service.png)
 
@@ -164,15 +174,15 @@ Inside each service the same three layers repeat (Figure 9). Controllers validat
 
 ![Figure 10. Deployment: Docker Compose (implemented) and Kubernetes with Helm (planned)](../diagrams/architecture/arch-deployment.png)
 
-Locally, `docker compose up --build` starts the infrastructure, the seven services, the gateway and the frontend; only the frontend (3000) and the gateway (8080) need to be reachable from the browser. In Kubernetes, ingress-nginx sends `/` to the frontend and `/api` to the gateway, with response buffering switched off so SSE works. Each service is a Deployment with a ClusterIP Service and Actuator health probes; secrets come from Kubernetes Secrets. GitHub Actions builds and tests every pull request and pushes images to GHCR on release.
+Locally, `docker compose up --build` starts the infrastructure, the seven services, the gateway and the frontend. The browser only needs to reach the frontend (3000) and the gateway (8080). In Kubernetes, ingress-nginx sends `/` to the frontend and `/api` to the gateway, with response buffering off so SSE works. Each service is a Deployment with a ClusterIP Service and Actuator health probes, and secrets come from Kubernetes Secrets. GitHub Actions builds and tests every pull request and pushes images to GHCR on release.
 
 ## 4.4 Justification
 
-**Microservices instead of a modular monolith (ADR-001).** The brief allows a layered monolith, a modular monolith or microservices. A modular monolith would be simpler to run and debug. We chose microservices because each of the nine members owns, tests and demonstrates an independent service; the brief's integration patterns (publish/subscribe, broker, webhooks) then cross real network boundaries instead of in-process calls; and the Kubernetes bonus deploys several independent workloads. To keep the cost manageable we skip a service registry and a config server (Compose and Kubernetes DNS resolve names; configuration comes from environment variables) and run one PostgreSQL server with a separate database per service. The team reconfirmed this on 25 October.
+**Microservices instead of a modular monolith (ADR-001).** The brief allows a layered monolith, a modular monolith or microservices. A modular monolith would be simpler to run and debug. We chose microservices for three reasons. Each of the nine members owns, tests and demonstrates an independent service. The brief's integration patterns (publish/subscribe, broker, webhooks) then cross real network boundaries instead of being in-process calls. And the Kubernetes bonus has several independent workloads to deploy. To keep the setup small, we skip a service registry and a config server: Compose and Kubernetes DNS resolve service names, and configuration comes from environment variables. One PostgreSQL server holds a separate database per service. The team reconfirmed this choice on 25 October.
 
-**Spring Boot 4.1 and Spring Cloud 2025.1 (ADR-009).** One supported, compatible set for the gateway, security, data, messaging and Spring AI, supported until mid-2027, so no upgrade is needed during the project. Java 21 is the target.
+**Spring Boot 4.1 and Spring Cloud 2025.1 (ADR-009).** These versions work together for the gateway, security, data, messaging and Spring AI, and they are supported until mid-2027, so the project needs no upgrade. Java 21 is the target.
 
-**Database per service (ADR-008).** Each service owns its schema and Flyway migrations; there are no foreign keys or queries across databases. A shared database was considered and rejected twice, because it couples services and invites cross-service joins. Consistency comes from shared conventions and the team lead's review of every migration.
+**Database per service (ADR-008).** Each service owns its schema and its Flyway migrations. No foreign keys or queries cross databases. The team considered a shared database twice and rejected it both times: it couples the services and invites cross-service joins. Consistency comes from shared conventions and the team lead's review of every migration.
 
 **Custom auth-service instead of Keycloak (ADR-006).** The auth owner has real, testable code to explain, and local setup stays light.
 
@@ -190,13 +200,13 @@ Locally, `docker compose up --build` starts the infrastructure, the seven servic
 
 ![Figure 12. RabbitMQ topology: outbox publisher, topic exchange, four queues and the webhook retry queues](../diagrams/integration/int-rabbitmq-topology.png)
 
-**Broker (ADR-002).** One durable topic exchange `parcel.events` with routing key `parcel.status.<status>`. Each consumer has its own queue bound to `parcel.status.#`, so a slow or failed consumer does not affect the others. Events carry IDs only; consumers fetch contact details at send time, so no personal data travels through the broker.
+**Broker (ADR-002).** There is one durable topic exchange, `parcel.events`, with routing key `parcel.status.<status>`. Each consumer has its own queue bound to `parcel.status.#`, so a slow or failed consumer does not hold up the others. Events carry IDs only. Consumers fetch contact details when they send, so no personal data passes through the broker.
 
-**Reliable publishing (ADR-005).** parcel-service writes the event to `outbox_events` in the same transaction as the status change; a relay publishes it with publisher confirms and marks it sent. If RabbitMQ is down, events wait in the table instead of being lost.
+**Reliable publishing (ADR-005).** parcel-service writes the event to `outbox_events` in the same transaction as the status change. A relay then publishes it with publisher confirms and marks it sent. If RabbitMQ is down, events wait in the table and are not lost.
 
-**Idempotent consumers.** Every consumer stores the `eventId` in its own `processed_events` table and skips duplicates, because the broker guarantees at-least-once delivery.
+**Idempotent consumers.** The broker delivers each message at least once, so a message can arrive twice. Every consumer stores the `eventId` in its own `processed_events` table and skips duplicates.
 
-**Webhook retry.** A failed delivery goes to `webhook.retry.10s`, then `1m`, then `5m`; each TTL queue dead-letters back to `webhook.q`. After the fourth failure the message is parked, and a dispatcher or admin can replay it. Every attempt is recorded in `webhook_deliveries`.
+**Webhook retry.** A failed delivery goes to `webhook.retry.10s`, then `1m`, then `5m`. Each of these TTL queues dead-letters back to `webhook.q`. After the fourth failure the message is parked until a dispatcher or admin replays it. `webhook_deliveries` records every attempt.
 
 # 6. Data design
 
@@ -214,13 +224,13 @@ Locally, `docker compose up --build` starts the infrastructure, the seven servic
 
 ![Figure 14. auth_db — identity only (users, roles, tokens, Google accounts, one-time login codes)](../diagrams/er/er-auth-db.png)
 
-`auth_db` holds identity only (ADR-011). Refresh tokens and one-time Google login codes are stored as SHA-256 hashes; a refresh token points to its replacement, so a reused token can revoke the whole chain. Role 2's first migration also created `merchant_profiles` and `courier_profiles`; they are left out on purpose and will be removed (section 13).
+`auth_db` holds identity only (ADR-011). Refresh tokens and one-time Google login codes are stored as SHA-256 hashes. Each refresh token points to its replacement, so reusing an old token can revoke the whole chain. Role 2's first migration also created `merchant_profiles` and `courier_profiles`. They are left out of the diagram on purpose and will be removed (section 13).
 
 ![Figure 15. pricing_db (design)](../diagrams/er/er-pricing-db.png)
 
 ![Figure 16. parcel_db (Sanduni, Role 3)](../diagrams/er-parcel-service.png)
 
-`parcel_db` keeps the status history with who, role, note and proof reference, and the outbox and processed-event tables for messaging. Check constraints enforce the status values, the tracking-number format and "failure reason only with `FAILED`".
+`parcel_db` keeps the status history (who, role, note and proof reference) and the outbox and processed-event tables used for messaging. Check constraints enforce the status values, the tracking-number format and "failure reason only with `FAILED`".
 
 ![Figure 17. dispatch_db — proposed design, pending review by Tharuki (Role 4)](../diagrams/er/er-dispatch-db.png)
 
@@ -244,25 +254,25 @@ Locally, `docker compose up --build` starts the infrastructure, the seven servic
 
 ![Figure 20e. Outbox relay publishes the event](../diagrams/seq-create-delivery_004.png)
 
-The SPA shows an estimate first. On confirm, the gateway and parcel-service both verify the JWT; parcel-service then asks pricing-service for the binding quote over the internal API and saves the parcel, its first history row and the outbox event in one transaction. The relay publishes `parcel.status.created` about a second later. If pricing is down the booking fails with `503`; there is no fallback price.
+The SPA shows an estimate first. When the customer confirms, the gateway and parcel-service both verify the JWT. parcel-service asks pricing-service for the binding quote over the internal API, then saves the parcel, its first history row and the outbox event in one transaction. The relay publishes `parcel.status.created` about a second later. If pricing is down, the booking fails with `503`. There is no fallback price.
 
 ## 7.2 Sequence 2: Merchant creates an order through the API
 
 ![Figure 21. Merchant API order](../diagrams/sequence/seq-merchant-api-order.png)
 
-The gateway rejects calls without `X-API-Key` (`401`) or over the per-key rate limit (`429`). merchant-service looks the key up by its SHA-256 hash and checks the merchant is approved. An idempotency key in the body makes store retries safe. The parcel is created through parcel-service's internal API with the same pricing rules as a customer booking, and the merchant later receives a signed webhook.
+The gateway rejects calls without `X-API-Key` (`401`) or over the per-key rate limit (`429`). merchant-service looks the key up by its SHA-256 hash and checks the merchant is approved. An idempotency key in the body makes it safe for the store to retry. parcel-service creates the parcel through its internal API, with the same pricing rules as a customer booking. The merchant later receives a signed webhook.
 
 ## 7.3 Sequence 3: Courier status update triggers notifications
 
 ![Figure 22. Courier status update and event fan-out](../diagrams/sequence/seq-courier-status-notification.png)
 
-dispatch-service checks the courier owns the assignment and stores an optional photo in MinIO, then asks parcel-service to change the status; only parcel-service knows the transition rules. After the commit, one event fans out in parallel: email and SMS, the merchant webhook, report counters, and a push to open tracking pages.
+dispatch-service checks that the courier owns the assignment and stores the photo, if any, in MinIO. It then asks parcel-service to change the status, because only parcel-service knows the transition rules. After the commit, one event fans out in parallel to email and SMS, the merchant webhook, the report counters and any open tracking pages.
 
 ## 7.4 Sequence 4: Login with Google (OAuth 2.0)
 
 ![Figure 23. Google login with the Authorization Code flow](../diagrams/sequence/seq-oauth2-google-login.png)
 
-The gateway forwards Spring Security's default paths `/oauth2/**` and `/login/oauth2/**` to auth-service unchanged. auth-service exchanges Google's code on the back channel, finds, links or creates the user (new users get `CUSTOMER`), and redirects the SPA with a one-time code valid for two minutes. The SPA exchanges it for our own JWT and refresh token, so Google's tokens never reach the browser.
+The gateway forwards Spring Security's default paths `/oauth2/**` and `/login/oauth2/**` to auth-service unchanged. auth-service exchanges Google's code on the back channel and finds, links or creates the user (new users get `CUSTOMER`). It then redirects the SPA with a one-time code that is valid for two minutes. The SPA swaps this code for our own JWT and refresh token, so Google's tokens never reach the browser.
 
 ## 7.5 Flowcharts
 
@@ -276,13 +286,13 @@ The gateway forwards Spring Security's default paths `/oauth2/**` and `/login/oa
 
 ![Figure 26. Webhook delivery, retry and replay](../diagrams/flowchart/flow-webhook-retry.png)
 
-**Webhook retry (Figure 26).** Four attempts over about six minutes, each recorded; then the message is parked until a person replays it, so a broken merchant endpoint cannot block the queue.
+**Webhook retry (Figure 26).** There are four attempts over about six minutes, and each one is recorded. After that the message is parked until someone replays it, so a broken merchant endpoint cannot block the queue.
 
 ![Figure 27. Login, Google login, token refresh and logout](../diagrams/flowchart/flow-login.png)
 
 ![Figure 28. How every request is authenticated and authorized](../diagrams/flowchart/flow-request-authorization.png)
 
-**Login and authorization (Figures 27–28).** Wrong credentials get one generic `401`. Access tokens last 15 minutes; refresh tokens rotate on every use, and a reused one revokes the chain. Every request then passes the same checks in order: credential, role, ownership, validation.
+**Login and authorization (Figures 27–28).** Wrong credentials get one generic `401`. Access tokens last 15 minutes. Refresh tokens rotate on every use, and reusing an old one revokes the chain. After login, every request passes the same checks in the same order: credential, role, ownership, validation.
 
 ![Figure 29. Merchant lifecycle — from branch feature/merchant, not yet merged (Sudari, Role 5)](img/activity-merchant-branch.png)
 
@@ -313,7 +323,7 @@ The gateway forwards Spring Security's default paths `/oauth2/**` and `/login/oa
 fee = route base fee + extra weight + size surcharge + express surcharge − promo
 ```
 
-The fee is calculated only in pricing-service. The public estimate (`GET /api/v1/pricing/estimate`) shows the expected fee; when a parcel is created, parcel-service asks for the binding quote (`POST /internal/pricing/quote`) and stores the total and its breakdown. A fee sent by a browser or a merchant is never used.
+Only pricing-service calculates fees. The public estimate (`GET /api/v1/pricing/estimate`) shows the expected fee. When a parcel is created, parcel-service asks for the binding quote (`POST /internal/pricing/quote`) and stores the total with its breakdown. A fee sent by a browser or a merchant is never used.
 
 | Component | Rule |
 |---|---|
@@ -337,7 +347,7 @@ The fee is calculated only in pricing-service. The public estimate (`GET /api/v1
 
 ![Figure 30. Pricing as a Strategy pattern (design)](../diagrams/architecture/class-pricing-strategy.png)
 
-**Strategy pattern.** Each component is a separate `FeeComponent` strategy. `FeeCalculator` applies them in order and builds the breakdown. A new surcharge, such as a fragile-item fee, is a new class, without changing the calculator (open/closed principle). The amounts live in `pricing_rules` and `promo_codes`, so admins change prices without a deployment.
+**Strategy pattern.** Each component is a separate `FeeComponent` strategy. `FeeCalculator` applies them in order and builds the breakdown. Adding a surcharge, such as a fragile-item fee, means adding one class; the calculator stays the same (open/closed principle). The amounts live in `pricing_rules` and `promo_codes`, so admins can change prices without a deployment.
 
 # 10. Design patterns and principles
 
@@ -452,7 +462,7 @@ From `git log` on `dev` (merge commits excluded) and the open branches, 31 Octob
 
 | Member | Role | Modules (commits on `dev`) | Diagrams authored |
 |---|---|---|---|
-| N.L. Sachintha Dilshan | 1 · Team lead | `common`, `docs`, service skeletons, CI set-up, `pricing-service` and `api-gateway` (started) · 39 commits | All diagrams in `usecase/`, `er/` (except parcel), `architecture/`, `integration/`, `sequence/`, `flowchart/`, corrections credited to their original authors; prepared with Claude Code (AI coding assistant), as the commit trailers record |
+| N.L. Sachintha Dilshan | 1 · Team lead | `common`, `docs`, service skeletons, CI set-up, `pricing-service` and `api-gateway` (started) · 39 commits | All diagrams in `usecase/`, `er/` (except parcel), `architecture/`, `integration/`, `sequence/`, `flowchart/`, corrections credited to their original authors |
 | Thulani Jayathilake | 2 · Auth | `auth-service`, frontend login and dashboards · 3 commits (PR #26) | Auth use case, auth architecture, password login, refresh token, Google login and internal contact lookup (the last two recreated) |
 | Sanduni Liyanage | 3 · Parcel | `parcel-service` · 10 commits | Create delivery, live tracking, history and receipt, internal parcel API, parcel_db ER, status lifecycle, status update activity, parcel components |
 | Tharuki | 4 · Dispatch | No commits yet | None yet; reviewer of the proposed `dispatch_db` design and the courier part of the status sequence |
@@ -502,3 +512,7 @@ Full text: `docs/decisions.md`.
 | SSE | Server-Sent Events: a one-way stream from server to browser over HTTP |
 | Tracking number | Public parcel reference in the form `SD-XXXX-XXXX` |
 | Webhook | HTTP callback from SwiftDrop to a merchant's server when a parcel changes |
+
+## 16.3 Use of AI tools
+
+Team members used AI coding assistants (Claude Code, GitHub Copilot) for parts of the code, the diagrams and this report; the commit trailers in the repository show where.
