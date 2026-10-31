@@ -65,7 +65,7 @@ class NotificationServiceTest {
     @Test
     void customerBooking_sendsEmailToCustomerOnEveryStatus() {
         when(authServiceClient.getUserContact(CUSTOMER_ID)).thenReturn(Optional.of(CUSTOMER_CONTACT));
-        when(parcelServiceClient.getRecipientContacts(PARCEL_ID)).thenReturn(Optional.empty());
+        // parcelServiceClient not called for non-SMS statuses (PICKED_UP)
 
         service.processStatusChange(buildCustomerEvent(ParcelStatus.CREATED, ParcelStatus.PICKED_UP));
 
@@ -118,7 +118,6 @@ class NotificationServiceTest {
     @Test
     void customerBooking_skipsEmailWhenCustomerContactNotFound() {
         when(authServiceClient.getUserContact(CUSTOMER_ID)).thenReturn(Optional.empty());
-        when(parcelServiceClient.getRecipientContacts(PARCEL_ID)).thenReturn(Optional.empty());
 
         service.processStatusChange(buildCustomerEvent(ParcelStatus.CREATED, ParcelStatus.PICKED_UP));
 
@@ -139,7 +138,6 @@ class NotificationServiceTest {
     @Test
     void customerBooking_recordsEmailAsFailedWhenSmtpFails() {
         when(authServiceClient.getUserContact(CUSTOMER_ID)).thenReturn(Optional.of(CUSTOMER_CONTACT));
-        when(parcelServiceClient.getRecipientContacts(PARCEL_ID)).thenReturn(Optional.empty());
         doThrow(new NotificationSendException("SMTP error", new RuntimeException()))
                 .when(emailChannel).send(anyString(), anyString(), anyString());
 
@@ -154,7 +152,6 @@ class NotificationServiceTest {
     @Test
     void customerBooking_emailBodyContainsTrackingUrl() {
         when(authServiceClient.getUserContact(CUSTOMER_ID)).thenReturn(Optional.of(CUSTOMER_CONTACT));
-        when(parcelServiceClient.getRecipientContacts(PARCEL_ID)).thenReturn(Optional.empty());
 
         service.processStatusChange(buildCustomerEvent(ParcelStatus.CREATED, ParcelStatus.PICKED_UP));
 
