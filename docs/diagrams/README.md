@@ -9,7 +9,7 @@ Export every diagram for the design PDF here (PNG or SVG plus the source file).
 - `.puml` files render with PlantUML ([plantuml.com](https://www.plantuml.com/plantuml) or the VS Code PlantUML extension). Diagrams split to fit A4 export one PNG per page: `name.png`, `name_001.png`, …
 - When a teammate's diagram had to be corrected, the corrected version credits them in its header comment. Image diagrams that were recreated keep the original as `<name>-original.*`.
 
-All diagrams are checked against [`architecture.md`](../architecture.md) v1.1.
+All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 
 ## Report set — design report, 1 November 2026
 
@@ -26,6 +26,7 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.1.
 | Use case | `usecase/uc-courier.mmd` | Courier day list and status updates | Role 1, Role 4 to review |
 | Use case | `usecase/uc-dispatcher-admin.mmd` | Dispatcher and Admin (Admin generalises Dispatcher) | Role 1 |
 | Use case | `usecase/uc-notification.mmd` | notification-service | Based on Thisaru's `usecase-notification.mmd` (Role 6) |
+| Use case | `Auth-Use case diagram.png` | auth-service use cases for all roles | Thulani (Role 2) |
 | ER | `er/er-overview.mmd` | Six databases, foreign keys vs logical references | Role 1 |
 | ER | `er/er-auth-db.mmd` | `auth_db` | From Thulani's migrations (Role 2) |
 | ER | `er/er-pricing-db.mmd` | `pricing_db` | Role 1 |
@@ -37,12 +38,15 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.1.
 | Architecture | `architecture/arch-layered-service.mmd` | Presentation → business logic → data inside one service | Role 1 |
 | Architecture | `arch-parcel-service.puml` | parcel-service components | Sanduni (Role 3) |
 | Architecture | `architecture/arch-notification-service.mmd` | notification-service components | Based on Thisaru's `arch-notification.mmd` (Role 6) |
+| Architecture | `Auth-Architecture diagram.png` | auth-service context | Thulani (Role 2) |
 | Integration | `integration/int-communication-styles.mmd` | Gateway, request/reply, pub/sub, webhook, SSE | Role 1 |
 | Integration | `integration/int-rabbitmq-topology.mmd` | Exchange, queues, retry and parking queues, idempotency | Role 1 with Role 6 |
 | Sequence 1 | `seq-create-delivery.puml` | Customer creates a delivery (5 pages) | Sanduni (Role 3) |
 | Sequence 2 | `sequence/seq-merchant-api-order.mmd` | Merchant API order | Based on Sudari's `seq-merchant-order.md` (Role 5) |
 | Sequence 3 | `sequence/seq-courier-status-notification.mmd` | Courier status update → notifications | Based on Thisaru's `seq-courier-status.mmd` (Role 4 + 6) |
 | Sequence 4 | `sequence/seq-oauth2-google-login.mmd` | OAuth 2.0 login with Google | Based on Thulani's `seq-google-login.mmd` (Role 2) |
+| Sequence | `Login flow (emailmobile + password).png`, `Refresh token flow.png` | Password login, token refresh | Thulani (Role 2) |
+| Sequence | `sequence/seq-internal-contact-lookup.mmd` | Internal contact lookup with `X-Internal-Token` | Recreated from Thulani's image (Role 2) |
 | Sequence | `sequence/seq-notification-email-sms.mmd` | Email and SMS for one event | Based on Thisaru's `seq-notification-email-sms.mmd` (Role 6) |
 | Sequence | `seq-webhook-retry.mmd`, `seq-webhook-replay.mmd` | Webhook retry, admin replay | Thisaru (Role 6) |
 | Sequence | `seq-live-tracking.puml`, `seq-parcel-history-receipt.puml`, `seq-internal-parcel-api.puml` | Live tracking, history and receipt, internal parcel API | Sanduni (Role 3) |
@@ -82,3 +86,10 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.1.
 | `er-merchant.md` | ER — `merchant_db` | Role 5 | Current; rendered as `er/er-merchant-db.mmd` |
 | `seq-merchant-order.md` | Sequence — merchant API order creation | Role 5 | Superseded by `sequence/seq-merchant-api-order.mmd` |
 | `architecture-overview.html` | Architecture overview (21 Oct) | Role 1 | Out of date; superseded by `architecture/arch-system-overview.mmd` |
+| `seq-google-login.mmd` | Sequence — Google login | Role 2 | Superseded by `sequence/seq-oauth2-google-login.mmd` (gateway, Spring default OAuth paths) |
+| `Auth-Use case diagram.png` | Use case — auth-service | Role 2 | Current |
+| `Auth-Architecture diagram.png` | Architecture — auth-service context | Role 2 | Current |
+| `Login flow (emailmobile + password).png` | Sequence — password login | Role 2 | Current |
+| `Refresh token flow.png` | Sequence — refresh token rotation | Role 2 | Current |
+| `Google OAuth login flow-original.png` | Sequence — Google login | Role 2 | Superseded by `sequence/seq-oauth2-google-login.mmd`: browser bypassed the gateway |
+| `Internal contact lookup flow-original.png` | Sequence — internal contact lookup | Role 2 | Superseded by `sequence/seq-internal-contact-lookup.mmd`: showed a bearer JWT instead of `X-Internal-Token` |
