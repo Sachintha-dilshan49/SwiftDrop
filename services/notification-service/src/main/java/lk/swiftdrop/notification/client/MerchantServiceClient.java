@@ -1,12 +1,12 @@
 package lk.swiftdrop.notification.client;
 
+import lk.swiftdrop.common.error.SwiftDropException;
 import lk.swiftdrop.notification.client.dto.MerchantWebhookResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +20,11 @@ public class MerchantServiceClient {
         this.restClient = restClient;
     }
 
+    /**
+     * Fetches the webhook configuration (URL + secret) for a merchant from merchant-service.
+     * Returns empty if the merchant has no webhook configured (404) or if merchant-service is unavailable.
+     * The InternalRestClientFactory maps 404 → NotFoundException and I/O failures → ServiceUnavailableException.
+     */
     public Optional<MerchantWebhookResponse> getWebhookConfig(UUID merchantId) {
         try {
             MerchantWebhookResponse response = restClient.get()
@@ -27,7 +32,7 @@ public class MerchantServiceClient {
                     .retrieve()
                     .body(MerchantWebhookResponse.class);
             return Optional.ofNullable(response);
-        } catch (RestClientException e) {
+        } catch (SwiftDropException e) {
             log.error("Failed to fetch webhook config for merchant {}: {}", merchantId, e.getMessage());
             return Optional.empty();
         }

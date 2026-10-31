@@ -52,6 +52,7 @@ swiftdrop:
   services:
     auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
     merchant-url: ${MERCHANT_SERVICE_URL:http://localhost:8085}
+    parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
 
 rabbitmq:
   queues:
