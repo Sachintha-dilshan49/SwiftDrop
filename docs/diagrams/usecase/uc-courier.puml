@@ -1,0 +1,40 @@
+@startuml uc-courier
+' Use case — Courier · Role 1 (Role 4 to review)
+' Source: docs/architecture.md v1.2 §5 (dispatch), §7, §9, §10.3
+' Layout: "Base <.. Extension" keeps the base use case next to the actor; the arrow still points at the base.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Courier
+
+actor "Courier\n(COURIER role, phone)" as Courier
+
+rectangle "SwiftDrop" {
+  usecase "Log in" as C1
+  usecase "View today's deliveries\nGET /api/v1/courier/deliveries/today" as C2
+  usecase "View delivery details\n(pickup, drop-off, recipient contact)" as C3
+  usecase "Update delivery status\nPOST /api/v1/courier/deliveries/{id}/status" as C4
+  usecase "Add note" as C5
+  usecase "Upload proof photo" as C6
+  usecase "Mark delivery FAILED\nwith reason" as C7
+}
+
+actor "MinIO\ndelivery-proofs" as MinIO <<system>>
+actor "Email / SMS / webhook\n(via status event)" as Notify <<system>>
+
+Courier -- C1
+Courier -- C2
+Courier -- C4
+C2 <.. C3 : <<extend>>
+C4 <.. C5 : <<extend>>
+C4 <.. C6 : <<extend>>\n[DELIVERED or proof needed]
+C4 <.. C7 : <<extend>>\n[from OUT_FOR_DELIVERY]
+C6 -- MinIO
+C7 -- Notify
+
+legend bottom right
+  Allowed: CREATED → PICKED_UP → IN_TRANSIT → OUT_FOR_DELIVERY → DELIVERED | FAILED;
+  any other move → 409. Only the assigned courier may update (403 otherwise).
+  dispatch-service asks parcel-service to change the status; every change triggers
+  email, SMS and webhooks through the status event.
+endlegend
+@enduml

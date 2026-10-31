@@ -1,5 +1,5 @@
 @startuml UC-01_customer_account
-!include _style.iuml
+!include usecase/_style.iuml
 left to right direction
 title SwiftDrop – Customer Account & Sign-in
 
@@ -26,7 +26,7 @@ Customer --> C02b
 C01 ..> C01a : <<include>>
 C01 ..> C02a : <<include>>
 C02 ..> C02a : <<include>>
-C03 .> C02 : <<extend>>\n[user picks Google]
+C02 <.. C03 : <<extend>>\n[user picks Google]
 C03 -- Google
 C02b ..> C02a : <<include>>
 C04 ..> C04a : <<include>>

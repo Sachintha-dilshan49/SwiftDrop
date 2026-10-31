@@ -1,5 +1,5 @@
 @startuml UC-00_customer_overview
-!include _style.iuml
+!include usecase/_style.iuml
 skinparam PackageBorderColor #CBD5E1
 skinparam PackageBackgroundColor #FBFCFE
 skinparam PackageFontStyle bold
@@ -51,9 +51,9 @@ Customer --> C12
 Customer -- C15
 Customer --> C16
 
-C03 .> C02 : <<extend>>
+C02 <.. C03 : <<extend>>
 C05 ..> C08 : <<include>>
-C13 .> C11 : <<extend>>\n[DELIVERED]
+C11 <.. C13 : <<extend>>\n[DELIVERED]
 
 C03 --> Google
 C15 --> Notify

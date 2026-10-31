@@ -6,7 +6,8 @@ Export every diagram for the design PDF here (PNG or SVG plus the source file).
   `bash docs/diagrams/render.sh` (all) or `bash docs/diagrams/render.sh usecase/uc-guest.mmd` (one file):
   `@mermaid-js/mermaid-cli`, `mermaid-config.json`, white background, scale 2, PNG next to the source.
   Flowchart-style diagrams use the ELK layout (`layout: elk` front matter). Any `.mmd` can also be pasted into [mermaid.live](https://mermaid.live).
-- `.puml` files render with PlantUML ([plantuml.com](https://www.plantuml.com/plantuml) or the VS Code PlantUML extension). Diagrams split to fit A4 export one PNG per page: `name.png`, `name_001.png`, …
+- Use case diagrams are PlantUML (`usecase/*.puml`, shared style `usecase/_style.iuml`, stick-figure actors, Smetana layout) and are rendered by `render.sh` with the PlantUML jar in `tools/plantuml/`.
+- Other `.puml` files render with PlantUML ([plantuml.com](https://www.plantuml.com/plantuml) or the VS Code PlantUML extension). Diagrams split to fit A4 export one PNG per page: `name.png`, `name_001.png`, …
 - When a teammate's diagram had to be corrected, the corrected version credits them in its header comment. Image diagrams that were recreated keep the original as `<name>-original.*`.
 
 All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
@@ -15,17 +16,17 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 
 | Area | File | Diagram | Author / based on |
 |---|---|---|---|
-| Use case | `usecase/uc-system-overview.mmd` | All actors and their main use cases | Role 1 |
-| Use case | `usecase/uc-guest.mmd` | Guest: public tracking, live SSE, fee estimate, sign-up, merchant registration | Role 1 |
+| Use case | `usecase/uc-system-overview.puml` | All actors and their main use cases | Role 1 |
+| Use case | `usecase/uc-guest.puml` | Guest: public tracking, live SSE, fee estimate, sign-up, merchant registration | Role 1 |
 | Use case | `UC-00_customer_overview.puml` | Customer overview | Supuni (Role 7) |
 | Use case | `UC-01_customer_account.puml` | Customer account and sign-in | Supuni (Role 7) |
-| Use case | `usecase/uc-customer-booking.mmd` | Customer books a delivery | Recreated from Supuni's UC-02 (Role 7) |
-| Use case | `usecase/uc-customer-tracking.mmd` | Customer tracking, history, receipts, notifications | Recreated from Supuni's UC-03 (Role 7) |
+| Use case | `usecase/uc-customer-booking.puml` | Customer books a delivery | Recreated from Supuni's UC-02 (Role 7) |
+| Use case | `usecase/uc-customer-tracking.puml` | Customer tracking, history, receipts, notifications | Recreated from Supuni's UC-03 (Role 7) |
 | Use case | `UC-04_customer_ai_assistant.puml` | Customer AI assistant | Supuni (Role 7) |
-| Use case | `usecase/uc-merchant.mmd` | Merchant, merchant store server, admin approval | Based on Sudari's `usecase-merchant.md` (Role 5) |
-| Use case | `usecase/uc-courier.mmd` | Courier day list and status updates | Role 1, Role 4 to review |
-| Use case | `usecase/uc-dispatcher-admin.mmd` | Dispatcher and Admin (Admin generalises Dispatcher) | Role 1 |
-| Use case | `usecase/uc-notification.mmd` | notification-service | Based on Thisaru's `usecase-notification.mmd` (Role 6) |
+| Use case | `usecase/uc-merchant.puml` | Merchant, merchant store server, admin approval | Based on Sudari's `usecase-merchant.md` (Role 5) |
+| Use case | `usecase/uc-courier.puml` | Courier day list and status updates | Role 1, Role 4 to review |
+| Use case | `usecase/uc-dispatcher-admin.puml` | Dispatcher and Admin (Admin generalises Dispatcher) | Role 1 |
+| Use case | `usecase/uc-notification.puml` | notification-service | Based on Thisaru's `usecase-notification.mmd` (Role 6) |
 | Use case | `Auth-Use case diagram.png` | auth-service use cases for all roles | Thulani (Role 2) |
 | ER | `er/er-overview.mmd` | Six databases, foreign keys vs logical references | Role 1 |
 | ER | `er/er-auth-db.mmd` | `auth_db` | From Thulani's migrations (Role 2) |
@@ -63,7 +64,7 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 
 | File | Diagram | Owner | Status |
 |---|---|---|---|
-| `usecase-notification.mmd` | Use case — notification-service actors and features | Role 6 | Superseded by `usecase/uc-notification.mmd` |
+| `usecase-notification.mmd` | Use case — notification-service actors and features | Role 6 | Superseded by `usecase/uc-notification.puml` |
 | `arch-notification.mmd` | Architecture — notification-service internal structure and dependencies | Role 6 | Superseded by `architecture/arch-notification-service.mmd` |
 | `seq-notification-email-sms.mmd` | Sequence — email and SMS notification flow | Role 6 | Superseded by `sequence/seq-notification-email-sms.mmd` |
 | `seq-webhook-retry.mmd` | Sequence — webhook delivery with retry chain | Role 6 | Current |
@@ -79,12 +80,12 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 | `arch-parcel-service.puml` | Component — parcel-service endpoints, parts and dependencies (landscape) | Role 3 | Current |
 | `UC-00_customer_overview.puml` | Use case — every customer-facing use case on one page (PNG + SVG) | Role 7 | Current |
 | `UC-01_customer_account.puml` | Use case — customer sign up, log in, Google login, sessions, log out (PNG + SVG) | Role 7 | Current |
-| `UC-02_customer_booking-original.puml` | Use case — customer books a delivery with the fee estimate (PNG + SVG) | Role 7 | Superseded by `usecase/uc-customer-booking.mmd` |
-| `UC-03_customer_tracking-original.puml` | Use case — delivery history, parcel details, live and public tracking, receipts, notifications (PNG + SVG) | Role 7 | Superseded by `usecase/uc-customer-tracking.mmd` |
+| `UC-02_customer_booking-original.puml` | Use case — customer books a delivery with the fee estimate (PNG + SVG) | Role 7 | Superseded by `usecase/uc-customer-booking.puml` |
+| `UC-03_customer_tracking-original.puml` | Use case — delivery history, parcel details, live and public tracking, receipts, notifications (PNG + SVG) | Role 7 | Superseded by `usecase/uc-customer-tracking.puml` |
 | `UC-04_customer_ai_assistant.puml` | Use case — customer AI assistant questions and guardrails (PNG + SVG) | Role 7 | Current |
 | `customer-use-cases.md` | Customer actors, use case descriptions (UC-C01 – UC-C20) and main flows | Role 7 | UC-C08, C11, C13, C15 need the same text fixes as UC-02/03 |
 | `_style.iuml` | Shared PlantUML style included by the `UC-*` diagrams | Role 7 | Current |
-| `usecase-merchant.md` | Use case — merchant platform | Role 5 | Superseded by `usecase/uc-merchant.mmd` |
+| `usecase-merchant.md` | Use case — merchant platform | Role 5 | Superseded by `usecase/uc-merchant.puml` |
 | `er-merchant.md` | ER — `merchant_db` | Role 5 | Current; rendered as `er/er-merchant-db.mmd` |
 | `seq-merchant-order.md` | Sequence — merchant API order creation | Role 5 | Superseded by `sequence/seq-merchant-api-order.mmd` |
 | `architecture-overview.html` | Architecture overview (21 Oct) | Role 1 | Out of date; superseded by `architecture/arch-system-overview.mmd` |

@@ -42,3 +42,6 @@ deploy/compose/data/
 # Tooling output
 graphify-out/
 .claude/settings.local.json
+
+# PlantUML jar for rendering diagrams (download: see docs/diagrams/render.sh)
+tools/plantuml/*.jar

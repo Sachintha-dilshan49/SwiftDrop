@@ -1,0 +1,38 @@
+@startuml uc-guest
+' Use case — Guest (public, not logged in) · Role 1
+' Source: docs/architecture.md v1.2 §6.1 public routes, §6.3 real-time tracking, §8
+' Layout: "Base <.. Extension" keeps the base use case next to the actor; the arrow still points at the base.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Guest
+
+actor "Guest\n(phone or browser,\nno account)" as Guest
+
+rectangle "SwiftDrop" {
+  usecase "Track parcel by tracking number\nGET /api/v1/track/{trackingNo}" as T1
+  usecase "Follow live status updates\n(SSE stream)" as T2
+  usecase "Get fee estimate\nGET /api/v1/pricing/estimate\n(public, rate-limited)" as E1
+  usecase "Sign up as Customer\nPOST /api/v1/auth/signup" as A1
+  usecase "Log in\nPOST /api/v1/auth/login" as A2
+  usecase "Log in with Google\n(OAuth 2.0 Authorization Code)" as A3
+  usecase "Register a merchant business\nPOST /api/v1/merchants/register" as M1
+}
+
+actor "Google OAuth 2.0" as Google <<system>>
+
+Guest -- T1
+Guest -- E1
+Guest -- A1
+Guest -- A2
+Guest -- M1
+T1 <.. T2 : <<extend>>\n[page left open]
+A2 <.. A3 : <<extend>>\n[user picks Google]
+A3 -- Google
+
+legend bottom right
+  Public tracking shows status and timeline only:
+  no names, phones, addresses or notes.
+  A merchant registration stays PENDING
+  until an Admin approves it.
+endlegend
+@enduml

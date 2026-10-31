@@ -1,0 +1,50 @@
+@startuml uc-merchant
+' Use case — Merchant
+' Based on usecase-merchant.md by Sudari Ratnayake (Role 5); corrected against docs/architecture.md v1.2 §5, §6.1, §6.3, §9
+' Changes: added log in, order API path and gateway checks, signed webhook to the store, reject with reason; Admin is the approver
+' Layout: "Base <.. Extension" keeps the base use case next to the actor; the arrow still points at the base.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Merchant
+
+actor "Merchant\n(MERCHANT role)" as Merchant
+actor "Admin" as Admin
+
+rectangle "SwiftDrop" {
+  usecase "Register business\n(status PENDING)" as M1
+  usecase "Log in" as M2
+  usecase "View profile and\napproval status" as M3
+  usecase "Create API key\n(shown once)" as M4
+  usecase "Revoke API key" as M5
+  usecase "Configure webhook URL\nand signing secret" as M6
+  usecase "View orders and\ntheir tracking" as M7
+  usecase "Review pending merchants" as A1
+  usecase "Approve merchant" as A2
+  usecase "Reject merchant\nwith reason" as A3
+  usecase "Create parcel order via API\nPOST /api/v1/merchant-api/orders\n(X-API-Key)" as M8
+  usecase "Receive signed status webhook\n(X-SwiftDrop-Signature)" as M9
+}
+
+actor "Merchant store server\n(e-commerce backend)" as Store <<system>>
+
+Merchant -- M1
+Merchant -- M2
+Merchant -- M3
+Merchant -- M4
+Merchant -- M5
+Merchant -- M6
+Merchant -- M7
+Admin -- A1
+A1 <.. A2 : <<extend>>
+A1 <.. A3 : <<extend>>
+M8 -- Store
+M9 -- Store
+' layout only: keep the store server in a column right of the boundary
+A2 -[hidden]- Store
+
+legend bottom right
+  API keys and orders only for APPROVED merchants.
+  Gateway: 401 without X-API-Key, 429 over the per-key rate limit.
+  merchant-service: revoked or expired key → 401, not APPROVED → 403.
+endlegend
+@enduml

@@ -1,0 +1,45 @@
+@startuml uc-customer-tracking
+' Use case — Customer tracking, history and receipts
+' Recreated from UC-03_customer_tracking.puml by Supuni (Role 7); original kept as ../UC-03_customer_tracking-original.*
+' Fixes per docs/architecture.md v1.2 §6.3 and parcel-service design (Role 3): receipt is available for any own parcel
+' (not only DELIVERED); another customer's parcel returns 404 (not 403); SMS only on 3 statuses and goes to the recipient
+' Layout: "Base <.. Extension" keeps the base use case next to the actor; the arrow still points at the base.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Customer tracking, history and receipts
+
+actor "Customer" as Customer
+actor "Guest\n(not logged in)" as Guest
+
+rectangle "SwiftDrop" {
+  usecase "Receive status\nnotifications" as C15
+  usecase "View my deliveries\n(delivery history)" as C10
+  usecase "View parcel details" as C11
+  usecase "View status history\n(who, when, note, proof)" as C11a
+  usecase "Download receipt (PDF)" as C13
+  usecase "Track parcel by\ntracking number (public)" as C14
+  usecase "Follow live updates\n(Server-Sent Events)" as C12
+}
+
+actor "Email / SMS\ngateway" as Notify <<system>>
+actor "Recipient\n(no account)" as Recipient
+
+Customer -- C15
+Customer -- C10
+Customer -- C11
+Customer -- C14
+Guest -- C14
+C11 ..> C11a : <<include>>
+C11 <.. C13 : <<extend>>
+C14 <.. C12 : <<extend>>\n[not DELIVERED or FAILED]
+C15 -- Notify
+Recipient -- C15
+' layout only: keep the gateway in a column right of the boundary; the Recipient is a person, so it sits with the people on the left
+C11a -[hidden]- Notify
+
+legend bottom right
+  Only the owner, a Dispatcher or an Admin sees a parcel; anyone else gets 404,
+  so parcel IDs cannot be probed. Customer booking: email to the customer on every
+  change; SMS to the recipient on OUT_FOR_DELIVERY, DELIVERED and FAILED.
+endlegend
+@enduml

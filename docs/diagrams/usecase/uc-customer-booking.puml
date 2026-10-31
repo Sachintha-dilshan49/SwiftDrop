@@ -1,0 +1,41 @@
+@startuml uc-customer-booking
+' Use case — Customer books a delivery
+' Recreated from UC-02_customer_booking.puml by Supuni (Role 7); original kept as ../UC-02_customer_booking-original.*
+' Fixes: pricing model per docs/architecture.md v1.2 §8 (was "zone + base fare + per-km rate"); added speed, promo code and recipient
+' Layout: ".>" (single dot) keeps "Get fee estimate" in the actor's column; "Base <.. Extension" keeps bases next to the actor.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Customer books a delivery
+
+actor "Customer" as Customer
+
+rectangle "SwiftDrop" {
+  usecase "Get fee estimate" as C08
+  usecase "Book a delivery" as C05
+  usecase "Apply promo code" as C07b
+  usecase "Enter pickup and drop-off\naddress and zone" as C06
+  usecase "Enter recipient\nname and phone" as C06b
+  usecase "Choose size,\nweight and speed" as C07
+  usecase "Confirm booking" as C09
+  usecase "Receive tracking number\n(e.g. SD-7K3Q-9P2M)" as C09a
+  usecase "Show validation errors" as C09b
+}
+
+Customer -- C08
+Customer -- C05
+C05 .> C08 : <<include>>
+C08 <.. C07b : <<extend>>
+C05 ..> C06 : <<include>>
+C05 ..> C06b : <<include>>
+C05 ..> C07 : <<include>>
+C05 ..> C09 : <<include>>
+C09 ..> C09a : <<include>>
+C05 <.. C09b : <<extend>>\n[invalid field, weight over size\nlimit, unknown or expired promo]
+
+legend bottom right
+  Fee from pricing-service (LKR): route base fee (300 / 350 / 400 / 650)
+  + 40 per extra kg + size surcharge + 100 express − promo.
+  The binding fee is recalculated on confirm; a fee sent by the browser is never trusted.
+  The parcel is saved as CREATED and ParcelStatusChanged is published through the outbox.
+endlegend
+@enduml
