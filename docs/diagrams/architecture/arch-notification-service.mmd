@@ -1,0 +1,76 @@
+---
+config:
+  layout: elk
+---
+%% Architecture — notification-service internal structure
+%% Based on arch-notification.mmd by Thisaru Ramanayaka (Role 6); corrected against docs/architecture.md v1.1 §6.2, §6.3
+%% Changes: parcel-service recipient look-up added, X-Internal-Token on internal calls, full retry chain (10 s → 1 m → 5 m → parking)
+flowchart LR
+  classDef comp fill:#ffffff,stroke:#333
+  classDef q fill:#eef3fb,stroke:#3b5b92
+  classDef ext fill:#ffffff,stroke:#888,stroke-dasharray:5 3
+  classDef data fill:#f4f4f4,stroke:#555
+
+  subgraph IN["Inbound"]
+    GW["api-gateway :8080<br/>JWT, /api/v1/admin/webhook-deliveries/**"]:::ext
+    NQ["notification.q"]:::q
+    WQ["webhook.q"]:::q
+  end
+
+  subgraph NS["notification-service :8086"]
+    NC["StatusChangeNotificationConsumer"]:::comp
+    WC["WebhookConsumer"]:::comp
+    IS["IdempotencyService"]:::comp
+    NSV["NotificationService<br/>(who is notified, §6.3)"]:::comp
+    EC["EmailChannel"]:::comp
+    SC["SmsChannel (mock)"]:::comp
+    WS["WebhookSender"]:::comp
+    SIGN["WebhookSigningService<br/>HMAC-SHA256"]:::comp
+    WDS["WebhookDeliveryService"]:::comp
+    CTRL["AdminWebhookDeliveryController<br/>ADMIN or DISPATCHER"]:::comp
+    CLIENTS["Auth / Parcel / Merchant clients<br/>InternalRestClientFactory + X-Internal-Token"]:::comp
+    DB[("notification_db<br/>processed_events · notifications<br/>webhook_deliveries")]:::data
+  end
+
+  subgraph RQ["Retry queues (TTL → dead-letter back to webhook.q)"]
+    R10["webhook.retry.10s"]:::q
+    R1M["webhook.retry.1m"]:::q
+    R5M["webhook.retry.5m"]:::q
+    PARK["webhook.parking"]:::q
+  end
+
+  subgraph EXT["Other services and external systems"]
+    AUTH["auth-service<br/>GET /internal/users/{id}/contact"]:::ext
+    PARCEL["parcel-service<br/>GET /internal/parcels/{id}/contacts"]:::ext
+    MERCH["merchant-service<br/>GET /internal/merchants/{id}/webhook"]:::ext
+    MAIL["Mailpit SMTP"]:::ext
+    SMS["SMS provider (mocked)"]:::ext
+    MWH["Merchant webhook URL"]:::ext
+  end
+
+  NQ --> NC
+  WQ --> WC
+  GW --> CTRL
+
+  NC --> IS
+  NC --> NSV
+  NSV --> CLIENTS
+  NSV --> EC --> MAIL
+  NSV --> SC --> SMS
+  WC --> IS
+  WC --> CLIENTS
+  WC --> WS
+  WS --> SIGN
+  WS --> MWH
+  WC --> WDS
+  CTRL --> WDS
+  CTRL --> WS
+  CLIENTS --> AUTH & PARCEL & MERCH
+
+  WC -- "attempt 1 fails" --> R10
+  WC -- "attempt 2 fails" --> R1M
+  WC -- "attempt 3 fails" --> R5M
+  WC -- "attempt 4 fails" --> PARK
+  R10 & R1M & R5M -. "TTL expires" .-> WQ
+
+  IS & NSV & WDS --> DB

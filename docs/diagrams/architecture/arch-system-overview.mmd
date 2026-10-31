@@ -1,0 +1,77 @@
+---
+config:
+  layout: elk
+---
+%% Architecture — system overview by layer · Role 1
+%% Source: docs/architecture.md v1.1 §2 (layers), §3, §4, §6. Replaces the stale ../architecture-overview.html (21 Oct).
+%% Only the gateway is reachable from outside; services talk REST on the private network and publish/consume via RabbitMQ.
+flowchart TB
+  classDef client fill:#ffffff,stroke:#222,stroke-width:1.5px
+  classDef edge fill:#eef3fb,stroke:#3b5b92,stroke-width:1.5px
+  classDef svc fill:#ffffff,stroke:#333
+  classDef data fill:#f4f4f4,stroke:#555
+  classDef ext fill:#ffffff,stroke:#888,stroke-dasharray:5 3
+
+  subgraph L1["Presentation layer"]
+    direction LR
+    CUST["Customer browser"]:::client
+    TRK["Public tracking page<br/>(phone, no login)"]:::client
+    COUR["Courier phone"]:::client
+    DISP["Dispatcher / Admin"]:::client
+    STORE["Merchant store server"]:::client
+    FE["frontend · React SPA<br/>nginx :80"]:::client
+  end
+
+  subgraph L2["Edge"]
+    GW["api-gateway :8080<br/>routing · JWT check (JWKS) · CORS<br/>X-Request-Id · Redis rate limit per API key<br/>SSE pass-through · never routes /internal/**"]:::edge
+  end
+
+  subgraph L3["Business logic layer — Spring Boot services (Controller → Service → Repository)"]
+    direction LR
+    AUTH["auth-service :8081<br/>users, roles, JWT, Google OAuth"]:::svc
+    PRICE["pricing-service :8082<br/>zones, rules, quote"]:::svc
+    PARCEL["parcel-service :8083<br/>status machine, outbox, SSE"]:::svc
+    DISPS["dispatch-service :8084<br/>assignments, proofs, reports"]:::svc
+    MERCH["merchant-service :8085<br/>merchants, API keys, orders"]:::svc
+    NOTIF["notification-service :8086<br/>email, SMS, webhooks + retry"]:::svc
+    AI["ai-assistant :8087<br/>chat + MCP tools<br/>(calls the gateway<br/>with the user's token)"]:::svc
+  end
+
+  subgraph L4["Integration layer"]
+    MQ{{"RabbitMQ · topic exchange parcel.events<br/>notification.q · webhook.q · dispatch.q · tracking.q<br/>webhook.retry.10s / 1m / 5m · webhook.parking"}}:::edge
+  end
+
+  subgraph L5["Data layer"]
+    direction LR
+    PG[("PostgreSQL 16 — one database per service<br/>auth_db · pricing_db · parcel_db<br/>dispatch_db · merchant_db · notification_db")]:::data
+    REDIS[("Redis 7<br/>rate limits")]:::data
+    MINIO[("MinIO<br/>delivery-proofs")]:::data
+  end
+
+  GOOGLE["Google OAuth 2.0"]:::ext
+  LLM["LLM provider"]:::ext
+  SMTP["Mailpit SMTP / mock SMS"]:::ext
+  WH["Merchant webhook URL"]:::ext
+
+  CUST & TRK & COUR & DISP --> FE
+  FE -- "HTTPS REST + SSE<br/>Bearer JWT" --> GW
+  STORE -- "HTTPS REST<br/>X-API-Key" --> GW
+
+  GW -- "routes /api/v1/** by path prefix" --> L3
+  GW --- REDIS
+
+  PARCEL -- "quote" --> PRICE
+  MERCH -- "create parcel" --> PARCEL
+  DISPS -- "change status" --> PARCEL
+  NOTIF -- "contacts / webhook config" --> AUTH & PARCEL & MERCH
+
+  PARCEL -. "publish via outbox" .-> MQ
+  MQ -. "consume" .-> NOTIF & DISPS & PARCEL
+
+  L3 -- "each service only its own database" --- PG
+  DISPS --- MINIO
+
+  AUTH --- GOOGLE
+  AI --- LLM
+  NOTIF --> SMTP
+  NOTIF -- "HMAC-signed POST" --> WH
