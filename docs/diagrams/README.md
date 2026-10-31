@@ -23,5 +23,8 @@ All `.mmd` files can be pasted into [mermaid.live](https://mermaid.live) to rend
 | `arch-parcel-service.puml` | Component — parcel-service endpoints, parts and dependencies (landscape) | Role 3 |
 | `er-` | ER diagram (full and per service) | Each service owner, merged by Role 1 |
 | `arch-` | Architecture overview (full system) | Role 1 |
-| `seq-merchant-order` | Merchant API order creation | Role 5 |
+| `usecase-merchant.md` | Use case — merchant registration, dashboard, API keys & orders | Role 5 |
+| `er-merchant.md` | ER diagram — merchant service data model | Role 5 |
+| `seq-merchant-order.md` | Sequence — merchant API order creation & downstream dispatch | Role 5 |
+| `activity-merchant.md` | Activity — complete merchant lifecycle & order fulfillment workflow | Role 5 |
 | `seq-google-login` | OAuth 2.0 login flow | Role 2 |
