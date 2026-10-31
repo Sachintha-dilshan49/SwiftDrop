@@ -51,8 +51,8 @@ class MerchantOrderServiceTest {
         Merchant merchant = new Merchant(UUID.randomUUID(), UUID.randomUUID(), "Apex", "BR-1", "Nimal",
                 "nimal@apex.lk", "0771234567", "Colombo", MerchantStatus.PENDING);
         MerchantCreateOrderRequest request = new MerchantCreateOrderRequest(
-                "Kamal Silva", "0712345678", "123 Galle Rd, Colombo", "456 Kandy Rd, Kelaniya",
-                new BigDecimal("2.50"), "MEDIUM", null);
+                "Kamal Silva", "0712345678", "kamal@example.com", "123 Galle Rd, Colombo", "456 Kandy Rd, Kelaniya",
+                "COLOMBO_SOUTH", "COLOMBO_CENTRAL", new BigDecimal("2.50"), "MEDIUM", "STANDARD", null);
 
         assertThatThrownBy(() -> merchantOrderService.createOrder(merchant, request))
                 .isInstanceOf(ForbiddenException.class)
@@ -69,8 +69,8 @@ class MerchantOrderServiceTest {
                 "nimal@apex.lk", "0771234567", "Colombo", MerchantStatus.APPROVED);
 
         MerchantCreateOrderRequest request = new MerchantCreateOrderRequest(
-                "Kamal Silva", "0712345678", "123 Galle Rd, Colombo", "456 Kandy Rd, Kelaniya",
-                new BigDecimal("2.50"), "MEDIUM", "idemp-key-123");
+                "Kamal Silva", "0712345678", "kamal@example.com", "123 Galle Rd, Colombo", "456 Kandy Rd, Kelaniya",
+                "COLOMBO_SOUTH", "COLOMBO_CENTRAL", new BigDecimal("2.50"), "MEDIUM", "STANDARD", "idemp-key-123");
 
         MerchantOrder existingOrder = new MerchantOrder(
                 UUID.randomUUID(), merchantId, UUID.randomUUID(), "SD-100200",
@@ -97,8 +97,8 @@ class MerchantOrderServiceTest {
                 "nimal@apex.lk", "0771234567", "Colombo", MerchantStatus.APPROVED);
 
         MerchantCreateOrderRequest request = new MerchantCreateOrderRequest(
-                "Kamal Silva", "0712345678", "123 Galle Rd, Colombo", "456 Kandy Rd, Kelaniya",
-                new BigDecimal("2.50"), "MEDIUM", "new-idemp-key");
+                "Kamal Silva", "0712345678", "kamal@example.com", "123 Galle Rd, Colombo", "456 Kandy Rd, Kelaniya",
+                "COLOMBO_SOUTH", "COLOMBO_CENTRAL", new BigDecimal("2.50"), "MEDIUM", "STANDARD", "new-idemp-key");
 
         UUID parcelId = UUID.randomUUID();
         CreateParcelInternalResponse parcelResponse = new CreateParcelInternalResponse(

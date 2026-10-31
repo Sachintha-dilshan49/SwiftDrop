@@ -84,7 +84,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"recipientName\": \"Kasun Perera\",\n  \"recipientPhone\": \"+94719876543\",\n  \"pickupAddress\": \"No. 45, Galle Road, Colombo 03\",\n  \"dropoffAddress\": \"No. 88, Kandy Road, Kiribathgoda\",\n  \"weightKg\": 2.50,\n  \"size\": \"MEDIUM\",\n  \"idempotencyKey\": \"shopify-order-10029\"\n}"
+          "raw": "{\n  \"recipientName\": \"Kasun Perera\",\n  \"recipientPhone\": \"+94719876543\",\n  \"recipientEmail\": \"kasun.perera@example.com\",\n  \"pickupAddress\": \"No. 45, Galle Road, Colombo 03\",\n  \"dropoffAddress\": \"No. 88, Kandy Road, Kiribathgoda\",\n  \"pickupZone\": \"COLOMBO_SOUTH\",\n  \"dropoffZone\": \"COLOMBO_CENTRAL\",\n  \"weightKg\": 2.50,\n  \"size\": \"MEDIUM\",\n  \"speed\": \"STANDARD\",\n  \"idempotencyKey\": \"shopify-order-10029\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/merchant-api/orders",
