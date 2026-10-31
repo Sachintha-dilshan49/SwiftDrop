@@ -1,0 +1,42 @@
+---
+config:
+  layout: elk
+---
+%% Flowchart — how every request is authenticated and authorized · Role 1
+%% Source: docs/architecture.md v1.1 §6.1 (gateway), §6.2 internal endpoints, §9 security, ADR-010
+%% Three credentials: user JWT (browser), X-API-Key (merchant store), X-Internal-Token (service to service).
+flowchart TD
+  classDef ok fill:#e8f5e9,stroke:#2e7d32
+  classDef err fill:#fdecea,stroke:#c62828
+  classDef step fill:#ffffff,stroke:#444
+  classDef gw fill:#eef3fb,stroke:#3b5b92
+
+  S([Request arrives]) --> SRC{From where?}
+
+  SRC -- "outside: browser or merchant server" --> GW[api-gateway :8080<br/>add X-Request-Id, CORS]:::gw
+  GW --> PATH{Path}
+  PATH -- "/internal/**" --> NR[Not routed: 404]:::err
+  PATH -- "public: /auth/login, /register, /refresh,<br/>/oauth2/**, /auth/token, /track/**" --> ROUTE[Route to owning service]:::gw
+  PATH -- "/merchant-api/**" --> K{X-API-Key header?}
+  K -- No --> K401[401]:::err
+  K -- Yes --> RL{Within per-key<br/>rate limit? Redis}
+  RL -- No --> R429[429]:::err
+  RL -- Yes --> ROUTE
+  PATH -- "any other /api/v1/**" --> J{Bearer JWT valid?<br/>RS256 signature via JWKS, not expired}
+  J -- No --> J401[401]:::err
+  J -- Yes --> ROUTE
+
+  SRC -- "inside: another service<br/>calling /internal/**" --> IT{X-Internal-Token equals<br/>INTERNAL_API_TOKEN?<br/>constant-time compare}
+  IT -- No --> I401[401 ProblemDetail]:::err
+  IT -- Yes --> IROLE[Caller gets ROLE_INTERNAL_SERVICE]:::step --> VAL
+
+  ROUTE --> SVC{Service: credential valid?<br/>JWT checked again, or API key hash<br/>found, not revoked, merchant APPROVED}
+  SVC -- No --> S401[401 / 403]:::err
+  SVC -- Yes --> ROLE{"@PreAuthorize role allowed?<br/>CUSTOMER, MERCHANT, COURIER,<br/>DISPATCHER, ADMIN"}
+  ROLE -- No --> R403[403 ProblemDetail]:::err
+  ROLE -- Yes --> OWN{Ownership in service layer<br/>customer owns parcel, courier owns<br/>assignment, merchant owns order}
+  OWN -- "No (parcel)" --> O404[404, so IDs cannot be probed]:::err
+  OWN -- "No (other)" --> O403[403]:::err
+  OWN -- Yes --> VAL{"@Valid request DTO?"}
+  VAL -- No --> V400[400 with field errors]:::err
+  VAL -- Yes --> BL[Business logic]:::step --> OK([2xx response, no personal data in errors or logs]):::ok

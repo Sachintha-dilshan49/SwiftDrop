@@ -1,0 +1,38 @@
+---
+config:
+  layout: elk
+---
+%% Flowchart — customer booking flow · Role 1 (Role 3 + Role 7 to review)
+%% Source: docs/architecture.md v1.1 §8, §10.1; matches seq-create-delivery.puml (Role 3)
+flowchart TD
+  classDef ok fill:#e8f5e9,stroke:#2e7d32
+  classDef err fill:#fdecea,stroke:#c62828
+  classDef step fill:#ffffff,stroke:#444
+
+  S([Customer opens Book a delivery]) --> L{Logged in?}
+  L -- No --> LOGIN[Log in or sign up<br/>see flow-login]:::step --> F
+  L -- Yes --> F[Fill form: pickup and drop-off address + zone,<br/>recipient name and phone, size, weight kg,<br/>speed, optional promo code]:::step
+  F --> Z{Valid in browser?<br/>zod schema}
+  Z -- No --> ZE[Show field errors]:::err --> F
+  Z -- Yes --> EST[GET /api/v1/pricing/estimate]:::step
+  EST --> EQ{Estimate OK?}
+  EQ -- "400: unknown or expired promo,<br/>weight over size limit" --> EE[Show reason]:::err --> F
+  EQ -- Yes --> SHOW[Show fee breakdown in LKR<br/>base + extra kg + size + express − promo]:::step
+  SHOW --> C{Customer confirms?}
+  C -- "No, edit" --> F
+  C -- Yes --> POST[POST /api/v1/parcels with Bearer JWT]:::step
+  POST --> G{Gateway: JWT valid?}
+  G -- No --> E401[401: refresh token and retry,<br/>else back to login]:::err
+  G -- Yes --> R{"@PreAuthorize CUSTOMER<br/>and @Valid request?"}
+  R -- "wrong role" --> E403[403 ProblemDetail]:::err
+  R -- "invalid field" --> E400[400 ProblemDetail]:::err --> F
+  R -- Yes --> Q[parcel-service asks pricing-service<br/>POST /internal/pricing/quote]:::step
+  Q --> QQ{Quote result}
+  QQ -- "timeout / 5xx" --> E503[503: nothing saved,<br/>no fallback price]:::err
+  QQ -- "400" --> E400
+  QQ -- "200" --> TN[Generate unique tracking number<br/>SD-XXXX-XXXX]:::step
+  TN --> TX[One transaction: parcel CREATED + fee breakdown,<br/>status history row, outbox event]:::step
+  TX --> OK[201 Created: show tracking number<br/>and receipt link]:::ok
+  OK --> EV[Outbox relay publishes parcel.status.created]:::step
+  EV --> N[Email to customer, live tracking ready]:::ok
+  N --> END([End])
