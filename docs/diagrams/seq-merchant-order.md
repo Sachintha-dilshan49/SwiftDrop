@@ -8,6 +8,7 @@ sequenceDiagram
     participant MerchantSvc as Merchant Service (:8085)
     participant DB as merchant_db
     participant ParcelSvc as Parcel Service (:8083)
+    participant PricingSvc as Pricing Service (:8082)
     participant Broker as RabbitMQ (`parcel.events`)
     participant NotifSvc as Notification Service (:8086)
 
@@ -32,10 +33,14 @@ sequenceDiagram
         Gateway-->>MerchantStore: 200 OK (existing order details)
     end
 
-    MerchantSvc->>ParcelSvc: POST /internal/parcels (merchantId, addresses, weight, size)
+    MerchantSvc->>ParcelSvc: POST /internal/parcels (X-Internal-Token, merchantId, addresses, weight, size, zones, speed, recipientEmail)
     activate ParcelSvc
-    Note over ParcelSvc: Calculates fee via pricing-service and persists Parcel
-    ParcelSvc-->>MerchantSvc: 200 OK (id, trackingNo, status: CREATED, feeAmount)
+    ParcelSvc->>PricingSvc: POST /internal/pricing/quote (pickupZone, dropoffZone, weightKg, size, speed)
+    activate PricingSvc
+    PricingSvc-->>ParcelSvc: 200 OK (total, breakdown, currency)
+    deactivate PricingSvc
+    Note over ParcelSvc: Saves Parcel (CREATED), fee breakdown, history row, and outbox row
+    ParcelSvc-->>MerchantSvc: 201 Created (id, trackingNo, status: CREATED, feeAmount, feeCurrency)
     deactivate ParcelSvc
 
     MerchantSvc->>DB: INSERT into merchant_orders (merchant_id, parcel_id, tracking_no, ...)

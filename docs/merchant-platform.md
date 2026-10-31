@@ -130,10 +130,14 @@ The SwiftDrop Merchant Platform enables business merchants to register, receive 
 {
   "recipientName": "Kasun Perera",
   "recipientPhone": "+94719876543",
+  "recipientEmail": "kasun.perera@example.com",
   "pickupAddress": "No. 45, Galle Road, Colombo 03",
   "dropoffAddress": "No. 88, Kandy Road, Kiribathgoda",
+  "pickupZone": "COLOMBO_SOUTH",
+  "dropoffZone": "COLOMBO_CENTRAL",
   "weightKg": 2.50,
   "size": "MEDIUM",
+  "speed": "STANDARD",
   "idempotencyKey": "shopify-order-10029"
 }
 ```
@@ -200,10 +204,14 @@ curl -X POST http://localhost:8085/merchant-api/orders \
   -d '{
     "recipientName": "Kasun Perera",
     "recipientPhone": "+94719876543",
+    "recipientEmail": "kasun.perera@example.com",
     "pickupAddress": "No. 45 Galle Rd, Colombo",
     "dropoffAddress": "No. 88 Kandy Rd, Kiribathgoda",
+    "pickupZone": "COLOMBO_SOUTH",
+    "dropoffZone": "COLOMBO_CENTRAL",
     "weightKg": 2.50,
     "size": "MEDIUM",
+    "speed": "STANDARD",
     "idempotencyKey": "order-101"
   }'
 ```
