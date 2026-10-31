@@ -1,0 +1,57 @@
+---
+config:
+  layout: elk
+---
+%% Integration — RabbitMQ topology (broker, pub/sub, retry) · Role 1 with Role 6
+%% Source: docs/architecture.md v1.1 §6.3, ADR-002, ADR-005
+flowchart LR
+  classDef svc fill:#ffffff,stroke:#333
+  classDef ex fill:#eef3fb,stroke:#3b5b92,stroke-width:1.5px
+  classDef q fill:#ffffff,stroke:#3b5b92
+  classDef retry fill:#fff8e6,stroke:#b07d00
+  classDef data fill:#f4f4f4,stroke:#555
+
+  subgraph PUB["Publisher — parcel-service"]
+    TX["Status change<br/>@Transactional"]:::svc
+    OB[("outbox_events<br/>PENDING")]:::data
+    RELAY["OutboxRelay<br/>every 1 s, publisher confirms"]:::svc
+    TX -- "same transaction" --> OB
+    RELAY -- "read PENDING, mark SENT" --> OB
+  end
+
+  EX{{"parcel.events<br/>topic, durable<br/>key parcel.status.&lt;status&gt;"}}:::ex
+
+  subgraph QUEUES["Queues — binding parcel.status.#"]
+    NQ["notification.q"]:::q
+    WQ["webhook.q"]:::q
+    DQ["dispatch.q"]:::q
+    TQ["tracking.q"]:::q
+  end
+
+  subgraph RETRY["Webhook retry (TTL + dead-letter to webhook.q)"]
+    R10["webhook.retry.10s"]:::retry
+    R1["webhook.retry.1m"]:::retry
+    R5["webhook.retry.5m"]:::retry
+    PK["webhook.parking<br/>(admin replay)"]:::retry
+  end
+
+  NOTIF_E["notification-service<br/>email on every change<br/>SMS on OUT_FOR_DELIVERY, DELIVERED, FAILED"]:::svc
+  NOTIF_W["notification-service<br/>signed webhook if merchantId set"]:::svc
+  DISP["dispatch-service<br/>daily report counters"]:::svc
+  TRACK["parcel-service<br/>push to open SSE streams"]:::svc
+
+  RELAY -- "publish ParcelStatusChanged v1<br/>messageId = eventId" --> EX
+  EX --> NQ & WQ & DQ & TQ
+  NQ --> NOTIF_E
+  WQ --> NOTIF_W
+  DQ --> DISP
+  TQ --> TRACK
+
+  NOTIF_W -- "fail 1" --> R10
+  NOTIF_W -- "fail 2" --> R1
+  NOTIF_W -- "fail 3" --> R5
+  NOTIF_W -- "fail 4" --> PK
+  R10 & R1 & R5 -. "TTL expires" .-> WQ
+
+  IDEM["Every consumer stores eventId in its own<br/>processed_events and skips duplicates"]:::data
+  NOTIF_E & NOTIF_W & DISP & TRACK -.- IDEM

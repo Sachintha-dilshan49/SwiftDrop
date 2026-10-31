@@ -1,0 +1,48 @@
+---
+config:
+  layout: elk
+---
+%% Integration — the five communication styles and where each is used · Role 1
+%% Source: docs/architecture.md v1.1 §6 (6.1 gateway, 6.2 request/reply, 6.3 pub/sub, webhook retry, real-time tracking)
+%% 1 Facade / single entry point  2 Request/reply (sync REST)  3 Publish/subscribe via broker  4 Webhook (outbound HTTP callback)  5 SSE (server push)
+flowchart TB
+  classDef client fill:#ffffff,stroke:#222,stroke-width:1.5px
+  classDef svc fill:#ffffff,stroke:#333
+  classDef edge fill:#eef3fb,stroke:#3b5b92
+  classDef ext fill:#ffffff,stroke:#888,stroke-dasharray:5 3
+
+  SPA["React SPA"]:::client
+  TRK["Tracking page<br/>EventSource"]:::client
+  STORE["Merchant store server"]:::client
+  GW["api-gateway :8080"]:::edge
+
+  subgraph PRIV["Private network"]
+    MERCH["merchant-service"]:::svc
+    DISP["dispatch-service"]:::svc
+    PARCEL["parcel-service"]:::svc
+    PRICE["pricing-service"]:::svc
+    NOTIF["notification-service"]:::svc
+    AUTH["auth-service"]:::svc
+    EX{{"RabbitMQ<br/>parcel.events (topic)"}}:::edge
+  end
+
+  WH["Merchant webhook URL"]:::ext
+
+  SPA -- "① HTTPS REST, Bearer JWT" --> GW
+  STORE -- "① HTTPS REST, X-API-Key" --> GW
+  GW -- "① route by path" --> MERCH & DISP & PARCEL
+
+  MERCH -- "② POST /internal/parcels" --> PARCEL
+  DISP -- "② PATCH /internal/parcels/{id}/status" --> PARCEL
+  PARCEL -- "② POST /internal/pricing/quote" --> PRICE
+  NOTIF -- "② GET contacts / webhook config" --> AUTH
+
+  PARCEL -. "③ publish ParcelStatusChanged<br/>(outbox relay)" .-> EX
+  EX -. "③ notification.q, webhook.q" .-> NOTIF
+  EX -. "③ dispatch.q" .-> DISP
+  EX -. "③ tracking.q" .-> PARCEL
+
+  NOTIF == "④ HMAC-signed POST,<br/>retry 10 s / 1 m / 5 m" ==> WH
+  WH -. "④ arrives at" .-> STORE
+
+  PARCEL == "⑤ SSE text/event-stream<br/>(via gateway, no buffering)" ==> TRK
