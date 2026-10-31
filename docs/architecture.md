@@ -428,8 +428,8 @@ Sequence diagrams for these go in the design PDF.
 ### 10.4 Login with Google (OAuth 2.0)
 1. SPA redirects to `/oauth2/authorization/google` (auth-service).
 2. User signs in with Google; Google redirects back with an authorization code.
-3. auth-service exchanges the code, finds or creates the user (role CUSTOMER), and creates a one-time code.
-4. Browser is redirected to `/auth/callback?code=…`; SPA calls `POST /auth/token` to get our JWT and refresh token.
+3. auth-service validates Google's response, finds or creates/links the user (role CUSTOMER), and creates a hashed, two-minute, single-use login code.
+4. Browser is redirected to the configured SPA callback with the one-time code; SPA calls `POST /api/v1/auth/token` to exchange it for our JWT and refresh token.
 
 ## 11. Design patterns
 

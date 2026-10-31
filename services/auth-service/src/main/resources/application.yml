@@ -1,6 +1,22 @@
+
 spring:
   application:
     name: auth-service
+
+  datasource:
+    url: ${AUTH_DB_URL:jdbc:postgresql://localhost:5432/auth_db}
+    username: ${AUTH_DB_USER:auth}
+    password: ${AUTH_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
   security:
     oauth2:
       resourceserver:
@@ -14,8 +30,20 @@ server:
 swiftdrop:
   internal.token: ${INTERNAL_API_TOKEN:}   # shared /internal/** token, ADR-010; startup fails if unset
   security:
-    # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
-    public-paths: []
+    public-paths:
+      - /api/v1/auth/**
+      - /.well-known/jwks.json
+      - /oauth2/**
+      - /login/oauth2/**
+  jwt:
+    private-key-base64: ${JWT_PRIVATE_KEY_B64:}
+    key-id: ${JWT_KEY_ID:swiftdrop-auth-1}
+    issuer: ${JWT_ISSUER:swiftdrop-auth}
+  google:
+    enabled: ${AUTH_GOOGLE_ENABLED:false}
+    client-id: ${AUTH_GOOGLE_CLIENT_ID:}
+    client-secret: ${AUTH_GOOGLE_CLIENT_SECRET:}
+    frontend-success-uri: ${AUTH_OAUTH_SUCCESS_REDIRECT_URI:http://localhost:3000/auth/callback}
 
 management:
   endpoints:
@@ -26,3 +54,7 @@ management:
     health:
       probes:
         enabled: true
+
+logging:
+  level:
+    org.flywaydb: INFO
