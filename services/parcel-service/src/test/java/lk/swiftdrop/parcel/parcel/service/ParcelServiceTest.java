@@ -12,7 +12,9 @@ import lk.swiftdrop.parcel.parcel.client.QuoteRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.PageResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.ParcelSummaryResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
@@ -28,8 +30,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -170,6 +177,53 @@ class ParcelServiceTest {
                 .isInstanceOf(ValidationException.class);
 
         verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("listParcels returns only the customer's own parcels as summaries")
+    void listParcelsScopesCustomersToTheirOwnParcels() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+        when(parcelRepository.findByCustomerId(customerId, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 1));
+
+        PageResponse<ParcelSummaryResponse> page = parcelService.listParcels(customerId, false, null, pageable);
+
+        assertThat(page.content()).extracting(ParcelSummaryResponse::trackingNo).containsExactly("SD-7K3Q-9P2M");
+        assertThat(page.page()).isZero();
+        assertThat(page.size()).isEqualTo(20);
+        assertThat(page.totalElements()).isEqualTo(1);
+        verify(parcelRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("listParcels filters a customer's parcels by status")
+    void listParcelsFiltersCustomerParcelsByStatus() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(parcelRepository.findByCustomerIdAndStatus(customerId, ParcelStatus.CREATED, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 1));
+
+        PageResponse<ParcelSummaryResponse> page =
+                parcelService.listParcels(customerId, false, ParcelStatus.CREATED, pageable);
+
+        assertThat(page.content()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("listParcels returns every parcel for dispatchers and admins, optionally by status")
+    void listParcelsReturnsAllParcelsForPrivilegedCallers() {
+        Pageable pageable = PageRequest.of(1, 5);
+        when(parcelRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 6));
+        when(parcelRepository.findByStatus(ParcelStatus.CREATED, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 6));
+
+        PageResponse<ParcelSummaryResponse> all = parcelService.listParcels(UUID.randomUUID(), true, null, pageable);
+        PageResponse<ParcelSummaryResponse> created =
+                parcelService.listParcels(UUID.randomUUID(), true, ParcelStatus.CREATED, pageable);
+
+        assertThat(all.page()).isEqualTo(1);
+        assertThat(all.totalElements()).isEqualTo(6);
+        assertThat(created.content()).hasSize(1);
+        verify(parcelRepository, never()).findByCustomerId(any(), any());
     }
 
     @Test
@@ -320,5 +374,37 @@ class ParcelServiceTest {
     private static UpdateParcelStatusRequest dispatcherUpdate(ParcelStatus status, String failureReason) {
         return new UpdateParcelStatusRequest(status, null, "Dispatcher update", null, failureReason,
                 UUID.randomUUID(), "DISPATCHER");
+    }
+
+    @Test
+    @DisplayName("getParcelForCustomer succeeds when caller is owner")
+    void getParcelForCustomerSuccess() {
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        ParcelResponse response = parcelService.getParcelForCustomer(sampleParcel.getId(), customerId, false);
+
+        assertThat(response.id()).isEqualTo(sampleParcel.getId());
+    }
+
+    @Test
+    @DisplayName("Customer cannot see another customer's parcel - throws NotFoundException (404)")
+    void customerCannotSeeAnotherCustomersParcel() {
+        UUID anotherCustomer = UUID.randomUUID();
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        assertThatThrownBy(() -> parcelService.getParcelForCustomer(sampleParcel.getId(), anotherCustomer, false))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Parcel not found");
+    }
+
+    @Test
+    @DisplayName("Privileged role (admin/dispatcher) can view any parcel")
+    void privilegedRoleCanViewAnyParcel() {
+        UUID anotherUser = UUID.randomUUID();
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        ParcelResponse response = parcelService.getParcelForCustomer(sampleParcel.getId(), anotherUser, true);
+
+        assertThat(response.id()).isEqualTo(sampleParcel.getId());
     }
 }

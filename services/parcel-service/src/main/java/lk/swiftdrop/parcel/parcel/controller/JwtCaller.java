@@ -2,10 +2,13 @@ package lk.swiftdrop.parcel.parcel.controller;
 
 import org.springframework.security.oauth2.jwt.Jwt;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Reads the caller's identity from a verified user access token. */
 final class JwtCaller {
+
+    private static final List<String> PRIVILEGED_ROLES = List.of("ADMIN", "DISPATCHER");
 
     private JwtCaller() {
     }
@@ -21,5 +24,11 @@ final class JwtCaller {
         } catch (IllegalArgumentException e) {
             throw new InvalidTokenException();
         }
+    }
+
+    /** Dispatchers and admins may see every parcel. */
+    static boolean isPrivileged(Jwt jwt) {
+        List<String> roles = jwt.getClaimAsStringList("roles");
+        return roles != null && roles.stream().anyMatch(PRIVILEGED_ROLES::contains);
     }
 }

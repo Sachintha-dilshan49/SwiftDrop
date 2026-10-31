@@ -9,7 +9,9 @@ import lk.swiftdrop.parcel.parcel.client.QuoteRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.PageResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.ParcelSummaryResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
@@ -17,6 +19,8 @@ import lk.swiftdrop.parcel.parcel.entity.ParcelStatusHistory;
 import lk.swiftdrop.parcel.parcel.repository.ParcelRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -143,5 +147,37 @@ public class ParcelService {
 
         log.info("Updated parcel {} status from {} to {}", parcelId, fromStatus, request.status());
         return ParcelResponse.fromEntity(updatedParcel);
+    }
+
+    @Transactional(readOnly = true)
+    public ParcelResponse getParcelForCustomer(UUID parcelId, UUID customerId, boolean isPrivileged) {
+        Parcel parcel = parcelRepository.findById(parcelId)
+                .orElseThrow(() -> new NotFoundException("Parcel not found: " + parcelId));
+
+        if (!isPrivileged && (parcel.getCustomerId() == null || !parcel.getCustomerId().equals(customerId))) {
+            throw new NotFoundException("Parcel not found: " + parcelId);
+        }
+
+        return ParcelResponse.fromEntity(parcel);
+    }
+
+    /**
+     * One page of parcels: the caller's own, or all parcels for dispatchers and admins,
+     * optionally filtered by status.
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<ParcelSummaryResponse> listParcels(UUID callerId, boolean isPrivileged,
+                                                           ParcelStatus status, Pageable pageable) {
+        Page<Parcel> page;
+        if (isPrivileged) {
+            page = status == null
+                    ? parcelRepository.findAll(pageable)
+                    : parcelRepository.findByStatus(status, pageable);
+        } else {
+            page = status == null
+                    ? parcelRepository.findByCustomerId(callerId, pageable)
+                    : parcelRepository.findByCustomerIdAndStatus(callerId, status, pageable);
+        }
+        return PageResponse.from(page.map(ParcelSummaryResponse::fromEntity));
     }
 }
