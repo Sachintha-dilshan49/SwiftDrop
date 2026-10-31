@@ -7,6 +7,8 @@ import lk.swiftdrop.parcel.outbox.service.OutboxService;
 import lk.swiftdrop.parcel.parcel.client.PricingQuote;
 import lk.swiftdrop.parcel.parcel.client.PricingServiceClient;
 import lk.swiftdrop.parcel.parcel.client.QuoteRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
@@ -64,6 +66,12 @@ class ParcelServiceTest {
         return new CreateParcelRequest("123 Main St, Colombo", "COLOMBO_SOUTH", "456 High St, Kandy", "INTER_CITY",
                 "Nimal Perera", "+94771234567", ParcelSize.MEDIUM, new BigDecimal("2.50"), DeliverySpeed.STANDARD,
                 "DROP100");
+    }
+
+    private static CreateInternalParcelRequest merchantRequest(UUID merchantId) {
+        return new CreateInternalParcelRequest(merchantId, "Warehouse A, Colombo", "COLOMBO_SOUTH",
+                "Customer Home, Galle", "INTER_CITY", "Sunil Fernando", "+94712345678", "sunil@example.com",
+                ParcelSize.MEDIUM, new BigDecimal("2.50"), DeliverySpeed.EXPRESS);
     }
 
     private Parcel savedParcel() {
@@ -135,6 +143,49 @@ class ParcelServiceTest {
 
         assertThatThrownBy(() -> parcelService.createCustomerParcel(customerId, customerRequest()))
                 .isInstanceOf(ValidationException.class);
+
+        verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("createMerchantParcel takes the fee from pricing's quote and stores the recipient's email")
+    void createMerchantParcelTakesFeeFromQuote() {
+        UUID merchantId = UUID.randomUUID();
+        when(pricingServiceClient.getQuote(new QuoteRequest("COLOMBO_SOUTH", "INTER_CITY", new BigDecimal("2.50"),
+                ParcelSize.MEDIUM, DeliverySpeed.EXPRESS, null))).thenReturn(QUOTE);
+        when(trackingNumberGenerator.generateUniqueTrackingNumber()).thenReturn("SD-9B2N-4X1Z");
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateInternalParcelResponse response = parcelService.createMerchantParcel(merchantRequest(merchantId));
+
+        assertThat(response.trackingNo()).isEqualTo("SD-9B2N-4X1Z");
+        assertThat(response.status()).isEqualTo(ParcelStatus.CREATED);
+        assertThat(response.feeAmount()).isEqualByComparingTo("730.00");
+        assertThat(response.feeCurrency()).isEqualTo("LKR");
+
+        Parcel parcel = savedParcel();
+        assertThat(response.id()).isEqualTo(parcel.getId());
+        assertStoresQuote(parcel);
+        assertThat(parcel.getMerchantId()).isEqualTo(merchantId);
+        assertThat(parcel.getCustomerId()).isNull();
+        assertThat(parcel.getRecipientEmail()).isEqualTo("sunil@example.com");
+        assertThat(parcel.getSpeed()).isEqualTo(DeliverySpeed.EXPRESS);
+        assertThat(parcel.getPromoCode()).isNull();
+        assertThat(parcel.getStatusHistory()).singleElement().satisfies(history -> {
+            assertThat(history.getChangedBy()).isEqualTo(merchantId);
+            assertThat(history.getChangedByRole()).isEqualTo("MERCHANT");
+        });
+        verify(outboxService).enqueueStatusChangedEvent(parcel, null, "Merchant order created");
+    }
+
+    @Test
+    @DisplayName("createMerchantParcel saves nothing when pricing is unavailable")
+    void createMerchantParcelSavesNothingWhenPricingUnavailable() {
+        when(pricingServiceClient.getQuote(any()))
+                .thenThrow(new ServiceUnavailableException("pricing-service is not available right now."));
+
+        assertThatThrownBy(() -> parcelService.createMerchantParcel(merchantRequest(UUID.randomUUID())))
+                .isInstanceOf(ServiceUnavailableException.class);
 
         verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
     }

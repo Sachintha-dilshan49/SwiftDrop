@@ -5,6 +5,8 @@ import lk.swiftdrop.parcel.outbox.service.OutboxService;
 import lk.swiftdrop.parcel.parcel.client.PricingQuote;
 import lk.swiftdrop.parcel.parcel.client.PricingServiceClient;
 import lk.swiftdrop.parcel.parcel.client.QuoteRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
@@ -53,6 +55,27 @@ public class ParcelService {
         Parcel savedParcel = saveNewParcel(parcel, quote, customerId, "CUSTOMER", "Delivery booking created");
         log.info("Created customer parcel {} with tracking {}", savedParcel.getId(), savedParcel.getTrackingNo());
         return ParcelResponse.fromEntity(savedParcel);
+    }
+
+    /** The fee always comes from pricing-service's quote; a merchant cannot set its own price. */
+    @Transactional
+    public CreateInternalParcelResponse createMerchantParcel(CreateInternalParcelRequest request) {
+        PricingQuote quote = pricingServiceClient.getQuote(new QuoteRequest(request.pickupZone(),
+                request.dropoffZone(), request.weightKg(), request.size(), request.speed(), null));
+
+        Parcel parcel = new Parcel(UUID.randomUUID(), trackingNumberGenerator.generateUniqueTrackingNumber(),
+                null, request.merchantId(), request.pickupAddress(), request.dropoffAddress(),
+                request.recipientName(), request.recipientPhone(), request.size(), request.weightKg(),
+                quote.total(), quote.currency());
+        parcel.setPickupZone(request.pickupZone());
+        parcel.setDropoffZone(request.dropoffZone());
+        parcel.setRecipientEmail(request.recipientEmail());
+        parcel.setSpeed(request.speed());
+
+        Parcel savedParcel = saveNewParcel(parcel, quote, request.merchantId(), "MERCHANT", "Merchant order created");
+        log.info("Created merchant parcel {} for merchant {} with tracking {}",
+                savedParcel.getId(), request.merchantId(), savedParcel.getTrackingNo());
+        return CreateInternalParcelResponse.fromEntity(savedParcel);
     }
 
     /** Stores the quote's breakdown, the CREATED history row and the outbox event in the caller's transaction. */
