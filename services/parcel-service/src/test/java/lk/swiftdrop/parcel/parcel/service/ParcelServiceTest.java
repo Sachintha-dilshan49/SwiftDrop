@@ -1,5 +1,6 @@
 package lk.swiftdrop.parcel.parcel.service;
 
+import lk.swiftdrop.common.error.NotFoundException;
 import lk.swiftdrop.common.error.ServiceUnavailableException;
 import lk.swiftdrop.common.error.ValidationException;
 import lk.swiftdrop.common.event.ParcelStatus;
@@ -11,6 +12,7 @@ import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
 import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -188,5 +191,29 @@ class ParcelServiceTest {
                 .isInstanceOf(ServiceUnavailableException.class);
 
         verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("getRecipientContacts returns the recipient's name, phone and email")
+    void getRecipientContactsReturnsRecipientDetails() {
+        UUID parcelId = UUID.randomUUID();
+        Parcel parcel = new Parcel(parcelId, "SD-9B2N-4X1Z", null, UUID.randomUUID(), "Warehouse A, Colombo",
+                "Customer Home, Galle", "Sunil Fernando", "+94712345678", ParcelSize.SMALL, BigDecimal.ONE,
+                new BigDecimal("350.00"), "LKR");
+        parcel.setRecipientEmail("sunil@example.com");
+        when(parcelRepository.findById(parcelId)).thenReturn(Optional.of(parcel));
+
+        assertThat(parcelService.getRecipientContacts(parcelId))
+                .isEqualTo(new RecipientContactsResponse("Sunil Fernando", "+94712345678", "sunil@example.com"));
+    }
+
+    @Test
+    @DisplayName("getRecipientContacts of an unknown parcel is a 404")
+    void getRecipientContactsOfUnknownParcelIsNotFound() {
+        UUID parcelId = UUID.randomUUID();
+        when(parcelRepository.findById(parcelId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.getRecipientContacts(parcelId))
+                .isInstanceOf(NotFoundException.class);
     }
 }

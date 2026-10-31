@@ -2,11 +2,13 @@ package lk.swiftdrop.parcel.parcel.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lk.swiftdrop.common.error.NotFoundException;
 import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.common.internal.InternalTokenAuthenticationFilter;
 import lk.swiftdrop.common.internal.InternalTokenTestContextCustomizerFactory;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
 import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
 import lk.swiftdrop.parcel.parcel.service.ParcelService;
@@ -30,11 +32,13 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasItems;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -178,6 +182,62 @@ class InternalParcelControllerTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(parcelService);
+    }
+
+    @Test
+    @DisplayName("GET /internal/parcels/{id}/contacts with the internal token returns the recipient's contacts")
+    void contactsWithInternalTokenReturnRecipient() throws Exception {
+        given(parcelService.getRecipientContacts(parcelId))
+                .willReturn(new RecipientContactsResponse("Sunil Fernando", "+94771234567", "sunil@example.com"));
+
+        mockMvc.perform(get("/internal/parcels/" + parcelId + "/contacts").header(TOKEN_HEADER, TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipientName").value("Sunil Fernando"))
+                .andExpect(jsonPath("$.recipientPhone").value("+94771234567"))
+                .andExpect(jsonPath("$.recipientEmail").value("sunil@example.com"));
+    }
+
+    @Test
+    @DisplayName("GET contacts of a customer booking returns recipientEmail as null")
+    void contactsOfCustomerBookingHaveNullEmail() throws Exception {
+        given(parcelService.getRecipientContacts(parcelId))
+                .willReturn(new RecipientContactsResponse("Nimal Perera", "+94771234567", null));
+
+        mockMvc.perform(get("/internal/parcels/" + parcelId + "/contacts").header(TOKEN_HEADER, TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recipientName").value("Nimal Perera"))
+                .andExpect(jsonPath("$.recipientEmail").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("GET contacts of an unknown parcel returns 404")
+    void contactsOfUnknownParcelAreNotFound() throws Exception {
+        given(parcelService.getRecipientContacts(parcelId))
+                .willThrow(new NotFoundException("Parcel not found: " + parcelId));
+
+        mockMvc.perform(get("/internal/parcels/" + parcelId + "/contacts").header(TOKEN_HEADER, TOKEN))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/not-found"));
+    }
+
+    @Test
+    @DisplayName("GET contacts without a token returns 401")
+    void contactsWithoutTokenAreUnauthorized() throws Exception {
+        mockMvc.perform(get("/internal/parcels/" + parcelId + "/contacts"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/unauthorized"));
+
+        verifyNoInteractions(parcelService);
+    }
+
+    @ParameterizedTest(name = "GET contacts with only a user JWT ({0}) returns 401")
+    @ValueSource(strings = {"customer-token", "merchant-token", "courier-token", "dispatcher-token", "admin-token"})
+    void contactsWithUserJwtOnlyAreUnauthorized(String token) throws Exception {
+        mockMvc.perform(get("/internal/parcels/" + parcelId + "/contacts")
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(parcelService);

@@ -1,5 +1,6 @@
 package lk.swiftdrop.parcel.parcel.service;
 
+import lk.swiftdrop.common.error.NotFoundException;
 import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.parcel.outbox.service.OutboxService;
 import lk.swiftdrop.parcel.parcel.client.PricingQuote;
@@ -9,6 +10,7 @@ import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
 import lk.swiftdrop.parcel.parcel.entity.ParcelStatusHistory;
 import lk.swiftdrop.parcel.parcel.repository.ParcelRepository;
@@ -76,6 +78,14 @@ public class ParcelService {
         log.info("Created merchant parcel {} for merchant {} with tracking {}",
                 savedParcel.getId(), request.merchantId(), savedParcel.getTrackingNo());
         return CreateInternalParcelResponse.fromEntity(savedParcel);
+    }
+
+    /** The recipient's contact details for notification-service; personal data, so it is never logged. */
+    @Transactional(readOnly = true)
+    public RecipientContactsResponse getRecipientContacts(UUID parcelId) {
+        Parcel parcel = parcelRepository.findById(parcelId)
+                .orElseThrow(() -> new NotFoundException("Parcel not found: " + parcelId));
+        return RecipientContactsResponse.fromEntity(parcel);
     }
 
     /** Stores the quote's breakdown, the CREATED history row and the outbox event in the caller's transaction. */
