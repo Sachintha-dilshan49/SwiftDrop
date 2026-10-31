@@ -1,0 +1,43 @@
+@startuml UC-01_customer_account
+!include _style.iuml
+left to right direction
+title SwiftDrop – Customer Account & Sign-in
+
+actor "Visitor\n(not logged in)" as Visitor
+actor "Customer" as Customer
+actor "Google\n(OAuth 2.0)" as Google <<external>>
+
+rectangle "SwiftDrop – Auth Service" {
+  usecase "Sign up with email\nand password" as C01
+  usecase "Validate input &\nhash password (BCrypt)" as C01a
+  usecase "Log in" as C02
+  usecase "Log in with Google" as C03
+  usecase "Issue access token (15 min)\n& refresh token (7 days)" as C02a
+  usecase "Refresh session" as C02b
+  usecase "Log out" as C04
+  usecase "Revoke refresh token" as C04a
+}
+
+Visitor --> C01
+Visitor --> C02
+Customer --> C04
+Customer --> C02b
+
+C01 ..> C01a : <<include>>
+C01 ..> C02a : <<include>>
+C02 ..> C02a : <<include>>
+C03 .> C02 : <<extend>>\n[user picks Google]
+C03 -- Google
+C02b ..> C02a : <<include>>
+C04 ..> C04a : <<include>>
+
+note as N1
+  OAuth 2.0 Authorization Code flow.
+  First-time Google users are created
+  with the CUSTOMER role.
+end note
+note as N2
+  Done automatically by the web app
+  when the API returns 401.
+end note
+@enduml

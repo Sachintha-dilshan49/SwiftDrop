@@ -1,0 +1,44 @@
+@startuml UC-03_customer_tracking
+!include _style.iuml
+left to right direction
+title SwiftDrop – Tracking, History & Receipts
+
+actor "Customer" as Customer
+actor "Visitor\n(not logged in)" as Visitor
+actor "Email / SMS\nGateway" as Notify <<external>>
+
+rectangle "SwiftDrop Platform" {
+  usecase "View my deliveries\n(delivery history)" as C10
+  usecase "View parcel details" as C11
+  usecase "View status history\n(who, when, note, proof)" as C11a
+  usecase "Track delivery live\n(Server-Sent Events)" as C12
+  usecase "Download receipt (PDF)" as C13
+  usecase "Track parcel by\ntracking number (public)" as C14
+  usecase "Receive status\nnotifications" as C15
+}
+
+Customer --> C10
+Customer --> C11
+Visitor --> C14
+C15 --> Customer
+C15 -- Notify
+
+C11 ..> C11a : <<include>>
+C12 .> C11 : <<extend>>\n[parcel not yet delivered]
+C13 .> C11 : <<extend>>\n[status = DELIVERED]
+C14 ..> C12 : <<include>>
+
+note as N1
+  A customer can only see their own
+  parcels (other parcels return 403/404).
+end note
+note as N2
+  Phone-first page. Shows status and
+  progress only, with no personal data.
+end note
+note as N3
+  Sent on every status change:
+  CREATED → PICKED_UP → IN_TRANSIT →
+  OUT_FOR_DELIVERY → DELIVERED / FAILED
+end note
+@enduml

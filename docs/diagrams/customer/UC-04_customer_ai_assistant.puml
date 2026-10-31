@@ -1,0 +1,39 @@
+@startuml UC-04_customer_ai_assistant
+!include _style.iuml
+left to right direction
+title SwiftDrop – AI Assistant (Customer)
+
+actor "Customer" as Customer
+actor "LLM Provider" as LLM <<external>>
+
+rectangle "SwiftDrop Platform" {
+  usecase "Chat with AI assistant" as C16
+  usecase "Ask where my parcel is\n(track_parcel)" as C17
+  usecase "Ask for a fee estimate\n(estimate_fee)" as C18
+  usecase "List my parcels\n(my_parcels)" as C19
+  usecase "Refuse unrelated or\nunauthorised questions" as C20
+  usecase "View parcel details" as C11
+  usecase "Get fee estimate" as C08
+  usecase "View my deliveries" as C10
+}
+
+Customer --> C16
+C16 -- LLM
+
+C17 .> C16 : <<extend>>
+C18 .> C16 : <<extend>>
+C19 .> C16 : <<extend>>
+C20 .> C16 : <<extend>>\n[off-topic or another\nuser's data]
+
+C17 ..> C11 : <<include>>
+C18 ..> C08 : <<include>>
+C19 ..> C10 : <<include>>
+
+note as N1
+  Tools call the API gateway with the
+  customer's own token, so the assistant
+  only sees what the customer may see.
+  e.g. "Where is my parcel?"
+       "How much to send 2 kg to Kandy?"
+end note
+@enduml

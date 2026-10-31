@@ -21,6 +21,7 @@ All `.mmd` files can be pasted into [mermaid.live](https://mermaid.live) to rend
 | `seq-parcel-history-receipt.puml` | Sequence — delivery history, parcel details, receipt PDF and public lookup (4 PNG pages, landscape) | Role 3 |
 | `seq-internal-parcel-api.puml` | Sequence — internal API: merchant orders and recipient contacts (4 PNG pages, landscape) | Role 3, contract with Role 5 + Role 6 |
 | `arch-parcel-service.puml` | Component — parcel-service endpoints, parts and dependencies (landscape) | Role 3 |
+| `customer/UC-00` … `UC-04` `.puml` | Use case — customer: overview, account, booking, tracking, AI assistant (PNG + SVG, descriptions in `customer/customer-use-cases.md`) | Role 7 |
 | `er-` | ER diagram (full and per service) | Each service owner, merged by Role 1 |
 | `arch-` | Architecture overview (full system) | Role 1 |
 | `seq-merchant-order` | Merchant API order creation | Role 5 |

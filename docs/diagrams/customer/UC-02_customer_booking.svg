@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="385px" preserveAspectRatio="none" style="width:1106px;height:385px;" version="1.1" viewBox="0 0 1106 385" width="1106px" zoomAndPan="magnify"><defs/><g><text fill="#000000" font-family="Arial" font-size="18" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="240" x="444.5" y="17.4375">SwiftDrop - Book a Delivery</text><!--cluster SwiftDrop Platform--><rect fill="#FFFFFF" height="320" style="stroke: #0F1A2E; stroke-width: 1.5;" width="802" x="293" y="45.7793"/><text fill="#000000" font-family="Arial" font-size="15" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="142" x="623" y="62.3105">SwiftDrop Platform</text><ellipse cx="392.0512" cy="173.6895" fill="#FFF6EF" rx="65.0512" ry="15.4102" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="96" x="344.0512" y="178.0543">Book a delivery</text><ellipse cx="667.811" cy="257.9214" fill="#FFF6EF" rx="78.311" ry="25.1421" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="105" x="615.311" y="254.2758">Enter pickup and</text><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="107" x="614.311" y="270.0053">drop-off address</text><ellipse cx="667.882" cy="173.7762" fill="#FFF6EF" rx="79.882" ry="23.4969" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="118" x="608.882" y="172.8639">Enter package size</text><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="69" x="633.382" y="188.5934">and weight</text><ellipse cx="667.7966" cy="333.7386" fill="#FFF6EF" rx="67.7966" ry="15.9593" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="103" x="616.2966" y="338.1034">Get fee estimate</text><ellipse cx="668.1948" cy="98.8182" fill="#FFF6EF" rx="68.1948" ry="16.039" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="104" x="616.1948" y="103.183">Confirm booking</text><ellipse cx="970.0931" cy="107.9519" fill="#FFF6EF" rx="109.0931" ry="24.6726" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="154" x="893.0931" y="105.2722">Receive tracking number</text><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="137" x="901.5931" y="121.0017">(e.g. SD-7K3Q-9P2M)</text><ellipse cx="391.8537" cy="283.75" fill="#FFF6EF" rx="82.8537" ry="18.9707" style="stroke: #C2410C; stroke-width: 1.5;"/><text fill="#0F1A2E" font-family="Arial" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="139" x="322.3537" y="288.1148">Show validation errors</text><!--entity Customer--><ellipse cx="126" cy="306.2793" fill="#FFF1E7" rx="8" ry="8" style="stroke: #0F1A2E; stroke-width: 2.0;"/><path d="M126,314.2793 L126,341.2793 M113,322.2793 L139,322.2793 M126,341.2793 L113,356.2793 M126,341.2793 L139,356.2793 " fill="none" style="stroke: #0F1A2E; stroke-width: 2.0;"/><text fill="#000000" font-family="Arial" font-size="13" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="63" x="94.5" y="371.873">Customer</text><path d="M6,198.2793 L6,261.5176 L246,261.5176 L246,208.2793 L236,198.2793 L6,198.2793 " fill="#F1F5F9" style="stroke: #94A3B8; stroke-width: 1.0;"/><path d="M236,198.2793 L236,208.2793 L246,208.2793 L236,198.2793 " fill="#F1F5F9" style="stroke: #94A3B8; stroke-width: 1.0;"/><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="188" x="12" y="213.9355">Fee comes from the pricing service:</text><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="164" x="12" y="227.2451">zone + base fare + per-km rate.</text><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="176" x="12" y="240.5547">The customer sees the fee before</text><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="219" x="12" y="253.8643">confirming (e.g. 2 kg Colombo → Kandy).</text><path d="M14,112.7793 L14,162.708 L238,162.708 L238,122.7793 L228,112.7793 L14,112.7793 " fill="#F1F5F9" style="stroke: #94A3B8; stroke-width: 1.0;"/><path d="M228,112.7793 L228,122.7793 L238,122.7793 L228,112.7793 " fill="#F1F5F9" style="stroke: #94A3B8; stroke-width: 1.0;"/><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="203" x="20" y="128.4355">Parcel is created with status CREATED</text><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="190" x="20" y="141.7451">and a ParcelStatusChanged event is</text><text fill="#000000" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="144" x="20" y="155.0547">published for notifications.</text><!--link Customer to C05--><path d="M157.65,323.5193 C182.33,313.0793 217.5,296.9293 246,278.7793 C264.91,266.7393 267.08,260.2593 285,246.7793 C311.45,226.8793 342.78,205.5693 364.48,191.1393 " fill="none" id="Customer-C05" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="368.69,188.3493,358.9788,189.9903,364.5232,191.1129,363.4005,196.6572,368.69,188.3493" style="stroke: #475569; stroke-width: 1.0;"/><!--link Customer to C08--><path d="M157.58,335.6693 C241.12,335.3593 474.92,334.4893 594.53,334.0493 " fill="none" id="Customer-C08" style="stroke: #475569; stroke-width: 1.0;"/><polygon fill="#475569" points="599.79,334.0293,590.7786,330.055,594.79,334.0436,590.8015,338.055,599.79,334.0293" style="stroke: #475569; stroke-width: 1.0;"/><!--link C05 to C06--><path d="M432.55,185.8993 C477.92,199.8093 552.85,222.7793 605.77,239.0093 " fill="none" id="C05-C06" style="stroke: #475569; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><polygon fill="#475569" points="610.82,240.5593,603.3807,234.1051,606.038,239.0989,601.0441,241.7562,610.82,240.5593" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="51" x="506" y="205.4355">«include»</text><!--link C05 to C07--><path d="M457.24,173.7793 C494.63,173.7793 542.21,173.7793 582.6,173.7793 " fill="none" id="C05-C07" style="stroke: #475569; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><polygon fill="#475569" points="587.99,173.7793,578.99,169.7793,582.99,173.7793,578.99,177.7793,587.99,173.7793" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="51" x="506" y="170.4355">«include»</text><!--link C05 to C08--><path d="M413.35,188.6093 C448.05,213.5193 521.4,264.4793 588,299.7793 C600.46,306.3793 614.47,312.7393 627.19,318.1293 " fill="none" id="C05-C08" style="stroke: #475569; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><polygon fill="#475569" points="631.82,320.0693,625.0775,312.8902,627.2118,318.129,621.9731,320.2633,631.82,320.0693" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="51" x="506" y="248.4355">«include»</text><!--link C05 to C09--><path d="M435.51,162.1393 C484.88,148.6293 566.15,126.3793 618.09,112.1693 " fill="none" id="C05-C09" style="stroke: #475569; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><polygon fill="#475569" points="623.03,110.8193,613.2902,109.3576,618.2102,112.1494,615.4184,117.0694,623.03,110.8193" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="51" x="506" y="126.4355">«include»</text><!--link C09 to C09a--><path d="M735.58,100.7793 C771.02,101.8393 815.56,103.1793 856.21,104.3993 " fill="none" id="C09-C09a" style="stroke: #475569; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><polygon fill="#475569" points="861.66,104.5593,852.7901,100.2786,856.6625,104.4022,852.5388,108.2746,861.66,104.5593" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="51" x="779" y="99.4355">«include»</text><!--link C09b to C05--><path d="M392,264.6193 C392,245.0693 392,214.8193 392,194.6593 " fill="none" id="C09b-C05" style="stroke: #475569; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><polygon fill="#475569" points="392,189.5193,388,198.5193,392,194.5193,396,198.5193,392,189.5193" style="stroke: #475569; stroke-width: 1.0;"/><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="48" x="344.5" y="218.1855">«extend»</text><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="87" x="325" y="231.4951">[invalid address,</text><text fill="#475569" font-family="Arial" font-size="11" lengthAdjust="spacingAndGlyphs" textLength="78" x="329.5" y="244.8047">size or weight]</text><!--
+@startuml UC-02_customer_booking
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam backgroundColor #FFFFFF
+skinparam packageStyle rectangle
+skinparam ArrowColor #475569
+skinparam ArrowFontColor #475569
+skinparam ArrowFontSize 11
+skinparam ActorBorderColor #0F1A2E
+skinparam ActorBackgroundColor #FFF1E7
+skinparam ActorFontStyle bold
+skinparam UsecaseBorderColor #C2410C
+skinparam UsecaseBackgroundColor #FFF6EF
+skinparam UsecaseFontColor #0F1A2E
+skinparam RectangleBorderColor #0F1A2E
+skinparam RectangleBorderThickness 1.5
+skinparam RectangleFontStyle bold
+skinparam RectangleFontSize 15
+skinparam NoteBackgroundColor #F1F5F9
+skinparam NoteBorderColor #94A3B8
+skinparam NoteFontSize 11
+skinparam TitleFontSize 18
+skinparam TitleFontStyle bold
+left to right direction
+title SwiftDrop - Book a Delivery
+
+actor "Customer" as Customer
+
+rectangle "SwiftDrop Platform" {
+  usecase "Book a delivery" as C05
+  usecase "Enter pickup and\ndrop-off address" as C06
+  usecase "Enter package size\nand weight" as C07
+  usecase "Get fee estimate" as C08
+  usecase "Confirm booking" as C09
+  usecase "Receive tracking number\n(e.g. SD-7K3Q-9P2M)" as C09a
+  usecase "Show validation errors" as C09b
+}
+
+Customer - -> C05
+Customer - -> C08
+
+C05 ..> C06 : <<include>>
+C05 ..> C07 : <<include>>
+C05 ..> C08 : <<include>>
+C05 ..> C09 : <<include>>
+C09 ..> C09a : <<include>>
+C09b .> C05 : <<extend>>\n[invalid address,\nsize or weight]
+
+note as N1
+  Fee comes from the pricing service:
+  zone + base fare + per-km rate.
+  The customer sees the fee before
+  confirming (e.g. 2 kg Colombo → Kandy).
+end note
+note as N2
+  Parcel is created with status CREATED
+  and a ParcelStatusChanged event is
+  published for notifications.
+end note
+@enduml
+
+PlantUML version 1.2019.06(Fri May 24 22:40:25 IST 2019)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Java Version: 21.0.12.1+1-1-24.04.4-Ubuntu
+Operating System: Linux
+OS Version: 6.18.44-fc-v185
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>
