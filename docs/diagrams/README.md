@@ -36,6 +36,8 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 | ER | `er/er-notification-db.mmd` | `notification_db` | From Thisaru's migrations (Role 6) |
 | Architecture | `architecture/arch-system-overview.mmd` | System by layer: presentation, edge, business logic, integration, data | Role 1 |
 | Architecture | `architecture/arch-layered-service.mmd` | Presentation → business logic → data inside one service | Role 1 |
+| Architecture | `architecture/arch-deployment.mmd` | Deployment: Docker Compose (implemented), Kubernetes with Helm (planned), CI | Role 1 with Role 8 |
+| Architecture | `architecture/class-pricing-strategy.mmd` | Class diagram — pricing fee components as a Strategy pattern (design) | Role 1 |
 | Architecture | `arch-parcel-service.puml` | parcel-service components | Sanduni (Role 3) |
 | Architecture | `architecture/arch-notification-service.mmd` | notification-service components | Based on Thisaru's `arch-notification.mmd` (Role 6) |
 | Architecture | `Auth-Architecture diagram.png` | auth-service context | Thulani (Role 2) |

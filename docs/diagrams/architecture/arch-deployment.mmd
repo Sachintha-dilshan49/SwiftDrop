@@ -1,0 +1,42 @@
+---
+config:
+  layout: elk
+---
+%% Architecture — deployment view: Docker Compose (local, implemented) and Kubernetes with Helm (bonus, planned) · Role 1 with Role 8
+%% Source: docs/architecture.md v1.2 §12, deploy/compose/docker-compose.yml, .github/workflows
+flowchart LR
+  classDef box fill:#ffffff,stroke:#333
+  classDef data fill:#f4f4f4,stroke:#555
+  classDef edge fill:#eef3fb,stroke:#3b5b92
+  classDef plan fill:#ffffff,stroke:#888,stroke-dasharray:5 3
+
+  DEV["Developer laptop / demo PC<br/>browser"]:::box
+
+  subgraph COMPOSE["Docker Compose · deploy/compose (implemented)"]
+    direction TB
+    FEC["frontend<br/>nginx, host 3000 → 80"]:::box
+    GWC["api-gateway<br/>host 8080, only backend port"]:::edge
+    SVCC["7 service containers<br/>8081–8087, internal network<br/>(exposed in dev for debugging)"]:::box
+    DATAC[("postgres 5432 · rabbitmq 5672/15672<br/>redis 6379 · minio 9000/9001<br/>mailpit 1025/8025")]:::data
+    FEC --> GWC --> SVCC --> DATAC
+  end
+
+  subgraph K8S["Kubernetes · Helm umbrella chart deploy/helm/swiftdrop (bonus, planned)"]
+    direction TB
+    ING["ingress-nginx<br/>/ → frontend · /api → api-gateway<br/>proxy-buffering off for SSE"]:::plan
+    DEP["Deployment + ClusterIP Service per service<br/>readiness / liveness from Actuator"]:::plan
+    CFG["ConfigMaps (non-secret config)<br/>Secrets (DB passwords, JWT key,<br/>INTERNAL_API_TOKEN, Google client)"]:::plan
+    STS[("StatefulSets or Bitnami charts<br/>Postgres · RabbitMQ · Redis · MinIO")]:::plan
+    ING --> DEP --> STS
+    CFG -.-> DEP
+  end
+
+  subgraph CI["GitHub Actions"]
+    direction TB
+    PR["pr.yml: build, unit + integration tests,<br/>JaCoCo report, frontend checks"]:::box
+    REL["release.yml: build images,<br/>push to GHCR (version + SHA)"]:::box
+  end
+
+  DEV -- "http://localhost:3000" --> FEC
+  REL -- "images" --> DEP
+  REL -. "same images" .-> SVCC
