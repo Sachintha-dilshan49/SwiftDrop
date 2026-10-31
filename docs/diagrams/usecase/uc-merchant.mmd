@@ -1,0 +1,43 @@
+---
+config:
+  layout: elk
+---
+%% Use case — Merchant
+%% Based on usecase-merchant.md by Sudari Ratnayake (Role 5); corrected against docs/architecture.md v1.1 §5, §6.1, §6.3, §9
+%% Changes: added log in, order API path and gateway checks, signed webhook to the store, reject with reason; Admin is the approver
+flowchart LR
+  classDef actor fill:#ffffff,stroke:#222,stroke-width:2px,font-weight:bold
+  classDef ext fill:#f2f2f2,stroke:#777,stroke-dasharray:5 3
+  classDef uc fill:#ffffff,stroke:#444
+  classDef note fill:#fffbe6,stroke:#c9a400,font-size:12px
+
+  Merchant["«actor»<br/>Merchant<br/>(MERCHANT role)"]:::actor
+  Admin["«actor»<br/>Admin"]:::actor
+
+  subgraph SD["SwiftDrop — merchant-service :8085"]
+    direction TB
+    M1(["Register business<br/>(status PENDING)"]):::uc
+    M2(["Log in"]):::uc
+    M3(["View profile and approval status"]):::uc
+    M4(["Create API key<br/>(shown once)"]):::uc
+    M5(["Revoke API key"]):::uc
+    M6(["Configure webhook URL<br/>and signing secret"]):::uc
+    M7(["View orders and their tracking"]):::uc
+    M8(["Create parcel order via API<br/>POST /api/v1/merchant-api/orders<br/>(X-API-Key)"]):::uc
+    M9(["Receive signed status webhook<br/>(X-SwiftDrop-Signature)"]):::uc
+    A1(["Review pending merchants"]):::uc
+    A2(["Approve merchant"]):::uc
+    A3(["Reject merchant with reason"]):::uc
+  end
+
+  Store["«system»<br/>Merchant store server<br/>(e-commerce backend)"]:::ext
+
+  Merchant --- M1 & M2 & M3 & M4 & M5 & M6 & M7
+  Store --- M8
+  M9 --- Store
+  Admin --- A1
+  A2 -. "«extend»" .-> A1
+  A3 -. "«extend»" .-> A1
+
+  N1["API keys and orders only for APPROVED merchants.<br/>Gateway: 401 without X-API-Key, 429 over the per-key rate limit.<br/>merchant-service: key hash lookup, revoked/expired → 401,<br/>merchant not APPROVED → 403.<br/>Webhooks are sent by notification-service on every status change."]:::note
+  M8 ~~~ N1

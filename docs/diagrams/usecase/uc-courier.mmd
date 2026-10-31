@@ -1,0 +1,38 @@
+---
+config:
+  layout: elk
+---
+%% Use case — Courier
+%% Source: docs/architecture.md v1.1 §5 (dispatch), §7, §9, §10.3 · Role 1 (Role 4 to review)
+flowchart LR
+  classDef actor fill:#ffffff,stroke:#222,stroke-width:2px,font-weight:bold
+  classDef ext fill:#f2f2f2,stroke:#777,stroke-dasharray:5 3
+  classDef uc fill:#ffffff,stroke:#444
+  classDef note fill:#fffbe6,stroke:#c9a400,font-size:12px
+
+  Courier["«actor»<br/>Courier<br/>(COURIER role, phone)"]:::actor
+
+  subgraph SD["SwiftDrop — dispatch-service :8084 (screens under /courier)"]
+    direction TB
+    C1(["Log in"]):::uc
+    C2(["View today's deliveries<br/>GET /api/v1/courier/deliveries/today"]):::uc
+    C3(["View delivery details<br/>(pickup, drop-off, recipient contact)"]):::uc
+    C4(["Update delivery status<br/>POST /api/v1/courier/deliveries/{id}/status"]):::uc
+    C5(["Add note"]):::uc
+    C6(["Upload proof photo<br/>(stored in MinIO)"]):::uc
+    C7(["Mark delivery FAILED<br/>with reason"]):::uc
+  end
+
+  MinIO["«system»<br/>MinIO delivery-proofs"]:::ext
+  Notify["«system»<br/>Email / SMS / webhook<br/>(via status event)"]:::ext
+
+  Courier --- C1 & C2 & C4
+  C3 -. "«extend»" .-> C2
+  C5 -. "«extend»" .-> C4
+  C6 -. "«extend»<br/>[DELIVERED or proof needed]" .-> C4
+  C7 -. "«extend»<br/>[from OUT_FOR_DELIVERY]" .-> C4
+  C6 --- MinIO
+  C4 -. "triggers" .-> Notify
+
+  N1["Allowed moves: CREATED → PICKED_UP → IN_TRANSIT →<br/>OUT_FOR_DELIVERY → DELIVERED | FAILED; others → 409.<br/>Only the assigned courier may update (403 otherwise).<br/>dispatch-service asks parcel-service to change the status."]:::note
+  C4 ~~~ N1
