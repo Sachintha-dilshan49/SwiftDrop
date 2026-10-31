@@ -29,12 +29,11 @@ flowchart LR
   Notify["«system»<br/>Email / SMS gateway"]:::ext
   Recipient["«actor»<br/>Recipient<br/>(no account)"]:::ext
 
-  Customer --- C10 & C11 & C14
+  Customer --- C10 & C11 & C14 & C15
   Guest --- C14
   C11 -. "«include»" .-> C11a
   C13 -. "«extend»" .-> C11
   C12 -. "«extend»<br/>[not DELIVERED / FAILED]" .-> C14
-  C15 --- Customer
   C15 --- Recipient
   C15 --- Notify
 

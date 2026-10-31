@@ -32,7 +32,7 @@ flowchart LR
     DB[("notification_db<br/>processed_events · notifications<br/>webhook_deliveries")]:::data
   end
 
-  subgraph RQ["Retry queues (TTL → dead-letter back to webhook.q)"]
+  subgraph RQ["Retry queues: when the TTL expires the message is dead-lettered back to webhook.q"]
     R10["webhook.retry.10s"]:::q
     R1M["webhook.retry.1m"]:::q
     R5M["webhook.retry.5m"]:::q
@@ -71,6 +71,5 @@ flowchart LR
   WC -- "attempt 2 fails" --> R1M
   WC -- "attempt 3 fails" --> R5M
   WC -- "attempt 4 fails" --> PARK
-  R10 & R1M & R5M -. "TTL expires" .-> WQ
 
   IS & NSV & WDS --> DB

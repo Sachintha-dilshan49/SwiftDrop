@@ -21,24 +21,26 @@ flowchart LR
 
   EX{{"parcel.events<br/>topic, durable<br/>key parcel.status.&lt;status&gt;"}}:::ex
 
-  subgraph QUEUES["Queues — binding parcel.status.#"]
+  subgraph QUEUES["Queues · binding parcel.status.#"]
     NQ["notification.q"]:::q
     WQ["webhook.q"]:::q
     DQ["dispatch.q"]:::q
     TQ["tracking.q"]:::q
   end
 
-  subgraph RETRY["Webhook retry (TTL + dead-letter to webhook.q)"]
+  subgraph RETRY["Retry queues · TTL expiry dead-letters back to webhook.q"]
     R10["webhook.retry.10s"]:::retry
     R1["webhook.retry.1m"]:::retry
     R5["webhook.retry.5m"]:::retry
     PK["webhook.parking<br/>(admin replay)"]:::retry
   end
 
-  NOTIF_E["notification-service<br/>email on every change<br/>SMS on OUT_FOR_DELIVERY, DELIVERED, FAILED"]:::svc
-  NOTIF_W["notification-service<br/>signed webhook if merchantId set"]:::svc
-  DISP["dispatch-service<br/>daily report counters"]:::svc
-  TRACK["parcel-service<br/>push to open SSE streams"]:::svc
+  subgraph CONS["Consumers · each skips duplicate eventIds (processed_events)"]
+    NOTIF_E["notification-service<br/>email on every change<br/>SMS on OUT_FOR_DELIVERY, DELIVERED, FAILED"]:::svc
+    NOTIF_W["notification-service<br/>signed webhook if merchantId set"]:::svc
+    DISP["dispatch-service<br/>daily report counters"]:::svc
+    TRACK["parcel-service<br/>push to open SSE streams"]:::svc
+  end
 
   RELAY -- "publish ParcelStatusChanged v1<br/>messageId = eventId" --> EX
   EX --> NQ & WQ & DQ & TQ
@@ -51,7 +53,3 @@ flowchart LR
   NOTIF_W -- "fail 2" --> R1
   NOTIF_W -- "fail 3" --> R5
   NOTIF_W -- "fail 4" --> PK
-  R10 & R1 & R5 -. "TTL expires" .-> WQ
-
-  IDEM["Every consumer stores eventId in its own<br/>processed_events and skips duplicates"]:::data
-  NOTIF_E & NOTIF_W & DISP & TRACK -.- IDEM
