@@ -21,6 +21,13 @@ All `.mmd` files can be pasted into [mermaid.live](https://mermaid.live) to rend
 | `seq-parcel-history-receipt.puml` | Sequence — delivery history, parcel details, receipt PDF and public lookup (4 PNG pages, landscape) | Role 3 |
 | `seq-internal-parcel-api.puml` | Sequence — internal API: merchant orders and recipient contacts (4 PNG pages, landscape) | Role 3, contract with Role 5 + Role 6 |
 | `arch-parcel-service.puml` | Component — parcel-service endpoints, parts and dependencies (landscape) | Role 3 |
+| `UC-00_customer_overview.puml` | Use case — every customer-facing use case on one page (PNG + SVG) | Role 7 |
+| `UC-01_customer_account.puml` | Use case — customer sign up, log in, Google login, sessions, log out (PNG + SVG) | Role 7 |
+| `UC-02_customer_booking.puml` | Use case — customer books a delivery with the fee estimate (PNG + SVG) | Role 7 |
+| `UC-03_customer_tracking.puml` | Use case — delivery history, parcel details, live and public tracking, receipts, notifications (PNG + SVG) | Role 7 |
+| `UC-04_customer_ai_assistant.puml` | Use case — customer AI assistant questions and guardrails (PNG + SVG) | Role 7 |
+| `customer-use-cases.md` | Customer actors, use case descriptions (UC-C01 – UC-C20) and main flows | Role 7 |
+| `_style.iuml` | Shared PlantUML style included by the `UC-*` diagrams | Role 7 |
 | `er-` | ER diagram (full and per service) | Each service owner, merged by Role 1 |
 | `arch-` | Architecture overview (full system) | Role 1 |
 | `seq-merchant-order` | Merchant API order creation | Role 5 |

@@ -1,0 +1,64 @@
+@startuml UC-00_customer_overview
+!include _style.iuml
+skinparam PackageBorderColor #CBD5E1
+skinparam PackageBackgroundColor #FBFCFE
+skinparam PackageFontStyle bold
+skinparam PackageFontColor #475569
+skinparam PackageFontSize 12
+left to right direction
+title SwiftDrop – Customer Use Case Diagram (Overview)
+
+actor "Visitor\n(not logged in)" as Visitor
+actor "Customer" as Customer
+
+rectangle "SwiftDrop Platform" {
+  package "Account" {
+    usecase "Sign up" as C01
+    usecase "Log in" as C02
+    usecase "Log in with Google" as C03
+    usecase "Log out" as C04
+  }
+  package "Deliveries" {
+    usecase "Book a delivery" as C05
+    usecase "Get fee estimate" as C08
+    usecase "View my deliveries" as C10
+    usecase "View parcel details\n& status history" as C11
+    usecase "Download receipt (PDF)" as C13
+  }
+  package "Tracking & updates" {
+    usecase "Track delivery live" as C12
+    usecase "Track parcel by\ntracking number (public)" as C14
+    usecase "Receive status\nnotifications" as C15
+  }
+  package "AI assistant" {
+    usecase "Chat with AI assistant" as C16
+  }
+}
+
+actor "Google\n(OAuth 2.0)" as Google <<external>>
+actor "Email / SMS\nGateway" as Notify <<external>>
+actor "LLM Provider" as LLM <<external>>
+
+Visitor --> C01
+Visitor --> C02
+Visitor --> C14
+
+Customer --> C04
+Customer --> C05
+Customer --> C10
+Customer --> C11
+Customer --> C12
+Customer -- C15
+Customer --> C16
+
+C03 .> C02 : <<extend>>
+C05 ..> C08 : <<include>>
+C13 .> C11 : <<extend>>\n[DELIVERED]
+
+C03 --> Google
+C15 --> Notify
+C16 --> LLM
+
+note "A Customer is a logged-in user with the\nCUSTOMER role (JWT). New sign-ups and\nGoogle users become CUSTOMER by default." as N1
+N1 .. Customer
+@enduml
