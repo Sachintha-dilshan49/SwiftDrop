@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * V5 against a database that already has data from V1–V4. Each test gets a new, empty database in
+ * V5 and V6 against a database that already has data. Each test gets a new, empty database in
  * the shared test container (never a developer's local database).
  */
 class ParcelMigrationIT {
@@ -145,6 +146,46 @@ class ParcelMigrationIT {
         insertParcel(UUID.randomUUID(), "SD-2222-6666", "FAILED", "Recipient unavailable");
     }
 
+    @Test
+    @DisplayName("V6 gives existing parcels a route and a fee breakdown that adds up to their fee")
+    void backfillsRouteAndFeeBreakdown() {
+        migrateTo("5");
+        UUID parcelId = UUID.randomUUID();
+        insertParcel(parcelId, "SD-7K3Q-9P2M", "CREATED", null);
+
+        migrateTo("6");
+
+        Map<String, Object> row = jdbc.queryForMap("""
+                SELECT pickup_zone, dropoff_zone, speed, route_type, base_fee, weight_fee, size_fee,
+                       express_fee, discount, fee_amount
+                FROM parcels WHERE id = ?
+                """, parcelId);
+        assertThat(row)
+                .containsEntry("pickup_zone", "UNKNOWN")
+                .containsEntry("dropoff_zone", "UNKNOWN")
+                .containsEntry("speed", "STANDARD")
+                .containsEntry("route_type", "SAME_ZONE");
+        assertThat((BigDecimal) row.get("base_fee")).isEqualByComparingTo((BigDecimal) row.get("fee_amount"));
+        assertThat(List.of("weight_fee", "size_fee", "express_fee", "discount"))
+                .allSatisfy(column -> assertThat((BigDecimal) row.get(column)).isZero());
+    }
+
+    @Test
+    @DisplayName("V6 accepts EXTRA_LARGE and rejects unknown sizes, speeds and routes, and merchant orders without an email")
+    void rejectsInvalidQuotedParcels() {
+        migrateTo("6");
+        insertQuotedParcel("SD-2222-3333", "EXTRA_LARGE", "EXPRESS", "INTER_CITY", null, null);
+        insertQuotedParcel("SD-2222-4444", "SMALL", "NEXT_DAY", "SAME_ZONE", UUID.randomUUID(), "shop@example.com");
+
+        assertRejected(() -> insertQuotedParcel("SD-2222-5555", "HUGE", "STANDARD", "SAME_ZONE", null, null));
+        assertRejected(() -> insertQuotedParcel("SD-2222-6666", "SMALL", "TOMORROW", "SAME_ZONE", null, null));
+        assertRejected(() -> insertQuotedParcel("SD-2222-7777", "SMALL", "STANDARD", "OVERSEAS", null, null));
+        assertRejected(() -> insertQuotedParcel("SD-2222-8888", "SMALL", "STANDARD", "SAME_ZONE",
+                UUID.randomUUID(), null));
+        // A parcel without a route and a fee breakdown
+        assertRejected(() -> insertParcel(UUID.randomUUID(), "SD-2222-9999", "CREATED", null));
+    }
+
     private void migrateTo(String version) {
         Flyway.configure()
                 .dataSource(dataSource)
@@ -160,6 +201,20 @@ class ParcelMigrationIT {
                                      recipient_phone, size, weight_kg, fee_amount, status, failure_reason)
                 VALUES (?, ?, ?, 'Pickup', 'Dropoff', 'Recipient', '0771234567', 'SMALL', 1.00, 350.00, ?, ?)
                 """, id, trackingNo, UUID.randomUUID(), status, failureReason);
+    }
+
+    /** Inserts a parcel in the V6 shape: a route, a speed and a fee breakdown that adds up to fee_amount. */
+    private void insertQuotedParcel(String trackingNo, String size, String speed, String routeType,
+                                    UUID merchantId, String recipientEmail) {
+        jdbc.update("""
+                INSERT INTO parcels (id, tracking_no, customer_id, merchant_id, pickup_address, pickup_zone,
+                                     dropoff_address, dropoff_zone, recipient_name, recipient_phone, recipient_email,
+                                     size, weight_kg, speed, route_type, base_fee, weight_fee, size_fee,
+                                     express_fee, discount, fee_amount)
+                VALUES (?, ?, ?, ?, 'Pickup', 'COLOMBO_SOUTH', 'Dropoff', 'COLOMBO_CENTRAL', 'Recipient',
+                        '0771234567', ?, ?, 1.00, ?, ?, 350.00, 0, 0, 0, 0, 350.00)
+                """, UUID.randomUUID(), trackingNo, merchantId == null ? UUID.randomUUID() : null, merchantId,
+                recipientEmail, size, speed, routeType);
     }
 
     /** Inserts an outbox row in the shape of the current schema (before or after V5). */

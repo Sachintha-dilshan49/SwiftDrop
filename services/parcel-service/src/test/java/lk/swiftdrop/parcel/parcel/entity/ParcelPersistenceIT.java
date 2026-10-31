@@ -3,6 +3,7 @@ package lk.swiftdrop.parcel.parcel.entity;
 import jakarta.persistence.EntityManager;
 import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.parcel.support.AbstractContainersIT;
+import lk.swiftdrop.parcel.support.ParcelFixtures;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,7 @@ class ParcelPersistenceIT extends AbstractContainersIT {
             Parcel parcel = new Parcel(parcelId, trackingNo(), customerId, null, "No. 12, Galle Road",
                     "No. 45, Peradeniya Road", "Kamal Silva", "+94719876543", ParcelSize.MEDIUM,
                     new BigDecimal("3.20"), new BigDecimal("820.00"), null);
+            ParcelFixtures.withRouteAndFee(parcel);
             parcel.setCourierId(courierId);
             parcel.addStatusHistory(new ParcelStatusHistory(null, parcel, ParcelStatus.CREATED, customerId,
                     "CUSTOMER", "Delivery booking created", null));
@@ -120,6 +122,7 @@ class ParcelPersistenceIT extends AbstractContainersIT {
         inTransaction(() -> {
             Parcel parcel = new Parcel(parcelId, trackingNo(), UUID.randomUUID(), null, "Pickup", "Dropoff",
                     "Recipient", "0771234567", ParcelSize.SMALL, BigDecimal.ONE, new BigDecimal("350.00"), "LKR");
+            ParcelFixtures.withRouteAndFee(parcel);
             parcel.addStatusHistory(new ParcelStatusHistory(UUID.randomUUID(), parcel, ParcelStatus.CREATED,
                     parcel.getCustomerId(), "CUSTOMER", "Created", null));
             entityManager.persist(parcel);
