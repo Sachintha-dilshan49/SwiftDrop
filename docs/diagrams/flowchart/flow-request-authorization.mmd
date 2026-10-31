@@ -16,7 +16,10 @@ flowchart TD
   SRC -- "outside: browser or merchant server" --> GW[api-gateway :8080<br/>add X-Request-Id, CORS]:::gw
   GW --> PATH{Path}
   PATH -- "/internal/**" --> NR[Not routed: 404]:::err
-  PATH -- "public: /auth/login, /register, /refresh,<br/>/oauth2/**, /auth/token, /track/**" --> ROUTE[Route to owning service]:::gw
+  PATH -- "public: /api/v1/auth/signup, login, refresh, token,<br/>/api/v1/track/**, /oauth2/**, /login/oauth2/**" --> ROUTE[Route to owning service]:::gw
+  PATH -- "GET /api/v1/pricing/estimate<br/>(public)" --> PRL{Within per-client<br/>rate limit? Redis}
+  PRL -- No --> R429
+  PRL -- Yes --> ROUTE
   PATH -- "/merchant-api/**" --> K{X-API-Key header?}
   K -- No --> K401[401]:::err
   K -- Yes --> RL{Within per-key<br/>rate limit? Redis}

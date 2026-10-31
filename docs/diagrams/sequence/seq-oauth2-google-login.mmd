@@ -1,9 +1,8 @@
 %% Sequence — Login with Google, OAuth 2.0 Authorization Code flow (report sequence 4)
-%% Based on seq-google-login.mmd by Thulani Jayathilake (Role 2, branch feature/internal-auth-and-docs); corrected against
-%% docs/architecture.md v1.1 §6.1 (gateway, public routes), §9 (tokens), §10.4
-%% Changes: browser traffic goes through the gateway with the /api/v1 prefix; error branches; first API call with the JWT.
-%% Open point (see audit): Google's redirect URI. Role 2 uses /login/oauth2/code/google, which the gateway does not route;
-%% this diagram assumes it is configured as /api/v1/oauth2/code/google so it falls under the public /api/v1/oauth2/** route.
+%% Based on seq-google-login.mmd by Thulani Jayathilake (Role 2); corrected against docs/architecture.md v1.2 §6.1, §9, §10.4
+%% Changes: browser traffic goes through the gateway; Spring's default OAuth paths (/oauth2/**, /login/oauth2/**) are
+%% forwarded to auth-service unchanged, without the /api/v1 prefix (team decision, 31 Oct 2026); error branches;
+%% first API call with the JWT. Google login is switched on with AUTH_GOOGLE_ENABLED=true.
 sequenceDiagram
     autonumber
     actor User as Customer
@@ -14,37 +13,37 @@ sequenceDiagram
     participant G as Google OAuth 2.0
 
     User->>SPA: click "Continue with Google"
-    SPA->>GW: GET /api/v1/oauth2/authorization/google (public route)
-    GW->>AUTH: forward
+    SPA->>GW: GET /oauth2/authorization/google (public, no /api/v1 prefix)
+    GW->>AUTH: forward unchanged
     AUTH-->>SPA: 302 to Google authorize URL<br/>(client_id, scope openid email profile, state, redirect_uri)
     SPA->>G: sign in and consent
     alt user cancels or denies
-        G-->>SPA: 302 redirect_uri?error=access_denied
-        SPA->>GW: GET /api/v1/oauth2/code/google?error=…
-        GW->>AUTH: forward
-        AUTH-->>SPA: 302 /auth/callback?error=login_failed
+        G-->>SPA: 302 /login/oauth2/code/google?error=access_denied
+        SPA->>GW: GET /login/oauth2/code/google?error=…
+        GW->>AUTH: forward unchanged
+        AUTH-->>SPA: 302 SPA /auth/callback?error=…
     else consent given
-        G-->>SPA: 302 redirect_uri?code=…&state=…
-        SPA->>GW: GET /api/v1/oauth2/code/google?code&state
-        GW->>AUTH: forward
+        G-->>SPA: 302 /login/oauth2/code/google?code&state
+        SPA->>GW: GET /login/oauth2/code/google?code&state
+        GW->>AUTH: forward unchanged
         AUTH->>AUTH: check state (CSRF)
         AUTH->>G: POST token endpoint (code + client secret), back channel
         G-->>AUTH: ID token (sub, email, name, email_verified)
-        AUTH->>DB: find oauth_accounts (GOOGLE, sub)<br/>else link by email, else create user + CUSTOMER role
+        AUTH->>DB: find oauth_accounts (GOOGLE, sub)<br/>else link by verified email, else create user + CUSTOMER role
         AUTH->>DB: INSERT oauth_login_codes (SHA-256 hash, expires in 2 min)
-        AUTH-->>SPA: 302 /auth/callback?code=<one-time code>
+        AUTH-->>SPA: 302 SPA /auth/callback?code=<one-time code>
         SPA->>GW: POST /api/v1/auth/token {code} (public route)
         GW->>AUTH: forward
         AUTH->>DB: lock code row, check unexpired and unused, set consumed_at
         alt code unknown, expired or already used
             AUTH-->>SPA: 400 ProblemDetail (via GW)
         else valid
-            AUTH->>DB: INSERT refresh_tokens (hash, 7 days)
-            AUTH-->>SPA: 200 {accessToken RS256 15 min with roles claim, refreshToken} (via GW)
+            AUTH->>DB: INSERT refresh_tokens (SHA-256 hash, 7 days)
+            AUTH-->>SPA: 200 {accessToken RS256 15 min with roles claim, refreshToken, user} (via GW)
         end
     end
 
     Note over SPA,AUTH: later requests
     SPA->>GW: GET /api/v1/parcels · Authorization: Bearer <accessToken>
-    GW->>GW: verify signature with cached JWKS (GET /.well-known/jwks.json on auth-service, internal)
+    GW->>GW: verify signature with cached JWKS (auth-service /.well-known/jwks.json, internal)
     GW->>GW: route to parcel-service, which verifies the JWT again and checks @PreAuthorize

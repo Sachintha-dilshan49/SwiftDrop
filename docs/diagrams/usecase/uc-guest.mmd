@@ -16,8 +16,8 @@ flowchart LR
     direction TB
     T1(["Track parcel by tracking number<br/>GET /api/v1/track/{trackingNo}"]):::uc
     T2(["Follow live status updates<br/>GET /api/v1/track/{trackingNo}/stream (SSE)"]):::uc
-    E1(["Get fee estimate<br/>GET /api/v1/pricing/estimate"]):::uc
-    A1(["Sign up as Customer<br/>POST /api/v1/auth/register"]):::uc
+    E1(["Get fee estimate<br/>GET /api/v1/pricing/estimate<br/>(public, rate-limited)"]):::uc
+    A1(["Sign up as Customer<br/>POST /api/v1/auth/signup"]):::uc
     A2(["Log in<br/>POST /api/v1/auth/login"]):::uc
     A3(["Log in with Google<br/>(OAuth 2.0 Authorization Code)"]):::uc
     M1(["Register a merchant business<br/>POST /api/v1/merchants/register"]):::uc

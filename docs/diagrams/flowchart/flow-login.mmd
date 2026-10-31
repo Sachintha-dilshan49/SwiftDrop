@@ -1,22 +1,20 @@
----
-config:
-  layout: elk
----
 %% Flowchart — login, Google login and token refresh · Role 1 (Role 2 to review)
-%% Source: docs/architecture.md v1.1 §9 (passwords, tokens, Google login), §10.4; detail in seq-oauth2-google-login
+%% Source: docs/architecture.md v1.2 §6.1, §9 (passwords, tokens, Google login), §10.4; detail in seq-oauth2-google-login
+%% Google login uses Spring's default paths /oauth2/** and /login/oauth2/**, forwarded unchanged by the gateway,
+%% and is only offered when AUTH_GOOGLE_ENABLED=true. Password login accepts an email or a mobile number.
 flowchart TD
   classDef ok fill:#e8f5e9,stroke:#2e7d32
   classDef err fill:#fdecea,stroke:#c62828
   classDef step fill:#ffffff,stroke:#444
 
   S([User opens Log in]) --> W{Method}
-  W -- "Email + password" --> P[POST /api/v1/auth/login]:::step
+  W -- "Email or mobile<br/>+ password" --> P[POST /api/v1/auth/login]:::step
   P --> V{"@Valid input?"}
   V -- No --> E400[400 field errors]:::err --> S
   V -- Yes --> U{User exists, ACTIVE<br/>and BCrypt matches?}
   U -- No --> E401[401 generic message<br/>no hint which part was wrong]:::err --> S
   U -- Yes --> ISSUE
-  W -- "Google" --> G[Redirect to Google via<br/>/api/v1/oauth2/authorization/google]:::step
+  W -- "Google<br/>(AUTH_GOOGLE_ENABLED)" --> G[Redirect to Google via<br/>/oauth2/authorization/google<br/>gateway forwards unchanged]:::step
   G --> GC{Consent given and<br/>state valid?}
   GC -- No --> GE[Back to login with error]:::err --> S
   GC -- Yes --> GU[Find or link user,<br/>new users get CUSTOMER]:::step
@@ -25,7 +23,7 @@ flowchart TD
   EX --> EXV{Code valid and unused?}
   EXV -- No --> GE
   EXV -- Yes --> ISSUE[Issue access JWT RS256 15 min with roles claim<br/>+ refresh token 7 days, stored hashed]:::ok
-  ISSUE --> HOME[SPA routes by role:<br/>customer, merchant, courier, dispatcher, admin]:::ok
+  ISSUE --> HOME[SPA opens the role dashboard:<br/>customer, merchant, courier, dispatcher, admin]:::ok
   HOME --> CALL[Call APIs with Bearer token]:::step
   CALL --> EXP{401 because the<br/>access token expired?}
   EXP -- No --> CALL

@@ -1,7 +1,7 @@
 %% ER — auth-service (auth_db) · owner Role 2
-%% From Role 2's Flyway V1–V3 on feature/internal-auth-and-docs (Thulani Jayathilake), core identity tables only.
-%% Open question (see audit): V1 also creates merchant_profiles and courier_profiles, which overlap merchant_db.merchants
-%% and dispatch_db.couriers; they are left out here until the team decides which service owns that data (ADR-008).
+%% From Role 2's Flyway V1–V3 (Thulani Jayathilake, PR #26). auth_db holds identity only (team decision, 31 Oct 2026):
+%% merchant profiles live in merchant_db, courier profiles in dispatch_db. V1 also creates merchant_profiles and
+%% courier_profiles; they are left out on purpose and listed as a known gap to remove in a later migration.
 erDiagram
     users ||--o{ user_roles : "has"
     roles ||--o{ user_roles : "granted as"

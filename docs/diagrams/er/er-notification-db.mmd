@@ -1,6 +1,8 @@
 %% ER — notification-service (notification_db) · owner Role 6
 %% From Flyway V1–V3 on dev (Thisaru Ramanayaka). No foreign keys: every *_id is a logical reference
 %% carried in the ParcelStatusChanged event (ADR-008). Rows are linked to an event by event_id.
+%% Planned change (team decision, 31 Oct 2026; not yet migrated): customer_id becomes nullable because merchant orders
+%% have no customer, and recipient_type records who was notified (CUSTOMER from auth_db, RECIPIENT from parcel_db).
 erDiagram
     processed_events ||..o{ notifications : "event_id"
     processed_events ||..o{ webhook_deliveries : "event_id"
@@ -17,9 +19,10 @@ erDiagram
         uuid event_id
         uuid parcel_id "parcel_db, no FK"
         varchar tracking_no
-        uuid customer_id "auth_db, NOT NULL in V2 (see audit)"
+        uuid customer_id "auth_db, nullable (planned V4)"
+        varchar recipient_type "CUSTOMER or RECIPIENT (planned V4)"
         varchar type "EMAIL, SMS"
-        varchar recipient "masked in logs"
+        varchar recipient "address or phone, masked in logs"
         varchar subject
         text body
         varchar status "SENT, FAILED"

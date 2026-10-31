@@ -1,5 +1,9 @@
+---
+title: "dispatch_db — Proposed design, pending review by Tharuki (Role 4)"
+---
 %% ER — dispatch-service (dispatch_db) · owner Role 4
-%% Design from docs/architecture.md v1.1 §4 and §10.3 (no migration on dev yet; Role 4 to confirm in V1).
+%% Proposed design – pending review by Tharuki (Role 4). From docs/architecture.md v1.2 §4 and §10.3; no migration on dev yet.
+%% Courier profile data (vehicle, zone) lives here, not in auth_db (team decision, 31 Oct 2026).
 %% user_id, parcel_id and assigned_by are logical references to other databases (no foreign key, ADR-008).
 erDiagram
     couriers ||--o{ assignments : "is given"
