@@ -88,6 +88,7 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 | `usecase-merchant.md` | Use case — merchant platform | Role 5 | Superseded by `usecase/uc-merchant.puml` |
 | `er-merchant.md` | ER — `merchant_db` | Role 5 | Current; rendered as `er/er-merchant-db.mmd` |
 | `seq-merchant-order.md` | Sequence — merchant API order creation | Role 5 | Superseded by `sequence/seq-merchant-api-order.mmd` |
+| `activity-merchant.md` | Activity — complete merchant lifecycle & order fulfillment workflow | Role 5 | Current |
 | `architecture-overview.html` | Architecture overview (21 Oct) | Role 1 | Out of date; superseded by `architecture/arch-system-overview.mmd` |
 | `seq-google-login.mmd` | Sequence — Google login | Role 2 | Superseded by `sequence/seq-oauth2-google-login.mmd` (gateway, Spring default OAuth paths) |
 | `Auth-Use case diagram.png` | Use case — auth-service | Role 2 | Current |
