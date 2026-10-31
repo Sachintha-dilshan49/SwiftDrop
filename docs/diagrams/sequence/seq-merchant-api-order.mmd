@@ -1,0 +1,77 @@
+%% Sequence — merchant creates an order through the API (report sequence 2)
+%% Based on seq-merchant-order.md by Sudari Ratnayake (Role 5); corrected against docs/architecture.md v1.1 §6.1, §6.2, §6.3, §10.2
+%% Changes: /api/v1 prefix; gateway X-API-Key presence check and per-key rate limit; idempotent replay as alt/else;
+%% event published by the outbox relay (not inline); X-Internal-Token on internal calls; webhook through webhook.q with retry
+sequenceDiagram
+    autonumber
+    participant Store as Merchant store server
+    participant GW as api-gateway :8080
+    participant Redis as Redis
+    box merchant-service :8085
+    participant MS as ApiKeyAuthenticationFilter<br/>+ MerchantOrderService
+    participant MDB as merchant_db
+    end
+    box parcel-service :8083
+    participant PS as InternalParcelController<br/>+ ParcelService
+    participant PDB as parcel_db
+    participant Relay as OutboxRelay
+    end
+    participant PR as pricing-service :8082
+    participant MQ as RabbitMQ parcel.events
+    participant NS as notification-service :8086
+
+    Store->>GW: POST /api/v1/merchant-api/orders<br/>X-API-Key: sd_live_… · body incl. idempotencyKey
+    alt no X-API-Key header
+        GW-->>Store: 401 ProblemDetail
+    end
+    GW->>Redis: increment counter for this key
+    alt over the per-key rate limit
+        GW-->>Store: 429 Too Many Requests
+    end
+    GW->>MS: forward (X-Request-Id)
+    MS->>MDB: find key by SHA-256(key)
+    alt unknown, revoked or expired key
+        MS-->>Store: 401 ProblemDetail (via GW)
+    else merchant not APPROVED
+        MS-->>Store: 403 ProblemDetail (via GW)
+    else @Valid fails
+        MS-->>Store: 400 ProblemDetail with field errors (via GW)
+    end
+    MS->>MDB: find order by (merchant_id, idempotencyKey)
+    alt order already exists (retry from the store)
+        MS-->>Store: 200 existing order (via GW), nothing created
+    else new order
+        MS->>PS: POST /internal/parcels · X-Internal-Token<br/>{merchantId, addresses, zones, recipient, size, weightKg, speed}
+        PS->>PR: POST /internal/pricing/quote · X-Internal-Token
+        alt weight does not fit size
+            PR-->>PS: 400
+            PS-->>MS: 400 (nothing saved)
+            MS-->>Store: 400 ProblemDetail (via GW)
+        else pricing down or slow (2 s / 5 s timeouts)
+            PS-->>MS: 503
+            MS-->>Store: 503 ProblemDetail (via GW)
+        else quote OK
+            PR-->>PS: 200 {routeType, baseFee, …, total, currency LKR}
+            Note over PS,PDB: one transaction
+            PS->>PDB: INSERT parcels (CREATED, merchant_id, fee breakdown)<br/>+ parcel_status_history + outbox_events (PENDING)
+            PS-->>MS: 201 {id, trackingNo, status CREATED, feeAmount}
+            MS->>MDB: INSERT merchant_orders (parcel_id, tracking_no, idempotency_key)
+            MS-->>GW: 201 Created MerchantOrderResponse
+            GW-->>Store: 201 Created {trackingNo, status, feeAmount}
+        end
+    end
+
+    Note over Relay,NS: asynchronous, about 1 s later
+    Relay->>PDB: read PENDING outbox rows
+    Relay->>MQ: publish ParcelStatusChanged (parcel.status.created)
+    MQ-->>Relay: publisher confirm
+    Relay->>PDB: mark SENT
+    MQ-)NS: webhook.q (merchantId is set)
+    NS->>MS: GET /internal/merchants/{merchantId}/webhook · X-Internal-Token
+    MS-->>NS: {webhookUrl, secret}
+    NS->>Store: POST webhook URL · X-SwiftDrop-Signature: sha256=HMAC(body)<br/>X-SwiftDrop-Event-Id · X-SwiftDrop-Timestamp
+    alt 2xx
+        Store-->>NS: 200, delivery recorded SUCCESS
+    else non-2xx or timeout
+        NS->>MQ: retry 10 s → 1 m → 5 m → webhook.parking (see flow-webhook-retry)
+    end

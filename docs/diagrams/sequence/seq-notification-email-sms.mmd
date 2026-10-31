@@ -1,0 +1,45 @@
+%% Sequence — email and SMS notification for one status event
+%% Based on seq-notification-email-sms.mmd by Thisaru Ramanayaka (Role 6); corrected against docs/architecture.md v1.1 §6.3 "Who is notified"
+%% Changes: customer vs merchant bookings; recipient contact from parcel-service (GET /internal/parcels/{id}/contacts);
+%% X-Internal-Token on look-ups. The rest of the original flow (idempotency, SENT/FAILED rows) is unchanged.
+sequenceDiagram
+    autonumber
+    participant MQ as RabbitMQ notification.q
+    participant NC as StatusChangeNotificationConsumer
+    participant IS as IdempotencyService
+    participant NSV as NotificationService
+    participant AUTH as auth-service
+    participant PS as parcel-service
+    participant EC as EmailChannel
+    participant SC as SmsChannel (mock)
+    participant DB as notification_db
+
+    MQ->>NC: ParcelStatusChanged v1 (IDs only)
+    NC->>IS: isAlreadyProcessed(eventId, "notification")
+    IS->>DB: SELECT processed_events
+    alt already processed
+        NC-->>MQ: ACK, skip
+    else new event
+        NC->>NSV: processStatusChange(event)
+        alt customer booking (merchantId null)
+            NSV->>AUTH: GET /internal/users/{customerId}/contact · X-Internal-Token
+            AUTH-->>NSV: {firstName, email, phone}
+            NSV->>EC: email to the customer
+        else merchant booking (merchantId set)
+            NSV->>PS: GET /internal/parcels/{parcelId}/contacts · X-Internal-Token
+            PS-->>NSV: {recipientName, recipientPhone, recipientEmail}
+            NSV->>EC: email to the recipient
+        end
+        NSV->>DB: save notifications (EMAIL, SENT or FAILED)
+        opt toStatus is OUT_FOR_DELIVERY, DELIVERED or FAILED
+            NSV->>PS: GET /internal/parcels/{parcelId}/contacts (if not fetched yet)
+            NSV->>SC: SMS to the recipient
+            NSV->>DB: save notifications (SMS, SENT or FAILED)
+        end
+        alt contact service unavailable (503)
+            NSV-->>NC: exception, message requeued (nothing logged with personal data)
+        end
+        NC->>IS: markProcessed(eventId, "notification")
+        IS->>DB: INSERT processed_events
+        NC-->>MQ: ACK
+    end

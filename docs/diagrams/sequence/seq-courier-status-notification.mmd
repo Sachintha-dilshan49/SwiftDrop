@@ -1,0 +1,81 @@
+%% Sequence — courier updates status, event fans out to notifications (report sequence 3)
+%% Based on seq-courier-status.mmd by Thisaru Ramanayaka (Role 6) with Role 4's part; corrected against
+%% docs/architecture.md v1.1 §6.2, §6.3 "Who is notified", §10.3
+%% Changes: proof photo to MinIO; X-Internal-Token; event published by the outbox relay; all four consumers shown;
+%% contacts for customer vs merchant bookings (recipient from parcel-service, not only the customer from auth-service)
+sequenceDiagram
+    autonumber
+    actor Courier
+    participant GW as api-gateway :8080
+    participant DS as dispatch-service :8084
+    participant S3 as MinIO delivery-proofs
+    box parcel-service :8083
+    participant PS as ParcelService<br/>+ ParcelStateMachine
+    participant PDB as parcel_db
+    participant Relay as OutboxRelay
+    participant TS as TrackingService (SSE)
+    end
+    participant MQ as RabbitMQ parcel.events
+    participant NS as notification-service :8086
+    participant AUTH as auth-service :8081
+    participant MS as merchant-service :8085
+    participant OUT as Mailpit / mock SMS / merchant webhook
+
+    Courier->>GW: POST /api/v1/courier/deliveries/{id}/status<br/>Bearer JWT · multipart {status, note, failureReason?, photo?}
+    GW->>GW: verify JWT (JWKS)
+    GW->>DS: forward
+    DS->>DS: @PreAuthorize COURIER · load assignment
+    alt assignment belongs to another courier
+        DS-->>Courier: 403 ProblemDetail (via GW)
+    end
+    opt photo attached
+        DS->>S3: PUT object delivery-proofs/{parcelId}/{uuid}.jpg
+        DS->>DS: save delivery_proofs row (object key)
+    end
+    DS->>PS: PATCH /internal/parcels/{parcelId}/status · X-Internal-Token<br/>{status, note, failureReason, proofReference, changedBy, COURIER}
+    PS->>PDB: SELECT … FOR UPDATE
+    alt transition not allowed
+        PS-->>DS: 409 Conflict
+        DS-->>Courier: 409 ProblemDetail (via GW)
+    else FAILED without reason
+        PS-->>DS: 400
+        DS-->>Courier: 400 ProblemDetail (via GW)
+    else allowed
+        Note over PS,PDB: one transaction
+        PS->>PDB: UPDATE parcels.status + INSERT parcel_status_history<br/>+ INSERT outbox_events (PENDING)
+        PS-->>DS: 200 ParcelResponse
+        DS-->>GW: 200
+        GW-->>Courier: 200 status updated
+    end
+
+    Note over Relay,MQ: asynchronous, about 1 s later
+    Relay->>MQ: publish ParcelStatusChanged v1 (parcel.status.out_for_delivery), IDs only
+    Relay->>PDB: mark SENT after confirm
+
+    par notification.q
+        MQ-)NS: event
+        NS->>NS: skip if eventId already processed
+        alt customer booking (merchantId null)
+            NS->>AUTH: GET /internal/users/{customerId}/contact · X-Internal-Token
+            NS->>OUT: email to the customer
+        else merchant booking
+            NS->>PS: GET /internal/parcels/{id}/contacts · X-Internal-Token
+            NS->>OUT: email to the recipient
+        end
+        opt status is OUT_FOR_DELIVERY, DELIVERED or FAILED
+            NS->>PS: GET /internal/parcels/{id}/contacts (recipient phone)
+            NS->>OUT: SMS to the recipient
+        end
+    and webhook.q
+        MQ-)NS: event
+        opt merchantId set
+            NS->>MS: GET /internal/merchants/{merchantId}/webhook
+            NS->>OUT: HMAC-signed POST, retry 10 s / 1 m / 5 m, then parking
+        end
+    and dispatch.q
+        MQ-)DS: event
+        DS->>DS: update daily_stats counters
+    and tracking.q
+        MQ-)TS: event
+        TS-->>TS: push STATUS_CHANGE to open tracking pages (SSE)
+    end
