@@ -1,0 +1,59 @@
+%% ER — auth-service (auth_db) · owner Role 2
+%% From Role 2's Flyway V1–V3 on feature/internal-auth-and-docs (Thulani Jayathilake), core identity tables only.
+%% Open question (see audit): V1 also creates merchant_profiles and courier_profiles, which overlap merchant_db.merchants
+%% and dispatch_db.couriers; they are left out here until the team decides which service owns that data (ADR-008).
+erDiagram
+    users ||--o{ user_roles : "has"
+    roles ||--o{ user_roles : "granted as"
+    users ||--o{ refresh_tokens : "owns"
+    refresh_tokens |o--o| refresh_tokens : "replaced_by"
+    users ||--o{ oauth_accounts : "linked to"
+    users ||--o{ oauth_login_codes : "one-time codes"
+
+    users {
+        uuid id PK
+        varchar full_name "150"
+        varchar email UK "255, unique lower(email)"
+        varchar mobile_number UK "30, nullable"
+        varchar password_hash "BCrypt 12, null for Google users"
+        varchar account_status "ACTIVE, SUSPENDED, DISABLED"
+        boolean email_verified
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    roles {
+        bigint id PK
+        varchar name UK "CUSTOMER, MERCHANT, COURIER, DISPATCHER, ADMIN"
+    }
+    user_roles {
+        uuid user_id PK,FK
+        bigint role_id PK,FK
+        varchar assignment_status "PENDING, ACTIVE, REJECTED, SUSPENDED"
+        timestamptz assigned_at
+        timestamptz reviewed_at
+        uuid reviewed_by FK "users.id"
+    }
+    refresh_tokens {
+        uuid id PK
+        uuid user_id FK
+        varchar token_hash UK "never the raw token"
+        timestamptz expires_at "7 days"
+        timestamptz revoked_at
+        uuid replaced_by FK "rotation chain"
+        timestamptz created_at
+    }
+    oauth_accounts {
+        uuid id PK
+        uuid user_id FK
+        varchar provider "GOOGLE"
+        varchar provider_user_id "Google sub"
+        timestamptz created_at
+    }
+    oauth_login_codes {
+        uuid id PK
+        uuid user_id FK
+        varchar code_hash UK "SHA-256, single use"
+        timestamptz expires_at "2 minutes"
+        timestamptz consumed_at
+        timestamptz created_at
+    }

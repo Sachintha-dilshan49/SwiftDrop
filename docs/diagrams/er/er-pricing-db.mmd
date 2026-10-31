@@ -1,0 +1,41 @@
+%% ER — pricing-service (pricing_db) · owner Role 1
+%% Design for the pricing model in docs/architecture.md v1.1 §8 (no migration on dev yet).
+%% fee = route base fee + extra weight + size surcharge + express surcharge − promo (LKR)
+erDiagram
+    zones ||--o{ zone_districts : "covers"
+
+    zones {
+        uuid id PK
+        varchar code UK "e.g. COLOMBO_SOUTH"
+        varchar name "Colombo South"
+        varchar zone_group "COLOMBO, SUBURBS, INTER_CITY"
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    zone_districts {
+        uuid id PK
+        uuid zone_id FK
+        varchar district_name UK "Colombo 04, Kandy, ..."
+        timestamptz created_at
+    }
+    pricing_rules {
+        uuid id PK
+        varchar rule_type "ROUTE_BASE, EXTRA_KG, SIZE, SPEED"
+        varchar rule_key "SAME_ZONE, NEIGHBOURING, SMALL, EXPRESS, ..."
+        numeric amount "10,2 LKR"
+        numeric max_weight_kg "SIZE rules only, 5 / 10 / 20 / 40"
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    promo_codes {
+        uuid id PK
+        varchar code UK "e.g. DROP100"
+        numeric discount_amount "10,2 fixed LKR off"
+        timestamptz valid_from
+        timestamptz valid_to
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
+    }

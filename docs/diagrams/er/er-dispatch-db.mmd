@@ -1,0 +1,60 @@
+%% ER — dispatch-service (dispatch_db) · owner Role 4
+%% Design from docs/architecture.md v1.1 §4 and §10.3 (no migration on dev yet; Role 4 to confirm in V1).
+%% user_id, parcel_id and assigned_by are logical references to other databases (no foreign key, ADR-008).
+erDiagram
+    couriers ||--o{ assignments : "is given"
+    assignments ||--o{ delivery_proofs : "has"
+    couriers ||--o{ daily_stats : "counted in"
+
+    couriers {
+        uuid id PK
+        uuid user_id UK "auth_db.users with COURIER role"
+        varchar display_name "shown to dispatchers"
+        varchar vehicle_type "BIKE, THREE_WHEELER, VAN"
+        varchar home_zone "pricing zone code"
+        varchar status "ACTIVE, OFF_DUTY, INACTIVE"
+        int max_daily_load
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    assignments {
+        uuid id PK
+        uuid parcel_id UK "parcel_db.parcels, active assignment"
+        varchar tracking_no
+        uuid courier_id FK
+        uuid assigned_by "dispatcher user id"
+        date delivery_date "courier day list"
+        int sequence_no "order in the day list"
+        varchar status "ACTIVE, COMPLETED, CANCELLED"
+        timestamptz assigned_at
+        timestamptz completed_at
+        timestamptz updated_at
+    }
+    delivery_proofs {
+        uuid id PK
+        uuid assignment_id FK
+        uuid parcel_id
+        varchar object_key "MinIO delivery-proofs/..."
+        varchar content_type "image/jpeg, image/png"
+        bigint size_bytes
+        varchar parcel_status "status it proves"
+        uuid uploaded_by "courier user id"
+        timestamptz created_at
+    }
+    daily_stats {
+        uuid id PK
+        date stat_date "UK with courier_id"
+        uuid courier_id FK "null = all couriers"
+        int created_count
+        int picked_up_count
+        int out_for_delivery_count
+        int delivered_count
+        int failed_count
+        timestamptz updated_at
+    }
+    processed_events {
+        uuid id PK
+        uuid event_id "UK with consumer_name"
+        varchar consumer_name "dispatch.q"
+        timestamptz processed_at
+    }

@@ -1,0 +1,85 @@
+---
+config:
+  layout: elk
+---
+%% ER overview — six service databases on one PostgreSQL server (database per service, ADR-008) · Role 1
+%% Solid lines: real foreign keys inside one database.
+%% Dashed lines: logical references across databases. The ID is stored without a foreign key and the data
+%% is fetched through the owning service's API, never by a cross-database query.
+%% Column detail: er-auth-db, er-pricing-db, ../er-parcel-service.puml (Role 3), er-dispatch-db, er-merchant-db, er-notification-db
+flowchart LR
+  classDef tbl fill:#ffffff,stroke:#444
+  classDef infra fill:#f6f6f6,stroke:#999,stroke-dasharray:4 3
+
+  subgraph AUTH["auth_db · auth-service"]
+    users[(users)]:::tbl
+    user_roles[(user_roles)]:::tbl
+    roles[(roles)]:::tbl
+    refresh_tokens[(refresh_tokens)]:::tbl
+    oauth_accounts[(oauth_accounts)]:::tbl
+    oauth_login_codes[(oauth_login_codes)]:::tbl
+  end
+
+  subgraph PRICING["pricing_db · pricing-service"]
+    zones[(zones)]:::tbl
+    zone_districts[(zone_districts)]:::tbl
+    pricing_rules[(pricing_rules)]:::tbl
+    promo_codes[(promo_codes)]:::tbl
+  end
+
+  subgraph PARCEL["parcel_db · parcel-service"]
+    parcels[(parcels)]:::tbl
+    history[(parcel_status_history)]:::tbl
+    outbox[(outbox_events)]:::tbl
+    p_processed[(processed_events)]:::tbl
+  end
+
+  subgraph DISPATCH["dispatch_db · dispatch-service"]
+    couriers[(couriers)]:::tbl
+    assignments[(assignments)]:::tbl
+    proofs[(delivery_proofs)]:::tbl
+    daily_stats[(daily_stats)]:::tbl
+    d_processed[(processed_events)]:::tbl
+  end
+
+  subgraph MERCHANT["merchant_db · merchant-service"]
+    merchants[(merchants)]:::tbl
+    api_keys[(merchant_api_keys)]:::tbl
+    webhook_endpoints[(merchant_webhook_endpoints)]:::tbl
+    merchant_orders[(merchant_orders)]:::tbl
+  end
+
+  subgraph NOTIF["notification_db · notification-service"]
+    notifications[(notifications)]:::tbl
+    webhook_deliveries[(webhook_deliveries)]:::tbl
+    n_processed[(processed_events)]:::tbl
+  end
+
+  MINIO[/"MinIO bucket delivery-proofs"/]:::infra
+
+  %% foreign keys inside one database
+  users --- user_roles --- roles
+  users --- refresh_tokens
+  users --- oauth_accounts
+  users --- oauth_login_codes
+  zones --- zone_districts
+  parcels --- history
+  couriers --- assignments --- proofs
+  couriers --- daily_stats
+  merchants --- api_keys
+  merchants --- webhook_endpoints
+  merchants --- merchant_orders
+
+  %% logical references across databases (IDs only)
+  parcels -. "customer_id" .-> users
+  parcels -. "merchant_id" .-> merchants
+  parcels -. "courier_id" .-> couriers
+  parcels -. "pickup / dropoff zone code" .-> zones
+  outbox -. "aggregate_id" .-> parcels
+  couriers -. "user_id" .-> users
+  merchants -. "user_id" .-> users
+  assignments -. "parcel_id" .-> parcels
+  merchant_orders -. "parcel_id" .-> parcels
+  notifications -. "parcel_id, customer_id" .-> parcels
+  webhook_deliveries -. "merchant_id" .-> merchants
+  proofs -. "object_key" .-> MINIO
