@@ -58,7 +58,11 @@ public class MerchantOrderService {
                 request.dropoffAddress(),
                 request.recipientName(),
                 request.recipientPhone(),
+                request.recipientEmail(),
+                request.pickupZone(),
+                request.dropoffZone(),
                 request.size(),
+                request.speed(),
                 request.weightKg()
         );
 
