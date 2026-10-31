@@ -3,11 +3,14 @@ package lk.swiftdrop.parcel.parcel.controller;
 import jakarta.validation.Valid;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
+import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.service.ParcelService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,5 +47,13 @@ public class InternalParcelController {
     @GetMapping("/{id}/contacts")
     public ResponseEntity<RecipientContactsResponse> getRecipientContacts(@PathVariable UUID id) {
         return ResponseEntity.ok(parcelService.getRecipientContacts(id));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ParcelResponse> updateParcelStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateParcelStatusRequest request) {
+        ParcelResponse response = parcelService.updateParcelStatus(id, request);
+        return ResponseEntity.ok(response);
     }
 }

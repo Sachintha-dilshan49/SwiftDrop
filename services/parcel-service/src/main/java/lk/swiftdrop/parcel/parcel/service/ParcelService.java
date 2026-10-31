@@ -11,6 +11,7 @@ import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
+import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
 import lk.swiftdrop.parcel.parcel.entity.ParcelStatusHistory;
 import lk.swiftdrop.parcel.parcel.repository.ParcelRepository;
@@ -29,15 +30,18 @@ public class ParcelService {
     private final ParcelRepository parcelRepository;
     private final TrackingNumberGenerator trackingNumberGenerator;
     private final PricingServiceClient pricingServiceClient;
+    private final ParcelStateMachine parcelStateMachine;
     private final OutboxService outboxService;
 
     public ParcelService(ParcelRepository parcelRepository,
                          TrackingNumberGenerator trackingNumberGenerator,
                          PricingServiceClient pricingServiceClient,
+                         ParcelStateMachine parcelStateMachine,
                          OutboxService outboxService) {
         this.parcelRepository = parcelRepository;
         this.trackingNumberGenerator = trackingNumberGenerator;
         this.pricingServiceClient = pricingServiceClient;
+        this.parcelStateMachine = parcelStateMachine;
         this.outboxService = outboxService;
     }
 
@@ -98,5 +102,46 @@ public class ParcelService {
         Parcel savedParcel = parcelRepository.save(parcel);
         outboxService.enqueueStatusChangedEvent(savedParcel, null, note);
         return savedParcel;
+    }
+
+    /**
+     * The parcel row stays locked until commit, so concurrent changes to one parcel run one after
+     * another: each sees the previous result, and outbox events get {@code seq} values in commit order.
+     */
+    @Transactional
+    public ParcelResponse updateParcelStatus(UUID parcelId, UpdateParcelStatusRequest request) {
+        Parcel parcel = parcelRepository.findByIdForUpdate(parcelId)
+                .orElseThrow(() -> new NotFoundException("Parcel not found: " + parcelId));
+
+        parcelStateMachine.validateTransition(parcel, request.status(), request.failureReason());
+        parcelStateMachine.validateAuthorization(parcel, request.changedBy(), request.changedByRole());
+
+        if (request.courierId() != null) {
+            parcel.setCourierId(request.courierId());
+        }
+
+        if (request.status() == ParcelStatus.FAILED) {
+            parcel.setFailureReason(request.failureReason());
+        }
+
+        ParcelStatus fromStatus = parcel.getStatus();
+        parcel.setStatus(request.status());
+
+        ParcelStatusHistory history = new ParcelStatusHistory(
+                UUID.randomUUID(),
+                parcel,
+                request.status(),
+                request.changedBy(),
+                request.changedByRole(),
+                request.note(),
+                request.proofReference()
+        );
+        parcel.addStatusHistory(history);
+
+        Parcel updatedParcel = parcelRepository.save(parcel);
+        outboxService.enqueueStatusChangedEvent(updatedParcel, fromStatus, request.note());
+
+        log.info("Updated parcel {} status from {} to {}", parcelId, fromStatus, request.status());
+        return ParcelResponse.fromEntity(updatedParcel);
     }
 }

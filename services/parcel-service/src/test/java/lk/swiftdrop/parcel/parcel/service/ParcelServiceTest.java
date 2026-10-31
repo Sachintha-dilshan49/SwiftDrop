@@ -1,5 +1,6 @@
 package lk.swiftdrop.parcel.parcel.service;
 
+import lk.swiftdrop.common.error.ConflictException;
 import lk.swiftdrop.common.error.NotFoundException;
 import lk.swiftdrop.common.error.ServiceUnavailableException;
 import lk.swiftdrop.common.error.ValidationException;
@@ -13,6 +14,7 @@ import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
+import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
 import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
@@ -34,6 +36,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -48,16 +52,34 @@ class ParcelServiceTest {
     @Mock
     private PricingServiceClient pricingServiceClient;
     @Mock
+    private ParcelStateMachine parcelStateMachine;
+    @Mock
     private OutboxService outboxService;
 
     @InjectMocks
     private ParcelService parcelService;
 
     private UUID customerId;
+    private Parcel sampleParcel;
 
     @BeforeEach
     void setUp() {
         customerId = UUID.randomUUID();
+        sampleParcel = new Parcel(
+                UUID.randomUUID(),
+                "SD-7K3Q-9P2M",
+                customerId,
+                null,
+                "123 Main St, Colombo",
+                "456 High St, Kandy",
+                "Nimal Perera",
+                "+94771234567",
+                ParcelSize.MEDIUM,
+                new BigDecimal("2.50"),
+                new BigDecimal("650.00"),
+                "LKR"
+        );
+        sampleParcel.setStatus(ParcelStatus.CREATED);
     }
 
     /** Colombo South to inter-city, 2.5 kg, MEDIUM, with DROP100: 650 + 80 + 100 + 0 - 100 = 730. */
@@ -215,5 +237,88 @@ class ParcelServiceTest {
 
         assertThatThrownBy(() -> parcelService.getRecipientContacts(parcelId))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("updateParcelStatus validates state machine, updates status, records history and enqueues event")
+    void updateParcelStatusSuccess() {
+        UUID parcelId = sampleParcel.getId();
+        UUID courierId = UUID.randomUUID();
+        UpdateParcelStatusRequest request = new UpdateParcelStatusRequest(
+                ParcelStatus.PICKED_UP,
+                courierId,
+                "Picked up from sender",
+                null,
+                null,
+                courierId,
+                "ROLE_COURIER"
+        );
+
+        when(parcelRepository.findByIdForUpdate(parcelId)).thenReturn(Optional.of(sampleParcel));
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParcelResponse response = parcelService.updateParcelStatus(parcelId, request);
+
+        assertThat(response.status()).isEqualTo(ParcelStatus.PICKED_UP);
+        assertThat(response.courierId()).isEqualTo(courierId);
+        verify(parcelRepository, never()).findById(any());
+        verify(parcelStateMachine).validateTransition(sampleParcel, ParcelStatus.PICKED_UP, null);
+        verify(parcelStateMachine).validateAuthorization(sampleParcel, courierId, "ROLE_COURIER");
+        verify(outboxService).enqueueStatusChangedEvent(sampleParcel, ParcelStatus.CREATED, "Picked up from sender");
+    }
+
+    @Test
+    @DisplayName("updateParcelStatus of an unknown parcel is a 404 and changes nothing")
+    void updateParcelStatusOfUnknownParcelIsNotFound() {
+        UUID parcelId = UUID.randomUUID();
+        when(parcelRepository.findByIdForUpdate(parcelId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.updateParcelStatus(parcelId, dispatcherUpdate(ParcelStatus.PICKED_UP, null)))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(parcelRepository, never()).save(any());
+        verifyNoInteractions(parcelStateMachine, outboxService);
+    }
+
+    @Test
+    @DisplayName("A rejected status change leaves the parcel as it was and enqueues no event")
+    void rejectedStatusChangeChangesNothing() {
+        when(parcelRepository.findByIdForUpdate(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        doThrow(new ConflictException("invalid-status-transition", "Invalid status transition",
+                "Parcel cannot move from CREATED to DELIVERED."))
+                .when(parcelStateMachine).validateTransition(sampleParcel, ParcelStatus.DELIVERED, null);
+
+        assertThatThrownBy(() -> parcelService.updateParcelStatus(sampleParcel.getId(),
+                dispatcherUpdate(ParcelStatus.DELIVERED, null)))
+                .isInstanceOf(ConflictException.class);
+
+        assertThat(sampleParcel.getStatus()).isEqualTo(ParcelStatus.CREATED);
+        assertThat(sampleParcel.getStatusHistory()).isEmpty();
+        verify(parcelRepository, never()).save(any());
+        verifyNoInteractions(outboxService);
+    }
+
+    @Test
+    @DisplayName("updateParcelStatus to FAILED stores the failure reason, a history row and the event")
+    void failedStatusStoresReasonHistoryAndEvent() {
+        sampleParcel.setStatus(ParcelStatus.OUT_FOR_DELIVERY);
+        when(parcelRepository.findByIdForUpdate(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParcelResponse response = parcelService.updateParcelStatus(sampleParcel.getId(),
+                dispatcherUpdate(ParcelStatus.FAILED, "Recipient not available"));
+
+        assertThat(response.status()).isEqualTo(ParcelStatus.FAILED);
+        assertThat(response.failureReason()).isEqualTo("Recipient not available");
+        assertThat(sampleParcel.getStatusHistory()).singleElement().satisfies(history -> {
+            assertThat(history.getStatus()).isEqualTo(ParcelStatus.FAILED);
+            assertThat(history.getChangedByRole()).isEqualTo("DISPATCHER");
+        });
+        verify(outboxService).enqueueStatusChangedEvent(sampleParcel, ParcelStatus.OUT_FOR_DELIVERY, "Dispatcher update");
+    }
+
+    private static UpdateParcelStatusRequest dispatcherUpdate(ParcelStatus status, String failureReason) {
+        return new UpdateParcelStatusRequest(status, null, "Dispatcher update", null, failureReason,
+                UUID.randomUUID(), "DISPATCHER");
     }
 }

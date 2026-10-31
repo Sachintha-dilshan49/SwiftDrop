@@ -2,13 +2,16 @@ package lk.swiftdrop.parcel.parcel.controller;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lk.swiftdrop.common.error.ConflictException;
 import lk.swiftdrop.common.error.NotFoundException;
 import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.common.internal.InternalTokenAuthenticationFilter;
 import lk.swiftdrop.common.internal.InternalTokenTestContextCustomizerFactory;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
+import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
 import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
 import lk.swiftdrop.parcel.parcel.service.ParcelService;
@@ -17,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -27,18 +31,22 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -188,6 +196,79 @@ class InternalParcelControllerTest {
     }
 
     @Test
+    @DisplayName("PATCH /internal/parcels/{id}/status with the internal token passes the caller from the body to the service")
+    void statusUpdateWithInternalTokenReachesService() throws Exception {
+        given(parcelService.updateParcelStatus(eq(parcelId), any(UpdateParcelStatusRequest.class)))
+                .willReturn(parcelResponse(ParcelStatus.PICKED_UP));
+
+        mockMvc.perform(patch("/internal/parcels/" + parcelId + "/status")
+                        .header(TOKEN_HEADER, TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(statusRequest("COURIER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PICKED_UP"));
+
+        // dispatch-service vouches for the caller; ParcelStateMachine checks the role and the assignment
+        ArgumentCaptor<UpdateParcelStatusRequest> passed = ArgumentCaptor.forClass(UpdateParcelStatusRequest.class);
+        verify(parcelService).updateParcelStatus(eq(parcelId), passed.capture());
+        assertThat(passed.getValue().changedBy()).isEqualTo(callerId);
+        assertThat(passed.getValue().changedByRole()).isEqualTo("COURIER");
+    }
+
+    @Test
+    @DisplayName("PATCH /internal/parcels/{id}/status without a token returns 401")
+    void statusUpdateWithoutTokenIsUnauthorized() throws Exception {
+        mockMvc.perform(patch("/internal/parcels/" + parcelId + "/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(statusRequest("COURIER"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/unauthorized"));
+
+        verifyNoInteractions(parcelService);
+    }
+
+    @ParameterizedTest(name = "PATCH status with only a user JWT ({0}) returns 401")
+    @ValueSource(strings = {"customer-token", "merchant-token", "courier-token", "dispatcher-token", "admin-token"})
+    void statusUpdateWithUserJwtOnlyIsUnauthorized(String token) throws Exception {
+        mockMvc.perform(patch("/internal/parcels/" + parcelId + "/status")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(statusRequest("ADMIN"))))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(parcelService);
+    }
+
+    @Test
+    @DisplayName("PATCH /internal/parcels/{id}/status without a status returns 400 with a field error")
+    void statusUpdateWithoutStatusIsBadRequest() throws Exception {
+        mockMvc.perform(patch("/internal/parcels/" + parcelId + "/status")
+                        .header(TOKEN_HEADER, TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"changedBy\":\"" + callerId + "\",\"changedByRole\":\"DISPATCHER\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/validation-error"))
+                .andExpect(jsonPath("$.errors[*].field", hasItems("status")));
+
+        verifyNoInteractions(parcelService);
+    }
+
+    @Test
+    @DisplayName("A transition the state machine rejects comes back as a 409 ProblemDetail")
+    void rejectedTransitionReturnsConflict() throws Exception {
+        given(parcelService.updateParcelStatus(eq(parcelId), any(UpdateParcelStatusRequest.class)))
+                .willThrow(new ConflictException("invalid-status-transition", "Invalid status transition",
+                        "Parcel cannot move from DELIVERED to IN_TRANSIT."));
+
+        mockMvc.perform(patch("/internal/parcels/" + parcelId + "/status")
+                        .header(TOKEN_HEADER, TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(statusRequest("DISPATCHER"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/invalid-status-transition"));
+    }
+
+    @Test
     @DisplayName("GET /internal/parcels/{id}/contacts with the internal token returns the recipient's contacts")
     void contactsWithInternalTokenReturnRecipient() throws Exception {
         given(parcelService.getRecipientContacts(parcelId))
@@ -241,6 +322,17 @@ class InternalParcelControllerTest {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(parcelService);
+    }
+
+    private UpdateParcelStatusRequest statusRequest(String claimedRole) {
+        return new UpdateParcelStatusRequest(ParcelStatus.PICKED_UP, callerId, "Picked up", null, null,
+                callerId, claimedRole);
+    }
+
+    private ParcelResponse parcelResponse(ParcelStatus status) {
+        return new ParcelResponse(parcelId, "SD-9B2N-4X1Z", null, UUID.randomUUID(), callerId, "Pickup", "Dropoff",
+                "Recipient", "+94771234567", ParcelSize.SMALL, new BigDecimal("1.50"), new BigDecimal("350.00"),
+                "LKR", status, null, Instant.now(), null, List.of());
     }
 
     private static CreateInternalParcelRequest createRequest() {
