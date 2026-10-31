@@ -1,0 +1,82 @@
+---
+config:
+  layout: elk
+---
+%% From branch feature/merchant (Sudari Ratnayake, Role 5), not yet merged. Content copied unchanged; rendered with the ELK layout so it fits a page from docs/diagrams/activity-merchant.md for the report.
+flowchart TD
+    %% Initial Node
+    Start([Start: Merchant wants to integrate]) --> RegisterForm[Fill Business Registration Form]
+
+    %% Swimlane 1: Registration & Validation
+    subgraph Merchant_Registration ["Phase 1: Registration & Onboarding"]
+        RegisterForm --> ValidateInput{Valid Registration Data?}
+        ValidateInput -- No --> ShowErrors[Display Validation Errors]
+        ShowErrors --> RegisterForm
+        ValidateInput -- Yes --> SubmitRegistration[Submit Registration Request]
+        SubmitRegistration --> PersistPending[Persist Merchant in merchant_db with status PENDING]
+    end
+
+    %% Swimlane 2: Admin Approval
+    subgraph Admin_Review ["Phase 2: Administrative Review"]
+        PersistPending --> AdminQueue[Admin lists Pending Merchants]
+        AdminQueue --> AdminDecision{Admin Review Decision}
+        AdminDecision -- Reject --> EnterRejectionReason[Enter Rejection Reason]
+        EnterRejectionReason --> UpdateStatusRejected[Update status to REJECTED]
+        UpdateStatusRejected --> RejectedEnd([Merchant Application Terminated])
+        
+        AdminDecision -- Approve --> UpdateStatusApproved[Update status to APPROVED]
+    end
+
+    %% Swimlane 3: API Key & Configuration
+    subgraph Integration_Setup ["Phase 3: Integration Setup"]
+        UpdateStatusApproved --> MerchantLogin[Merchant Logs into Portal with ROLE_MERCHANT]
+        MerchantLogin --> RequestApiKey[Request API Key Generation]
+        RequestApiKey --> GenerateSecretKey[Generate 32-byte secure key with prefix sd_live_]
+        GenerateSecretKey --> HashKey[Hash key with SHA-256 and store in merchant_api_keys]
+        HashKey --> DisplayRawOnce[Display raw API key ONCE with warning]
+        DisplayRawOnce --> StoreSafely[Merchant stores key safely in E-Commerce store]
+        
+        StoreSafely --> ConfigWebhook[Configure Webhook URL & Generate HMAC Signing Secret]
+        ConfigWebhook --> WebhookSaved[Persist in merchant_webhook_endpoints]
+    end
+
+    %% Swimlane 4: External Order Placement
+    subgraph Order_Execution ["Phase 4: Order Creation & Fulfillment"]
+        WebhookSaved --> StorePlacesOrder[E-Commerce store sends POST /merchant-api/orders with X-API-Key]
+        StorePlacesOrder --> GatewayRateLimit{Gateway: Has X-API-Key & Within Rate Limit?}
+        GatewayRateLimit -- No --> Gateway401[Return 401 Unauthorized / 429 Too Many Requests]
+        
+        GatewayRateLimit -- Yes --> ValidateApiKey{Merchant-Service: API Key Valid & Merchant APPROVED?}
+        ValidateApiKey -- No --> RejectAuth[Return 401 Unauthorized / 403 Forbidden]
+        
+        ValidateApiKey -- Yes --> CheckIdempotency{Idempotency Key in Database?}
+        CheckIdempotency -- Yes --> ReturnExisting[Return existing cached order details]
+        
+        CheckIdempotency -- No --> CallParcelSvc[Call POST /internal/parcels with X-Internal-Token]
+        CallParcelSvc --> QuoteFee[Parcel-Service gets binding quote from Pricing-Service]
+        QuoteFee --> ValidateWeightSize{Weight fits Size?}
+        ValidateWeightSize -- No --> Parcel400[Return 400 Bad Request to Store]
+        ValidateWeightSize -- Yes --> CreateParcelRecord[Create Parcel CREATED and Outbox Event]
+        CreateParcelRecord --> PersistMerchantOrder[Persist MerchantOrder in merchant_db]
+        PersistMerchantOrder --> ReturnOrderCreated[Return 201 Created with trackingNo & fee]
+    end
+
+    %% Phase 5: Tracking & Webhook Notification
+    subgraph Webhook_Tracking ["Phase 5: Status Updates & Webhook Delivery"]
+        ReturnOrderCreated --> ParcelDispatched[Courier Updates Status: PICKED_UP / DELIVERED]
+        ParcelDispatched --> BrokerEvent[Parcel-Service publishes ParcelStatusChanged to RabbitMQ]
+        BrokerEvent --> NotifConsumer[Notification-Service consumes event from webhook.q]
+        NotifConsumer --> FetchSecret[Fetch Webhook URL & Secret from Merchant-Service]
+        FetchSecret --> SignAndPost[Sign payload with HMAC-SHA256 and POST to Merchant Webhook]
+        SignAndPost --> Complete([Delivery Complete & Webhook Acknowledged])
+    end
+
+    %% Style nodes
+    classDef startEnd fill:#2563eb,stroke:#1d4ed8,stroke-width:2px,color:#fff;
+    classDef decision fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#1f2937;
+    classDef action fill:#f3f4f6,stroke:#4b5563,stroke-width:1px,color:#111827;
+    classDef failure fill:#fee2e2,stroke:#b91c1c,stroke-width:1px,color:#7f1d1d;
+
+    class Start,Complete,RejectedEnd startEnd;
+    class ValidateInput,AdminDecision,GatewayRateLimit,ValidateApiKey,CheckIdempotency,ValidateWeightSize decision;
+    class ShowErrors,RejectAuth,Gateway401,Parcel400 failure;
