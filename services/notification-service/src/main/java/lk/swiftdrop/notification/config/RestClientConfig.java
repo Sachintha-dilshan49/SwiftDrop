@@ -38,6 +38,19 @@ public class RestClientConfig {
     }
 
     /**
+     * Client for parcel-service internal endpoint (GET /internal/parcels/{id}/contacts).
+     * Uses InternalRestClientFactory (ADR-010): attaches X-Internal-Token + X-Request-Id,
+     * applies 2s/5s timeouts, and maps 404 → NotFoundException, 5xx → ServiceUnavailableException.
+     */
+    @Bean
+    @Qualifier("parcelServiceClient")
+    public RestClient parcelServiceRestClient(
+            InternalRestClientFactory clients,
+            @Value("${swiftdrop.services.parcel-url}") String baseUrl) {
+        return clients.create("parcel-service", baseUrl);
+    }
+
+    /**
      * Outbound webhook client — NOT an internal call. No X-Internal-Token.
      * Longer timeouts to accommodate slower merchant endpoints.
      */
