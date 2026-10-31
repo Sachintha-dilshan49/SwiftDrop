@@ -20,7 +20,7 @@ class ParcelApplicationIT extends AbstractContainersIT {
                 "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1",
                 String.class);
 
-        assertThat(applied).isNotNull().isGreaterThanOrEqualTo(5);
-        assertThat(latest).isEqualTo("5");
+        assertThat(applied).isNotNull().isGreaterThanOrEqualTo(6);
+        assertThat(latest).isEqualTo("6");
     }
 }

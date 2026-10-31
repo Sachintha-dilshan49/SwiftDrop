@@ -41,8 +41,14 @@ public class Parcel {
     @Column(name = "pickup_address", nullable = false, length = 500)
     private String pickupAddress;
 
+    @Column(name = "pickup_zone", nullable = false, length = 30)
+    private String pickupZone;
+
     @Column(name = "dropoff_address", nullable = false, length = 500)
     private String dropoffAddress;
+
+    @Column(name = "dropoff_zone", nullable = false, length = 30)
+    private String dropoffZone;
 
     @Column(name = "recipient_name", nullable = false, length = 150)
     private String recipientName;
@@ -50,12 +56,42 @@ public class Parcel {
     @Column(name = "recipient_phone", nullable = false, length = 20)
     private String recipientPhone;
 
+    @Column(name = "recipient_email", length = 254)
+    private String recipientEmail;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "size", nullable = false, length = 10)
+    @Column(name = "size", nullable = false, length = 20)
     private ParcelSize size;
 
     @Column(name = "weight_kg", nullable = false, precision = 6, scale = 2)
     private BigDecimal weightKg;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "speed", nullable = false, length = 10)
+    private DeliverySpeed speed;
+
+    @Column(name = "promo_code", length = 30)
+    private String promoCode;
+
+    // Fee breakdown copied from pricing-service's quote, so the receipt never changes afterwards
+    @Enumerated(EnumType.STRING)
+    @Column(name = "route_type", nullable = false, length = 20)
+    private RouteType routeType;
+
+    @Column(name = "base_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal baseFee;
+
+    @Column(name = "weight_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal weightFee;
+
+    @Column(name = "size_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal sizeFee;
+
+    @Column(name = "express_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal expressFee;
+
+    @Column(name = "discount", nullable = false, precision = 10, scale = 2)
+    private BigDecimal discount;
 
     @Column(name = "fee_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal feeAmount;
@@ -126,6 +162,19 @@ public class Parcel {
     public void addStatusHistory(ParcelStatusHistory history) {
         statusHistory.add(history);
         history.setParcel(this);
+    }
+
+    /** Stores pricing-service's quote: its breakdown, and its total as the fee. */
+    public void applyFee(RouteType routeType, BigDecimal baseFee, BigDecimal weightFee, BigDecimal sizeFee,
+                         BigDecimal expressFee, BigDecimal discount, BigDecimal total, String currency) {
+        this.routeType = routeType;
+        this.baseFee = baseFee;
+        this.weightFee = weightFee;
+        this.sizeFee = sizeFee;
+        this.expressFee = expressFee;
+        this.discount = discount;
+        this.feeAmount = total;
+        this.feeCurrency = currency;
     }
 
     // Getters and Setters
@@ -215,6 +264,70 @@ public class Parcel {
 
     public void setWeightKg(BigDecimal weightKg) {
         this.weightKg = weightKg;
+    }
+
+    public String getPickupZone() {
+        return pickupZone;
+    }
+
+    public void setPickupZone(String pickupZone) {
+        this.pickupZone = pickupZone;
+    }
+
+    public String getDropoffZone() {
+        return dropoffZone;
+    }
+
+    public void setDropoffZone(String dropoffZone) {
+        this.dropoffZone = dropoffZone;
+    }
+
+    public String getRecipientEmail() {
+        return recipientEmail;
+    }
+
+    public void setRecipientEmail(String recipientEmail) {
+        this.recipientEmail = recipientEmail;
+    }
+
+    public DeliverySpeed getSpeed() {
+        return speed;
+    }
+
+    public void setSpeed(DeliverySpeed speed) {
+        this.speed = speed;
+    }
+
+    public String getPromoCode() {
+        return promoCode;
+    }
+
+    public void setPromoCode(String promoCode) {
+        this.promoCode = promoCode;
+    }
+
+    public RouteType getRouteType() {
+        return routeType;
+    }
+
+    public BigDecimal getBaseFee() {
+        return baseFee;
+    }
+
+    public BigDecimal getWeightFee() {
+        return weightFee;
+    }
+
+    public BigDecimal getSizeFee() {
+        return sizeFee;
+    }
+
+    public BigDecimal getExpressFee() {
+        return expressFee;
+    }
+
+    public BigDecimal getDiscount() {
+        return discount;
     }
 
     public BigDecimal getFeeAmount() {
