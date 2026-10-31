@@ -1,0 +1,141 @@
+package lk.swiftdrop.parcel.parcel.service;
+
+import lk.swiftdrop.common.error.ServiceUnavailableException;
+import lk.swiftdrop.common.error.ValidationException;
+import lk.swiftdrop.common.event.ParcelStatus;
+import lk.swiftdrop.parcel.outbox.service.OutboxService;
+import lk.swiftdrop.parcel.parcel.client.PricingQuote;
+import lk.swiftdrop.parcel.parcel.client.PricingServiceClient;
+import lk.swiftdrop.parcel.parcel.client.QuoteRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
+import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
+import lk.swiftdrop.parcel.parcel.entity.Parcel;
+import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
+import lk.swiftdrop.parcel.parcel.entity.RouteType;
+import lk.swiftdrop.parcel.parcel.repository.ParcelRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ParcelServiceTest {
+
+    @Mock
+    private ParcelRepository parcelRepository;
+    @Mock
+    private TrackingNumberGenerator trackingNumberGenerator;
+    @Mock
+    private PricingServiceClient pricingServiceClient;
+    @Mock
+    private OutboxService outboxService;
+
+    @InjectMocks
+    private ParcelService parcelService;
+
+    private UUID customerId;
+
+    @BeforeEach
+    void setUp() {
+        customerId = UUID.randomUUID();
+    }
+
+    /** Colombo South to inter-city, 2.5 kg, MEDIUM, with DROP100: 650 + 80 + 100 + 0 - 100 = 730. */
+    private static final PricingQuote QUOTE = new PricingQuote(RouteType.INTER_CITY, new BigDecimal("650.00"),
+            new BigDecimal("80.00"), new BigDecimal("100.00"), new BigDecimal("0.00"), new BigDecimal("100.00"),
+            new BigDecimal("730.00"), "LKR");
+
+    private static CreateParcelRequest customerRequest() {
+        return new CreateParcelRequest("123 Main St, Colombo", "COLOMBO_SOUTH", "456 High St, Kandy", "INTER_CITY",
+                "Nimal Perera", "+94771234567", ParcelSize.MEDIUM, new BigDecimal("2.50"), DeliverySpeed.STANDARD,
+                "DROP100");
+    }
+
+    private Parcel savedParcel() {
+        ArgumentCaptor<Parcel> saved = ArgumentCaptor.forClass(Parcel.class);
+        verify(parcelRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    private static void assertStoresQuote(Parcel parcel) {
+        assertThat(parcel.getRouteType()).isEqualTo(RouteType.INTER_CITY);
+        assertThat(parcel.getBaseFee()).isEqualByComparingTo("650.00");
+        assertThat(parcel.getWeightFee()).isEqualByComparingTo("80.00");
+        assertThat(parcel.getSizeFee()).isEqualByComparingTo("100.00");
+        assertThat(parcel.getExpressFee()).isEqualByComparingTo("0.00");
+        assertThat(parcel.getDiscount()).isEqualByComparingTo("100.00");
+        assertThat(parcel.getFeeAmount()).isEqualByComparingTo("730.00");
+        assertThat(parcel.getFeeCurrency()).isEqualTo("LKR");
+        assertThat(parcel.getStatus()).isEqualTo(ParcelStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("createCustomerParcel stores the route, the quote's breakdown, the first history row and an outbox event")
+    void createCustomerParcelStoresQuoteHistoryAndEvent() {
+        when(pricingServiceClient.getQuote(new QuoteRequest("COLOMBO_SOUTH", "INTER_CITY", new BigDecimal("2.50"),
+                ParcelSize.MEDIUM, DeliverySpeed.STANDARD, "DROP100"))).thenReturn(QUOTE);
+        when(trackingNumberGenerator.generateUniqueTrackingNumber()).thenReturn("SD-7K3Q-9P2M");
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParcelResponse response = parcelService.createCustomerParcel(customerId, customerRequest());
+
+        assertThat(response.trackingNo()).isEqualTo("SD-7K3Q-9P2M");
+        assertThat(response.feeAmount()).isEqualByComparingTo("730.00");
+        assertThat(response.status()).isEqualTo(ParcelStatus.CREATED);
+
+        Parcel parcel = savedParcel();
+        assertStoresQuote(parcel);
+        assertThat(parcel.getCustomerId()).isEqualTo(customerId);
+        assertThat(parcel.getMerchantId()).isNull();
+        assertThat(parcel.getPickupZone()).isEqualTo("COLOMBO_SOUTH");
+        assertThat(parcel.getDropoffZone()).isEqualTo("INTER_CITY");
+        assertThat(parcel.getSpeed()).isEqualTo(DeliverySpeed.STANDARD);
+        assertThat(parcel.getPromoCode()).isEqualTo("DROP100");
+        assertThat(parcel.getRecipientEmail()).isNull();
+        assertThat(parcel.getStatusHistory()).singleElement().satisfies(history -> {
+            assertThat(history.getStatus()).isEqualTo(ParcelStatus.CREATED);
+            assertThat(history.getChangedBy()).isEqualTo(customerId);
+            assertThat(history.getChangedByRole()).isEqualTo("CUSTOMER");
+        });
+        verify(outboxService).enqueueStatusChangedEvent(parcel, null, "Delivery booking created");
+    }
+
+    @Test
+    @DisplayName("createCustomerParcel saves nothing and enqueues no event when pricing is unavailable")
+    void createCustomerParcelSavesNothingWhenPricingUnavailable() {
+        when(pricingServiceClient.getQuote(any()))
+                .thenThrow(new ServiceUnavailableException("pricing-service is not available right now."));
+
+        assertThatThrownBy(() -> parcelService.createCustomerParcel(customerId, customerRequest()))
+                .isInstanceOf(ServiceUnavailableException.class);
+
+        verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("createCustomerParcel saves nothing when pricing rejects the input")
+    void createCustomerParcelSavesNothingWhenPricingRejectsInput() {
+        when(pricingServiceClient.getQuote(any()))
+                .thenThrow(new ValidationException("Promo code DROP100 has expired"));
+
+        assertThatThrownBy(() -> parcelService.createCustomerParcel(customerId, customerRequest()))
+                .isInstanceOf(ValidationException.class);
+
+        verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+}
