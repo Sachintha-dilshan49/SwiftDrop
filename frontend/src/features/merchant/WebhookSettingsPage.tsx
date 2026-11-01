@@ -6,7 +6,7 @@ interface Props {
 }
 
 export const WebhookSettingsPage: React.FC<Props> = ({ token }) => {
-  const [settings, setSettings] = useState<WebhookSettingsResponse | null>(null);
+  const [, setSettings] = useState<WebhookSettingsResponse | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [rotateSecret, setRotateSecret] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -19,8 +19,7 @@ export const WebhookSettingsPage: React.FC<Props> = ({ token }) => {
       const data = await merchantApi.getWebhookSettings(token);
       setSettings(data);
       setWebhookUrl(data.webhookUrl || '');
-    } catch (err: any) {
-      // 404 means not yet configured
+    } catch {
       setSettings(null);
     }
   };
@@ -42,45 +41,60 @@ export const WebhookSettingsPage: React.FC<Props> = ({ token }) => {
       setSavedSecret(res.secret);
       setRotateSecret(false);
       fetchSettings();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save webhook settings');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to save webhook settings';
+      setError(message);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Webhook Settings</h1>
-        <p className="text-sm text-gray-500">
-          Receive real-time notifications whenever your parcels change status (delivered by SwiftDrop Notification Service).
-        </p>
+    <div className="merchant-body" style={{ maxWidth: '840px' }}>
+      <div className="merchant-page-head">
+        <div>
+          <h1>Webhook Settings</h1>
+          <p>
+            Receive real-time notifications whenever parcels change status.
+          </p>
+        </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
+        <div className="alert" role="alert" style={{ marginBottom: '20px' }}>
           {error}
         </div>
       )}
 
-      {/* Secret Display Banner (shown only on save / rotation) */}
       {savedSecret && (
-        <div className="mb-6 p-6 bg-green-50 border border-green-200 rounded-xl shadow-sm">
-          <h3 className="text-sm font-semibold text-green-900 mb-1">Webhook Secret Generated</h3>
-          <p className="text-xs text-green-800 mb-3">
-            Use this secret to verify the <code className="font-mono bg-white px-1 py-0.5 rounded">X-SwiftDrop-Signature</code> header on inbound webhook POST requests. Copy it now:
+        <div className="demo-callout-banner" style={{ marginBottom: '24px', background: '#e6f6ee', borderColor: '#a7dfb8' }}>
+          <strong style={{ fontSize: '13px', color: '#167a49', display: 'block', marginBottom: '6px' }}>
+            ✓ Webhook Secret Generated
+          </strong>
+          <p style={{ fontSize: '11px', color: '#14603b', margin: '0 0 12px' }}>
+            Use this secret to verify the <code>X-SwiftDrop-Signature</code> header on inbound webhook requests.
           </p>
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input
               type="text"
               readOnly
               value={savedSecret}
-              className="font-mono text-sm px-3 py-2 bg-white border border-green-300 rounded-lg w-full max-w-md select-all"
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #a7dfb8',
+                width: '100%',
+                maxWidth: '420px',
+                background: '#ffffff',
+              }}
             />
             <button
+              type="button"
               onClick={() => navigator.clipboard.writeText(savedSecret)}
-              className="px-3 py-2 bg-green-600 text-white text-xs rounded-lg font-medium hover:bg-green-700 transition"
+              className="button button-primary"
+              style={{ width: 'auto', padding: '0 18px', height: '36px', fontSize: '11px' }}
             >
               Copy Secret
             </button>
@@ -88,63 +102,47 @@ export const WebhookSettingsPage: React.FC<Props> = ({ token }) => {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mb-8">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Webhook Endpoint URL *
-            </label>
-            <input
-              type="url"
-              required
-              value={webhookUrl}
-              onChange={(e) => setWebhookUrl(e.target.value)}
-              placeholder="https://your-domain.com/api/swiftdrop/webhook"
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white text-sm"
-            />
-            <span className="text-xs text-gray-500">
-              Must be a valid HTTP or HTTPS endpoint that accepts JSON POST requests.
-            </span>
-          </div>
-
-          {settings && (
-            <div className="flex items-center gap-2 pt-2">
+      <div className="dev-card">
+        {loading ? (
+          <p style={{ color: 'var(--muted)', textAlign: 'center', padding: '20px' }}>Loading webhook settings…</p>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="reg-form-group">
+              <label htmlFor="webhookUrl">Webhook Endpoint URL *</label>
               <input
-                type="checkbox"
-                id="rotateSecret"
-                checked={rotateSecret}
-                onChange={(e) => setRotateSecret(e.target.checked)}
-                className="rounded border-gray-300 text-blue-600"
+                id="webhookUrl"
+                type="url"
+                required
+                value={webhookUrl}
+                onChange={(e) => setWebhookUrl(e.target.value)}
+                placeholder="https://api.yourdomain.com/swiftdrop/webhook"
               />
-              <label htmlFor="rotateSecret" className="text-sm text-gray-700 dark:text-gray-300">
-                Rotate HMAC-SHA256 signing secret on save
+              <p className="reg-hint">Must accept HTTPS POST requests with JSON payloads.</p>
+            </div>
+
+            <div style={{ margin: '20px 0' }}>
+              <label className="terms-check" style={{ cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={rotateSecret}
+                  onChange={(e) => setRotateSecret(e.target.checked)}
+                />
+                <span style={{ fontSize: '12px', color: '#48566c' }}>
+                  Rotate signing secret (invalidates previously issued secret immediately)
+                </span>
               </label>
             </div>
-          )}
 
-          <div className="pt-2">
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
+              className="button button-primary"
+              style={{ width: 'auto', padding: '0 24px', height: '40px' }}
             >
-              {saving ? 'Saving...' : settings ? 'Update Webhook' : 'Configure Webhook'}
+              {saving ? 'Saving…' : 'Save webhook configuration'}
             </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Signature Verification Guide */}
-      <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Signature Verification Guide</h3>
-        <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-          Every webhook payload sent by SwiftDrop includes the following security headers:
-        </p>
-        <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside space-y-1 mb-3">
-          <li><code className="font-mono">X-SwiftDrop-Signature</code>: sha256=&lt;HMAC-SHA256 signature using your secret&gt;</li>
-          <li><code className="font-mono">X-SwiftDrop-Event-Id</code>: Unique event UUID for idempotency</li>
-          <li><code className="font-mono">X-SwiftDrop-Timestamp</code>: UTC ISO-8601 timestamp of delivery</li>
-        </ul>
+          </form>
+        )}
       </div>
     </div>
   );
