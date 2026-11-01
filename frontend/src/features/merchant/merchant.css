@@ -1,0 +1,933 @@
+/* ==========================================================================
+   SwiftDrop Merchant Platform Styles (Figma SwiftDrop UI · v1)
+   ========================================================================== */
+
+/* Page & Layout Shell */
+.merchant-layout {
+  display: flex;
+  min-height: 100vh;
+  background: #f3f5f8;
+  color: var(--ink);
+  font-family: inherit;
+}
+
+/* Sidebar (Width 248px matching Figma 1:1754, 1:2129, 1:2731) */
+.merchant-sidebar {
+  width: 248px;
+  flex: 0 0 248px;
+  background: #ffffff;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-sizing: border-box;
+  z-index: 20;
+}
+
+.merchant-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  padding-left: 6px;
+}
+
+.merchant-sidebar-brand .brand-mark {
+  width: 28px;
+  height: 28px;
+  background: var(--ink);
+  color: var(--orange);
+  border-radius: 7px 7px 7px 2px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+
+.merchant-sidebar-brand .brand-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.merchant-role-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 105, 15, 0.12);
+  color: var(--orange-dark);
+  margin-left: 4px;
+}
+
+/* Navigation Links */
+.merchant-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.merchant-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.merchant-nav-item:hover {
+  background: #f7f9fb;
+  color: var(--ink);
+}
+
+.merchant-nav-item.is-active {
+  background: rgba(255, 105, 15, 0.08);
+  color: var(--orange-dark);
+  font-weight: 700;
+}
+
+.merchant-nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+/* Sidebar Footer & Switcher */
+.merchant-sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.merchant-portal-switcher {
+  background: #f4f6f9;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.merchant-portal-switcher-label {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.merchant-switcher-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.merchant-switcher-btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 10px;
+  font-weight: 650;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.merchant-switcher-btn.is-active {
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.merchant-user-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fafbfc;
+  border: 1px solid var(--line);
+}
+
+.merchant-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.merchant-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--orange);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.merchant-user-text h4 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.2;
+}
+
+.merchant-user-text p {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.1;
+}
+
+.merchant-signout-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.merchant-signout-btn:hover {
+  color: #d93829;
+}
+
+/* Main Area */
+.merchant-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Top Header (Height 64px) */
+.merchant-topbar {
+  height: 64px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.merchant-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f4f6f9;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 14px;
+  width: 340px;
+}
+
+.merchant-search-wrapper svg {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.merchant-search-wrapper input {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  width: 100%;
+  color: var(--ink);
+  outline: none;
+}
+
+.merchant-search-wrapper input::placeholder {
+  color: var(--muted);
+}
+
+.merchant-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.merchant-portal-pill {
+  font-size: 11px;
+  font-weight: 650;
+  padding: 5px 12px;
+  background: #f0f2f5;
+  border-radius: 999px;
+  color: #556277;
+}
+
+.merchant-icon-btn {
+  position: relative;
+  background: none;
+  border: none;
+  color: #556277;
+  cursor: pointer;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.merchant-icon-btn:hover {
+  background: #f4f6f9;
+}
+
+.merchant-bell-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  background: #ff4747;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+}
+
+/* Page Body Container */
+.merchant-body {
+  padding: 32px;
+  max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+
+.merchant-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 16px;
+}
+
+.merchant-page-head h1 {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--ink);
+}
+
+.merchant-page-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Stat Cards Grid */
+.merchant-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.merchant-stat-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.merchant-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.merchant-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin: 12px 0 4px;
+  color: var(--ink);
+}
+
+.merchant-stat-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: #197c52;
+}
+
+/* Filter Pills */
+.merchant-filters-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.merchant-filter-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.merchant-filter-pill {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.merchant-filter-pill:hover {
+  border-color: #cbd4e0;
+}
+
+.merchant-filter-pill.is-active {
+  background: var(--ink);
+  color: #ffffff;
+  border-color: var(--ink);
+}
+
+/* Data Table Card */
+.merchant-card-box {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.merchant-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+
+.merchant-table th {
+  background: #fafbfc;
+  padding: 12px 18px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--line);
+}
+
+.merchant-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.merchant-table tr:last-child td {
+  border-bottom: none;
+}
+
+.merchant-table tr:hover td {
+  background: #fafbfc;
+}
+
+.merchant-tracking-link {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--orange-dark);
+  text-decoration: none;
+}
+
+.merchant-tracking-link:hover {
+  text-decoration: underline;
+}
+
+/* Status Badges */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status-pill.awaiting {
+  background: #fff6e8;
+  color: #9c5c11;
+}
+
+.status-pill.transit {
+  background: #eaf3fe;
+  color: #1e599e;
+}
+
+.status-pill.delivered {
+  background: #e8f7ef;
+  color: #157949;
+}
+
+.status-pill.failed {
+  background: #fdeeee;
+  color: #b32a2a;
+}
+
+/* Developer Settings 2-Column Grid (Figma 1:2731) */
+.dev-settings-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 24px;
+}
+
+.dev-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dev-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.dev-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dev-card-title {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0;
+  color: var(--ink);
+}
+
+.dev-card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 20px;
+  line-height: 1.45;
+}
+
+.dev-key-row {
+  margin-bottom: 16px;
+}
+
+.dev-key-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4a576b;
+  margin-bottom: 6px;
+}
+
+.dev-key-input-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f9fafb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 6px 3px 12px;
+}
+
+.dev-key-input-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+}
+
+.dev-action-btn-icon {
+  background: none;
+  border: none;
+  padding: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+
+.dev-action-btn-icon:hover {
+  background: #edf1f6;
+  color: var(--ink);
+}
+
+/* Webhook Log List */
+.dev-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dev-log-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.dev-code-box {
+  background: #151d2a;
+  border-radius: 10px;
+  padding: 16px;
+  color: #f1f4f8;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-x: auto;
+  position: relative;
+}
+
+/* Mode Switch (Sandbox vs Live) */
+.sandbox-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* Switch Toggle UI */
+.switch-pill {
+  width: 36px;
+  height: 20px;
+  background: #d4dbe4;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.switch-pill.is-active {
+  background: var(--orange);
+}
+
+.switch-pill-handle {
+  width: 16px;
+  height: 16px;
+  background: #ffffff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s;
+}
+
+.switch-pill.is-active .switch-pill-handle {
+  transform: translateX(16px);
+}
+
+/* Registration Page Shell (Figma 1:1517) */
+.reg-shell {
+  min-height: 100vh;
+  background: #f3f5f8;
+  padding: 40px 20px;
+}
+
+.reg-container {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.reg-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.reg-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.reg-back-link:hover {
+  color: var(--ink);
+}
+
+.reg-header {
+  margin-bottom: 28px;
+}
+
+.reg-header h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  margin: 4px 0 8px;
+}
+
+.reg-header p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.reg-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 28px;
+  margin-bottom: 20px;
+}
+
+.reg-card-title {
+  font-size: 17px;
+  font-weight: 750;
+  color: var(--ink);
+  margin: 0 0 18px;
+}
+
+.reg-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.reg-form-group {
+  margin-bottom: 16px;
+}
+
+.reg-form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #48566c;
+  margin-bottom: 6px;
+}
+
+.reg-form-group input,
+.reg-form-group select {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.reg-form-group input:focus,
+.reg-form-group select:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(255, 105, 15, 0.1);
+}
+
+.reg-hint {
+  font-size: 10px;
+  color: var(--muted);
+  margin: 5px 0 0;
+}
+
+.doc-upload-box {
+  border: 1.5px dashed #cbd4e1;
+  background: #fbfcfd;
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.doc-upload-box:hover {
+  border-color: var(--orange);
+  background: #fffaf7;
+}
+
+.doc-upload-box.is-uploaded {
+  border-style: solid;
+  border-color: #a7dfb8;
+  background: #f3fbf6;
+}
+
+/* Approval Pending Screen (Figma 1:1652) */
+.pending-shell {
+  min-height: 100vh;
+  background: #f3f5f8;
+  padding: 48px 20px;
+}
+
+.pending-card {
+  max-width: 660px;
+  margin: 0 auto;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+}
+
+.pending-icon-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #fff4ec;
+  color: var(--orange);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 20px;
+}
+
+.pending-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: left;
+  margin: 32px 0;
+  padding: 20px 24px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.pending-step-item {
+  display: flex;
+  gap: 14px;
+  position: relative;
+}
+
+.pending-step-bullet {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.pending-step-bullet.done {
+  background: #e6f6ee;
+  color: #167a49;
+}
+
+.pending-step-bullet.active {
+  background: #fff1e6;
+  color: var(--orange-dark);
+}
+
+.pending-step-bullet.idle {
+  background: #eef2f6;
+  color: var(--muted);
+}
+
+.demo-callout-banner {
+  background: #fff9f4;
+  border: 1px solid #fedec8;
+  border-radius: 10px;
+  padding: 16px 20px;
+  text-align: left;
+  margin-top: 24px;
+}
+
+/* Modal UI for Create Order */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(18, 28, 45, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 20px;
+}
+
+.modal-dialog {
+  background: #ffffff;
+  border-radius: 14px;
+  width: min(600px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 900px) {
+  .merchant-sidebar {
+    display: none;
+  }
+  .merchant-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dev-settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .reg-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .merchant-topbar {
+    padding: 0 16px;
+  }
+  .merchant-search-wrapper {
+    width: 180px;
+  }
+  .merchant-body {
+    padding: 20px 16px;
+  }
+  .merchant-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

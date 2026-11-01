@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { AuthUser } from "../auth/authApi";
 import { DashboardRole } from "../auth/authPortals";
+import { MerchantDashboardPage } from "../features/merchant/MerchantDashboardPage";
+import { AdminMerchantsPage } from "../features/merchant/AdminMerchantsPage";
 
 type DashboardItem = {
   title: string;
@@ -108,61 +111,100 @@ type RoleDashboardProps = {
 };
 
 export function RoleDashboard({ role, user, onSignOut }: RoleDashboardProps) {
+  const [adminTab, setAdminTab] = useState<'overview' | 'merchants'>('overview');
+
+  // If role is MERCHANT, render the dedicated Figma Merchant Dashboard
+  if (role === 'MERCHANT') {
+    return (
+      <MerchantDashboardPage
+        onSignOut={onSignOut}
+        onSwitchPortal={(portal) => {
+          if (portal === 'customer') window.location.assign('/customer');
+          if (portal === 'admin') window.location.assign('/admin');
+        }}
+      />
+    );
+  }
+
   const content = dashboardContent[role];
 
   return (
     <div className={`dashboard dashboard-${role.toLowerCase()}`}>
-      <header className="dashboard-header">
+      <header className="dashboard-header" role="banner">
         <div className="dashboard-brand">
           <span className="dashboard-brand-mark" aria-hidden="true">S</span>
           <span>SwiftDrop</span>
         </div>
         <span className="dashboard-portal">{content.label}</span>
         <span className="dashboard-page-name">{content.heading}</span>
+        {role === 'ADMIN' && (
+          <div style={{ display: 'flex', gap: '8px', marginLeft: '16px' }}>
+            <button
+              type="button"
+              className={`merchant-filter-pill ${adminTab === 'overview' ? 'is-active' : ''}`}
+              style={{ fontSize: '10px', padding: '4px 10px' }}
+              onClick={() => setAdminTab('overview')}
+            >
+              Overview
+            </button>
+            <button
+              type="button"
+              className={`merchant-filter-pill ${adminTab === 'merchants' ? 'is-active' : ''}`}
+              style={{ fontSize: '10px', padding: '4px 10px' }}
+              onClick={() => setAdminTab('merchants')}
+            >
+              Merchants (Approval Queue)
+            </button>
+          </div>
+        )}
         <div className="dashboard-user">
           <span className="dashboard-user-name">{user.fullName}</span>
           <button className="dashboard-signout" type="button" onClick={onSignOut}>Sign out</button>
         </div>
       </header>
 
-      <main className="dashboard-main">
-        <div className="dashboard-heading">
-          <div>
-            <p className="dashboard-eyebrow">{content.label}</p>
-            <h1>Good morning, {user.fullName.split(/\s+/)[0]}</h1>
-            <p>{content.description}</p>
+      {role === 'ADMIN' && adminTab === 'merchants' ? (
+        <AdminMerchantsPage />
+      ) : (
+        <main className="dashboard-main">
+          <div className="dashboard-heading">
+            <div>
+              <p className="dashboard-eyebrow">{content.label}</p>
+              <h1>Good morning, {user.fullName.split(/\s+/)[0]}</h1>
+              <p>{content.description}</p>
+            </div>
+            <span className="dashboard-data-note">Dashboard preview · sample data</span>
           </div>
-          <span className="dashboard-data-note">Dashboard preview · sample data</span>
-        </div>
 
-        <section className="dashboard-stats" aria-label="Dashboard summary">
-          {content.stats.map((stat) => (
-            <article className="dashboard-stat" key={stat.label}>
-              <span>{stat.label}</span>
-              <strong>{stat.value}</strong>
-              <small>{stat.note}</small>
-            </article>
-          ))}
-        </section>
-
-        <section className="dashboard-list" aria-labelledby="dashboard-list-heading">
-          <div className="dashboard-list-heading">
-            <h2 id="dashboard-list-heading">{content.itemsHeading}</h2>
-            <span>{content.items.length} shown</span>
-          </div>
-          <div className="dashboard-items">
-            {content.items.map((item) => (
-              <article className="dashboard-item" key={item.title}>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </div>
-                <span className="dashboard-status">{item.status}</span>
+          <section className="dashboard-stats" aria-label="Dashboard summary">
+            {content.stats.map((stat) => (
+              <article className="dashboard-stat" key={stat.label}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+                <small>{stat.note}</small>
               </article>
             ))}
-          </div>
-        </section>
-      </main>
+          </section>
+
+          <section className="dashboard-list" aria-labelledby="dashboard-list-heading">
+            <div className="dashboard-list-heading">
+              <h2 id="dashboard-list-heading">{content.itemsHeading}</h2>
+              <span>{content.items.length} shown</span>
+            </div>
+            <div className="dashboard-items">
+              {content.items.map((item) => (
+                <article className="dashboard-item" key={item.title}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.detail}</p>
+                  </div>
+                  <span className="dashboard-status">{item.status}</span>
+                </article>
+              ))}
+            </div>
+          </section>
+        </main>
+      )}
     </div>
   );
 }
