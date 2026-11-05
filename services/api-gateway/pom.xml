@@ -15,7 +15,8 @@
     <name>SwiftDrop api-gateway</name>
 
     <dependencies>
-        <!-- Reactive gateway: common's servlet parts (error advice, request-ID filter, security chain) do not apply here -->
+        <!-- Reactive gateway: common's servlet parts (error advice, request-ID filter, security chain) do not apply here.
+             Only plain helpers (RequestIds, ProblemDetails) and the shared logback pattern are used. -->
         <dependency>
             <groupId>lk.swiftdrop</groupId>
             <artifactId>common</artifactId>
@@ -28,10 +29,30 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- JWT check against auth-service's JWKS (reactive resource server) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security-oauth2-resource-server</artifactId>
+        </dependency>
+        <!-- RedisRateLimiter for the merchant API and the public fee estimate -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
