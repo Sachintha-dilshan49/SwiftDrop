@@ -1,5 +1,5 @@
 @startuml UC-04_customer_ai_assistant
-!include _style.iuml
+!include usecase/_style.iuml
 left to right direction
 title SwiftDrop – AI Assistant (Customer)
 
@@ -20,10 +20,10 @@ rectangle "SwiftDrop Platform" {
 Customer --> C16
 C16 -- LLM
 
-C17 .> C16 : <<extend>>
-C18 .> C16 : <<extend>>
-C19 .> C16 : <<extend>>
-C20 .> C16 : <<extend>>\n[off-topic or another\nuser's data]
+C16 <.. C17 : <<extend>>
+C16 <.. C18 : <<extend>>
+C16 <.. C19 : <<extend>>
+C16 <.. C20 : <<extend>>\n[off-topic or another\nuser's data]
 
 C17 ..> C11 : <<include>>
 C18 ..> C08 : <<include>>

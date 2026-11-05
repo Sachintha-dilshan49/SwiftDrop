@@ -1,0 +1,10 @@
+{
+  "theme": "neutral",
+  "themeVariables": {
+    "fontFamily": "Arial, Helvetica, sans-serif",
+    "fontSize": "14px"
+  },
+  "flowchart": { "htmlLabels": true, "curve": "basis", "padding": 12 },
+  "sequence": { "showSequenceNumbers": true, "wrap": false, "messageFontSize": 13, "noteFontSize": 12 },
+  "er": { "fontSize": 13 }
+}

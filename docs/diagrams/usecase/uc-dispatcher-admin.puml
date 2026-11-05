@@ -1,0 +1,47 @@
+@startuml uc-dispatcher-admin
+' Use case — Dispatcher and Admin · Role 1
+' Source: docs/architecture.md v1.2 §5, §6.3 webhook retry, §7, §9
+' Admin specialises Dispatcher: an Admin can do everything a Dispatcher can, plus the admin-only use cases.
+' Layout: "-|>" (single dash) keeps both actors in the left column; "Base <.. Extension" keeps bases next to the actor.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Dispatcher and Admin
+
+actor "Dispatcher\n(DISPATCHER role)" as Dispatcher
+actor "Admin\n(ADMIN role)" as Admin
+Admin -|> Dispatcher
+
+rectangle "SwiftDrop" {
+  usecase "View unassigned parcels\nGET /dispatch/unassigned" as D1
+  usecase "Assign parcel to courier\nPOST /dispatch/assignments" as D2
+  usecase "View courier workload\nGET /dispatch/workload" as D3
+  usecase "View daily reports\nGET /reports/daily" as D4
+  usecase "View all parcels\nand history" as D5
+  usecase "Update status on\nbehalf of a courier" as D6
+  usecase "View webhook deliveries\nGET /admin/webhook-deliveries" as D7
+  usecase "Replay parked webhook\nPOST /admin/webhook-deliveries/{id}/replay" as D8
+  usecase "Approve / reject merchants\n/admin/merchants" as A1
+  usecase "Manage users and roles\n/admin/users" as A2
+  usecase "Manage zones\n/admin/zones" as A3
+  usecase "Manage pricing rules\nand promo codes" as A4
+}
+
+Dispatcher -- D1
+Dispatcher -- D2
+Dispatcher -- D4
+Dispatcher -- D5
+Dispatcher -- D6
+Dispatcher -- D7
+D2 ..> D3 : <<include>>
+D7 <.. D8 : <<extend>>\n[delivery PARKED]
+Admin -- A1
+Admin -- A2
+Admin -- A3
+Admin -- A4
+
+legend bottom right
+  The four use cases linked to Admin are admin-only.
+  All routes are /api/v1/... through the gateway;
+  roles are checked with @PreAuthorize in each service.
+endlegend
+@enduml

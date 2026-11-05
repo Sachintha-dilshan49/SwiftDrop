@@ -1,0 +1,63 @@
+---
+config:
+  layout: elk
+---
+%% Architecture — presentation, business logic and data layers inside one request path · Role 1
+%% Source: docs/architecture.md v1.1 §2 Layers, AGENTS.md §6 (controller → service → repository), docs/conventions.md
+%% Example: parcel-service; every service follows the same layering and gets the shared `common` concerns.
+flowchart TB
+  classDef pres fill:#ffffff,stroke:#222,stroke-width:1.5px
+  classDef biz fill:#eef3fb,stroke:#3b5b92
+  classDef data fill:#f4f4f4,stroke:#555
+  classDef common fill:#fff8e6,stroke:#b07d00,stroke-dasharray:4 3
+
+  subgraph P["Presentation layer"]
+    direction LR
+    PAGES["React pages<br/>src/features/&lt;feature&gt;"]:::pres
+    FORMS["Forms + zod validation"]:::pres
+    APIC["API clients src/api/<br/>(VITE_API_BASE_URL, TanStack Query)"]:::pres
+    ES["EventSource (SSE)"]:::pres
+    PAGES --> FORMS --> APIC
+    PAGES --> ES
+  end
+
+  GW["api-gateway :8080 (edge)"]:::biz
+
+  subgraph B["Business logic layer — parcel-service :8083"]
+    direction TB
+    subgraph CM["common (shared library, auto-configured)"]
+      direction LR
+      SEC["Security filter chains<br/>JWT (JWKS) · X-Internal-Token"]:::common
+      ERR["ProblemDetail handler<br/>(RFC 7807)"]:::common
+      LOG["Request ID + PII log masking"]:::common
+    end
+    CTRL["Controllers<br/>@Valid request DTOs (records)<br/>@PreAuthorize roles"]:::biz
+    SVC["Services<br/>business rules · ownership checks<br/>@Transactional"]:::biz
+    SM["ParcelStateMachine<br/>(State)"]:::biz
+    MAP["Mappers<br/>entity ↔ DTO"]:::biz
+    CLI["Clients<br/>InternalRestClientFactory<br/>(2 s / 5 s timeouts)"]:::biz
+    EVT["OutboxRelay · event consumers"]:::biz
+    SEC --> CTRL --> SVC
+    SVC --> SM
+    SVC --> MAP
+    SVC --> CLI
+    CTRL -. "exceptions" .-> ERR
+  end
+
+  subgraph D["Data layer"]
+    direction LR
+    REPO["Repositories<br/>Spring Data JPA"]:::data
+    DB[("parcel_db<br/>PostgreSQL + Flyway<br/>ddl-auto = validate")]:::data
+    MQ{{"RabbitMQ"}}:::data
+    REPO --> DB
+  end
+
+  OTHER["pricing-service<br/>(owns pricing_db)"]:::biz
+
+  APIC -- "HTTPS JSON" --> GW
+  ES -- "SSE" --> GW
+  GW --> SEC
+  SVC --> REPO
+  EVT --> REPO
+  EVT <--> MQ
+  CLI -- "REST /internal/**" --> OTHER

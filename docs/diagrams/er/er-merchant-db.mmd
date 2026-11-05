@@ -1,0 +1,58 @@
+%% ER — merchant-service (merchant_db) · owner Role 5
+%% Converted from er-merchant.md by Sudari Ratnayake (Role 5) to a renderable .mmd; matches Flyway V1–V4 on dev.
+%% parcel_id and user_id are logical references to other databases (no foreign key, ADR-008).
+erDiagram
+    merchants ||--o{ merchant_api_keys : "owns"
+    merchants ||--o| merchant_webhook_endpoints : "configures"
+    merchants ||--o{ merchant_orders : "places"
+
+    merchants {
+        uuid id PK
+        uuid user_id UK "auth_db.users, no FK"
+        varchar business_name "200"
+        varchar business_reg_no UK "100"
+        varchar contact_name "150"
+        varchar email UK "255"
+        varchar phone "30"
+        varchar address "500"
+        varchar status "PENDING, APPROVED, REJECTED"
+        varchar rejection_reason "500"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    merchant_api_keys {
+        uuid id PK
+        uuid merchant_id FK "ON DELETE CASCADE"
+        varchar name "100"
+        varchar key_prefix "sd_live_..., for lookup"
+        varchar key_hash UK "SHA-256, raw key shown once"
+        boolean revoked
+        timestamptz revoked_at
+        timestamptz expires_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    merchant_webhook_endpoints {
+        uuid id PK
+        uuid merchant_id FK,UK "one per merchant"
+        varchar webhook_url "1000"
+        varchar secret "HMAC signing secret"
+        boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    merchant_orders {
+        uuid id PK
+        uuid merchant_id FK
+        uuid parcel_id "parcel_db.parcels, no FK"
+        varchar tracking_no
+        varchar recipient_name
+        varchar recipient_phone
+        varchar dropoff_address
+        varchar status "copy, parcel-service owns status"
+        numeric fee_amount "10,2"
+        char fee_currency "LKR"
+        varchar idempotency_key "unique per merchant"
+        timestamptz created_at
+        timestamptz updated_at
+    }

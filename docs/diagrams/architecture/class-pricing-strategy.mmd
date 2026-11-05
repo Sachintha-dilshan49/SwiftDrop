@@ -1,0 +1,47 @@
+%% Class diagram — pricing as a Strategy pattern (design for pricing-service, not implemented yet) · Role 1
+%% Source: docs/architecture.md v1.2 §8, §11. Each fee component is one strategy; the calculator only sums them.
+classDiagram
+    direction LR
+    class QuoteController {
+        +estimate(EstimateQuery) QuoteResponse
+        +quote(QuoteRequest) QuoteResponse
+    }
+    class FeeCalculator {
+        -List~FeeComponent~ components
+        +calculate(QuoteRequest) Quote
+    }
+    class FeeComponent {
+        <<interface>>
+        +apply(QuoteRequest, QuoteBuilder) void
+    }
+    class RouteBaseFee {
+        +apply() SAME_ZONE 300 · NEIGHBOURING 350 · COLOMBO_SUBURBS 400 · INTER_CITY 650
+    }
+    class ExtraWeightFee {
+        +apply() 40 per kg above 1 kg, rounded up
+    }
+    class SizeSurcharge {
+        +apply() SMALL 0 · MEDIUM 100 · LARGE 250 · EXTRA_LARGE 500
+    }
+    class SpeedSurcharge {
+        +apply() EXPRESS 100 · STANDARD 0 · NEXT_DAY 0
+    }
+    class PromoDiscount {
+        +apply() fixed amount, never below 0
+    }
+    class PricingRuleRepository {
+        <<Repository>>
+    }
+    class PromoCodeRepository {
+        <<Repository>>
+    }
+    QuoteController --> FeeCalculator
+    FeeCalculator o-- FeeComponent
+    FeeComponent <|.. RouteBaseFee
+    FeeComponent <|.. ExtraWeightFee
+    FeeComponent <|.. SizeSurcharge
+    FeeComponent <|.. SpeedSurcharge
+    FeeComponent <|.. PromoDiscount
+    RouteBaseFee ..> PricingRuleRepository
+    SizeSurcharge ..> PricingRuleRepository
+    PromoDiscount ..> PromoCodeRepository

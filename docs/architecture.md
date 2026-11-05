@@ -1,6 +1,8 @@
 # SwiftDrop Architecture
 
-Version 1.1 · 29 October 2026 · Owner: Role 1 (team lead)
+Version 1.2 · 31 October 2026 · Owner: Role 1 (team lead)
+
+Changes in 1.2: table names match the Flyway migrations (§4); merchant and auth endpoints match the code (§5); the fee estimate is public and the Google OAuth paths are forwarded without the `/api/v1` prefix (§6.1, §10.4); `auth_db` holds identity data only (§4, ADR-011).
 
 This is the source of truth for how the system is built. Changes to anything here need a PR and, for big changes, an entry in [`decisions.md`](decisions.md).
 
@@ -107,7 +109,7 @@ flowchart TB
   GW --> R[(Redis)]
 ```
 
-A detailed visual version is in [`diagrams/architecture-overview.html`](diagrams/architecture-overview.html) (open in a browser) and in the design PDF.
+Detailed diagrams: [`diagrams/architecture/`](diagrams/architecture/), [`diagrams/integration/`](diagrams/integration/) and the design report [`report/SwiftDrop_Design_Report.md`](report/SwiftDrop_Design_Report.md). The older `diagrams/architecture-overview.html` is out of date.
 
 ## 4. Services
 
@@ -127,26 +129,28 @@ A detailed visual version is in [`diagrams/architecture-overview.html`](diagrams
 
 | Database | Tables |
 |---|---|
-| `auth_db` | `users`, `roles`, `user_roles`, `refresh_tokens`, `oauth_accounts` |
+| `auth_db` | `users`, `roles`, `user_roles`, `refresh_tokens`, `oauth_accounts`, `oauth_login_codes` |
 | `pricing_db` | `zones`, `zone_districts`, `pricing_rules`, `promo_codes` |
 | `parcel_db` | `parcels`, `parcel_status_history`, `outbox_events`, `processed_events` |
 | `dispatch_db` | `couriers`, `assignments`, `delivery_proofs`, `daily_stats`, `processed_events` |
-| `merchant_db` | `merchants`, `api_keys`, `webhook_endpoints` |
+| `merchant_db` | `merchants`, `merchant_api_keys`, `merchant_webhook_endpoints`, `merchant_orders` |
 | `notification_db` | `notifications`, `webhook_deliveries`, `processed_events` |
 
-The full ER diagram lives in the design PDF.
+`auth_db` holds identity only: accounts, roles, tokens and linked Google accounts. Merchant business details live in `merchant_db.merchants` and courier details (vehicle, zone) in `dispatch_db.couriers` (ADR-011).
+
+ER diagrams: [`diagrams/er/`](diagrams/er/) (one per database plus an overview) and [`diagrams/er-parcel-service.puml`](diagrams/er-parcel-service.puml).
 
 ## 5. API surface
 
-All public routes are prefixed `/api/v1` and go through the gateway. `/internal/**` routes are service-to-service only and are **not** exposed by the gateway.
+All public routes are prefixed `/api/v1` and go through the gateway. The exceptions are Spring Security's Google OAuth paths `/oauth2/**` and `/login/oauth2/**`, which the gateway forwards to auth-service unchanged. `/internal/**` routes are service-to-service only and are **not** exposed by the gateway.
 
 | Service | Endpoints |
 |---|---|
-| auth | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) · internal `GET /internal/users/{id}/contact` |
+| auth | `POST /auth/signup` · `POST /auth/login` (email or mobile number) · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` and `GET /login/oauth2/code/google` (no `/api/v1` prefix, only when `AUTH_GOOGLE_ENABLED=true`) · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) · internal `GET /internal/users/{id}/contact` |
 | pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size&speed&promoCode` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` · internal `POST /internal/pricing/quote` (rules in [§8](#8-pricing)) |
 | parcel | `POST /parcels` · `GET /parcels` (mine) · `GET /parcels/{id}` · `GET /parcels/{id}/receipt` (PDF) · `GET /track/{trackingNo}` (public) · `GET /track/{trackingNo}/stream` (SSE, public) · internal `POST /internal/parcels` · internal `PATCH /internal/parcels/{id}/status` · internal `GET /internal/parcels/{id}/contacts` |
 | dispatch | `GET /dispatch/unassigned` · `POST /dispatch/assignments` · `GET /dispatch/workload` · `GET /reports/daily?from&to` · `GET /courier/deliveries/today` · `POST /courier/deliveries/{id}/status` (multipart, optional photo) |
-| merchant | `POST /merchants/register` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `POST /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key) · `GET /merchants/me/orders` · internal `GET /internal/merchants/{id}/webhook` |
+| merchant | `POST /merchants/register` · `GET /merchants/me` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `PATCH /admin/merchants/{id}/reject` · `POST, GET /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `GET, PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key, full path `/api/v1/merchant-api/orders`) · `GET /merchants/me/orders` · `GET /merchants/me/orders/{id}` · internal `GET /internal/merchants/{id}/webhook` |
 | notification | `GET /admin/webhook-deliveries` · `POST /admin/webhook-deliveries/{id}/replay` |
 | ai-assistant | `POST /assistant/chat` · MCP endpoint `/mcp` (tools: `track_parcel`, `estimate_fee`, `my_parcels`) |
 
@@ -166,29 +170,56 @@ There are three ways traffic moves, and each has one job:
 
 External clients (the SPA in a browser, merchant store servers) reach the system **only** through `api-gateway`. Service ports are not exposed outside the private network.
 
+Status: everything in this section is **built** in `services/api-gateway` (Spring Cloud Gateway, WebFlux), except where marked as an open item below.
+
 The gateway does:
 
-- **Routing** by path prefix (table below). The `/api/v1` prefix is kept; services see the full path.
-- **JWT check** on every non-public route, using auth-service's JWKS (fetched once and cached, refreshed on unknown key IDs).
-- **CORS** for the SPA origin.
-- **`X-Request-Id`**: creates one if the client did not send it and forwards it; every service logs it.
-- **Rate limiting** with Redis for `/api/v1/merchant-api/**`, per API key.
-- **SSE pass-through** for `/api/v1/track/{trackingNo}/stream` without response buffering.
-- **Public routes** (no JWT): `POST /api/v1/auth/login`, `/register`, `/refresh`, the Google OAuth routes (`/api/v1/oauth2/**` and `POST /api/v1/auth/token`), and `/api/v1/track/**`.
-- **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT. The gateway rejects requests without an `X-API-Key` header (`401`) and rate-limits per key; merchant-service verifies the key itself. (Built in the gateway task.)
+- **Routing** by path prefix (table below). The `/api/v1` prefix is kept; services see the full path. The more specific `/api/v1/admin/<x>/**` routes are ordered before the broad ones. HTTP client timeouts: 2 s connect, 10 s response.
+- **JWT check** on every non-public route, using auth-service's JWKS (fetched on the first token and cached, refreshed on unknown key IDs; the gateway starts even when auth-service is down). The gateway only authenticates: no role or ownership checks, and the `Authorization` header is forwarded unchanged so each service verifies the token again. Missing, expired or invalid token → `401` ProblemDetail (`.../problems/unauthorized`) that does not say which.
+- **CORS** for the SPA origins (`GATEWAY_CORS_ALLOWED_ORIGINS`), applied inside Spring Security so preflight succeeds without a token. Credentials are allowed (the refresh token is an httpOnly cookie); `X-Request-Id` is exposed.
+- **`X-Request-Id`**: kept if the client sent a safe one, otherwise a new one replaces it; forwarded to the service, returned on every response (including the gateway's own 401/404), and logged. One access-log line per request: method, path, status, duration and request ID (no query strings, tokens, API keys or cookies).
+- **Rate limiting** with Redis (`RequestRateLimiter` + `RedisRateLimiter`): `/api/v1/merchant-api/**` per API key and the public `GET /api/v1/pricing/estimate` per client IP. Buckets are `merchant-api:<sha256(key)>` and `pricing-estimate:<sha256(ip)>`, so raw keys and IPs never reach Redis. The client IP is the last `X-Forwarded-For` entry (the one nginx appends; one trusted hop), or the remote address without the header. Over the limit → `429` ProblemDetail with the `X-RateLimit-*` headers. If Redis is unreachable the limiter **fails open** (requests pass) and the gateway stays healthy.
+- **SSE pass-through** for `GET /api/v1/track/{trackingNo}/stream`: its own route with no response timeout and no buffering, so events arrive as they are sent.
+- **Public routes** (no JWT): `POST /api/v1/auth/signup`, `/register`, `/login`, `/refresh`, `/logout` and `/token`; `GET /api/v1/pricing/estimate` (guests and the AI assistant, rate-limited; booking still needs a login); `POST /api/v1/merchants/register`; `/api/v1/track/**`; the Google OAuth paths `/oauth2/**` and `/login/oauth2/**`, forwarded unchanged without the `/api/v1` prefix so Spring Security's default redirect URI works (`/api/v1/oauth2/**` is routed and public too); CORS preflight; `/actuator/health/**`. The list is `swiftdrop.gateway.public-paths` in the gateway's `application.yml`. On public routes the gateway ignores any token it is sent and forwards it as is.
+- **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT. The gateway rejects requests without a non-blank `X-API-Key` header (`401`, "Missing X-API-Key header") and rate-limits per key; merchant-service verifies the key itself.
+- **Errors** are ProblemDetails from the gateway's own handler: `404` no route, `503` service unreachable ("Service temporarily unavailable"), `504` service too slow, `429` over the limit. Bodies never contain exception messages, hostnames or ports. Error responses from a service pass through untouched.
 
-The gateway does **not** contain business logic or ownership checks (those are in the services, see §9), and it **never routes `/internal/**`**.
+The gateway does **not** contain business logic or ownership checks (those are in the services, see §9), and it **never routes `/internal/**`**: `/internal/**` and `/api/v1/internal/**` answer `404` before security runs (also when disguised with `..`, `%xx` or `;params`), and an incoming `X-Internal-Token` header is removed from every request. Under `/actuator` only `/actuator/health/**` (with liveness/readiness probes) is reachable.
 
 | Path | Service |
 |---|---|
 | `/api/v1/auth/**`, `/api/v1/oauth2/**`, `/api/v1/admin/users/**` | `auth-service:8081` |
+| `/oauth2/**`, `/login/oauth2/**` (forwarded unchanged, no prefix) | `auth-service:8081` |
 | `/api/v1/pricing/**`, `/api/v1/admin/zones/**`, `/api/v1/admin/pricing-rules/**` | `pricing-service:8082` |
 | `/api/v1/parcels/**`, `/api/v1/track/**` | `parcel-service:8083` |
 | `/api/v1/dispatch/**`, `/api/v1/courier/**`, `/api/v1/reports/**` | `dispatch-service:8084` |
 | `/api/v1/merchants/**`, `/api/v1/merchant-api/**`, `/api/v1/admin/merchants/**` | `merchant-service:8085` |
 | `/api/v1/admin/webhook-deliveries/**` | `notification-service:8086` |
 | `/api/v1/assistant/**` | `ai-assistant:8087` |
-| `/internal/**` | not routed |
+| `/internal/**`, `/api/v1/internal/**` | not routed (`404`) |
+
+#### Gateway environment variables
+
+| Variable | Default (local) | Purpose |
+|---|---|---|
+| `AUTH_SERVICE_URL`, `PRICING_SERVICE_URL`, `PARCEL_SERVICE_URL`, `DISPATCH_SERVICE_URL`, `MERCHANT_SERVICE_URL`, `NOTIFICATION_SERVICE_URL`, `AI_ASSISTANT_URL` | `http://localhost:8081` … `:8087` | Route targets (Docker: `http://<service>:<port>`) |
+| `JWT_JWK_SET_URI` | `http://localhost:8081/.well-known/jwks.json` | auth-service JWKS |
+| `REDIS_HOST`, `REDIS_PORT` | `localhost`, `6379` | Rate-limiter store |
+| `GATEWAY_CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Allowed SPA origins, comma-separated |
+| `GATEWAY_HTTP_CONNECT_TIMEOUT_MS` | `2000` | Connect timeout to services |
+| `GATEWAY_HTTP_RESPONSE_TIMEOUT` | `10s` | Response timeout (not applied to the SSE route) |
+| `GATEWAY_MERCHANT_RATE_LIMIT_REPLENISH`, `GATEWAY_MERCHANT_RATE_LIMIT_BURST` | `10`, `20` | Merchant API: tokens per second and burst, per key |
+| `GATEWAY_ESTIMATE_RATE_LIMIT_REPLENISH`, `GATEWAY_ESTIMATE_RATE_LIMIT_BURST` | `5`, `20` | Fee estimate: tokens per second and burst, per client IP |
+
+The gateway does not need `INTERNAL_API_TOKEN`: it never calls `/internal/**`, and `common`'s servlet auto-configuration does not run in the reactive gateway.
+
+#### Open items
+
+- merchant-service serves `/merchant-api/orders` without the `/api/v1` prefix, so `POST /api/v1/merchant-api/orders` through the gateway returns `404` until Role 5 moves it (required by ADR-011).
+- pricing-service does not list `GET /api/v1/pricing/estimate` as public yet, so guests get `401` from the service (Role 1, task 4).
+- The frontend calls auth-service directly for Google login (`VITE_AUTH_BASE_URL`); it can switch to the gateway's `/oauth2/**` route (Roles 2 and 7).
+- Swagger UI aggregation in the gateway (§5) is not built yet.
+- The per-IP limit trusts one proxy hop. Port 8080 is also published in Docker Compose for development; clients that call it directly can set `X-Forwarded-For` themselves, so the limit only holds behind nginx or the Ingress.
 
 ### 6.2 Service-to-service (request/reply over REST)
 
@@ -302,7 +333,7 @@ The fee is calculated **only in pricing-service**. A price sent by the browser o
 
 | Endpoint | Who calls it | Purpose |
 |---|---|---|
-| `GET /api/v1/pricing/estimate` (public, through the gateway) | Booking screen, AI assistant (`estimate_fee`) | Show the expected fee before booking |
+| `GET /api/v1/pricing/estimate` (public, through the gateway, rate-limited per client) | Guests, booking screen, AI assistant (`estimate_fee`) | Show the expected fee before booking |
 | `POST /internal/pricing/quote` (internal, `X-Internal-Token`) | parcel-service, for customer bookings and merchant orders | The binding fee when the parcel is created |
 
 Both use the same rules below. parcel-service stores the quote's `total` **and** its breakdown with the parcel, so the receipt shows how the fee was made up even if the rules change later.
@@ -404,7 +435,7 @@ Colombo South → Colombo Central, 1.2 kg, `SMALL`, `EXPRESS`:
 
 ## 10. Key flows
 
-Sequence diagrams for these go in the design PDF.
+Sequence diagrams for these are in [`diagrams/sequence/`](diagrams/sequence/) and [`diagrams/seq-create-delivery.puml`](diagrams/seq-create-delivery.puml).
 
 ### 10.1 Customer creates a delivery
 1. SPA calls `GET /pricing/estimate` and shows the fee.
@@ -426,8 +457,8 @@ Sequence diagrams for these go in the design PDF.
 4. The event fans out: email/SMS, merchant webhook, report counters, and SSE push to open tracking pages.
 
 ### 10.4 Login with Google (OAuth 2.0)
-1. SPA redirects to `/oauth2/authorization/google` (auth-service).
-2. User signs in with Google; Google redirects back with an authorization code.
+1. SPA redirects to `/oauth2/authorization/google`; the gateway forwards it to auth-service unchanged. Google login is offered only when `AUTH_GOOGLE_ENABLED=true`.
+2. User signs in with Google; Google redirects back to `/login/oauth2/code/google` (also forwarded unchanged) with an authorization code.
 3. auth-service validates Google's response, finds or creates/links the user (role CUSTOMER), and creates a hashed, two-minute, single-use login code.
 4. Browser is redirected to the configured SPA callback with the one-time code; SPA calls `POST /api/v1/auth/token` to exchange it for our JWT and refresh token.
 

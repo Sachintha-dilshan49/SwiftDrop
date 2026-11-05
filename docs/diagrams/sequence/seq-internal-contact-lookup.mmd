@@ -1,0 +1,26 @@
+%% Sequence — internal contact lookup (auth-service)
+%% Recreated from "Internal contact lookup flow.png" by Thulani Jayathilake (Role 2); original kept as
+%% ../Internal contact lookup flow-original.png
+%% Fix: /internal/** is protected by X-Internal-Token (ADR-010, common), not by a user's bearer JWT, as the code and
+%% InternalUserControllerTest show. Not routed by the gateway.
+sequenceDiagram
+    autonumber
+    participant NS as notification-service
+    participant F as common internal-token filter<br/>(in auth-service)
+    participant C as InternalUserController
+    participant DB as auth_db
+
+    NS->>F: GET /internal/users/{userId}/contact<br/>X-Internal-Token (InternalRestClientFactory)
+    F->>F: compare with INTERNAL_API_TOKEN (constant time)
+    alt missing or wrong token
+        F-->>NS: 401 ProblemDetail
+    else valid
+        F->>C: forward as ROLE_INTERNAL_SERVICE
+        C->>DB: find user by id
+        alt unknown user
+            C-->>NS: 404 ProblemDetail
+        else found
+            C-->>NS: 200 {email, phone, firstName}
+        end
+    end
+    Note over NS,C: personal data: private network only, never logged unmasked, never put in events

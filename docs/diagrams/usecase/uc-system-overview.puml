@@ -1,0 +1,67 @@
+@startuml uc-system-overview
+' Use case — SwiftDrop system overview (all actors) · Role 1
+' Source: docs/architecture.md v1.2 §1, §5, §9. Detail per actor in the other diagrams in this folder.
+!include _style.iuml
+left to right direction
+title SwiftDrop – Main use cases of every actor
+
+actor "Guest\n(not logged in)" as Guest
+actor "Customer" as Customer
+actor "Merchant" as Merchant
+actor "Courier" as Courier
+actor "Dispatcher" as Dispatcher
+actor "Admin" as Admin
+
+actor "Google OAuth 2.0" as Google <<system>>
+actor "Merchant store\nserver" as Store <<system>>
+actor "Email / SMS\ngateway" as Notify <<system>>
+
+rectangle "SwiftDrop" {
+  usecase "Sign up / log in\n(email or Google)" as UA
+  usecase "Track parcel by\ntracking number (live)" as UT
+  usecase "Get fee estimate" as UE
+  usecase "Book a delivery" as UB
+  usecase "View my deliveries,\ndetails and receipt" as UH
+  usecase "Chat with AI assistant" as UAI
+  usecase "Register business" as UR
+  usecase "Manage API keys\nand webhook" as UK
+  usecase "View merchant orders" as UMD
+  usecase "Create order via\nmerchant API" as UMO
+  usecase "View today's deliveries" as UD
+  usecase "Update delivery status\n(note, proof photo)" as US
+  usecase "Assign parcels\nto couriers" as UAS
+  usecase "View workload and\ndaily reports" as URP
+  usecase "View / replay\nwebhook deliveries" as UWH
+  usecase "Approve / reject\nmerchants" as UMA
+  usecase "Manage users\nand roles" as UU
+  usecase "Manage zones, pricing\nrules, promo codes" as UP
+}
+
+Guest -- UA
+Guest -- UT
+Guest -- UE
+Customer -- UB
+Customer -- UH
+Customer -- UAI
+Merchant -- UR
+Merchant -- UK
+Merchant -- UMD
+Courier -- UD
+Courier -- US
+Dispatcher -- UAS
+Dispatcher -- URP
+Dispatcher -- UWH
+Admin -- UMA
+Admin -- UU
+Admin -- UP
+Admin --|> Dispatcher
+
+UB ..> UE : <<include>>
+UA -- Google
+UMO -- Store
+US -- Notify
+' layout only: keep the external systems in a column right of the boundary
+UE -[hidden]- Google
+UE -[hidden]- Store
+UE -[hidden]- Notify
+@enduml

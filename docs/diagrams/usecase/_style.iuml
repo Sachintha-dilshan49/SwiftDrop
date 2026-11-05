@@ -1,0 +1,53 @@
+' Shared style for SwiftDrop use case diagrams (report theme: orange #FF6A13 accents, navy #0F1A2E text).
+' Smetana is PlantUML's built-in layout engine, so Graphviz is not needed.
+!pragma layout smetana
+skinparam actorStyle awesome
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam dpi 150
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam defaultFontColor #0F1A2E
+skinparam TitleFontSize 18
+skinparam TitleFontStyle bold
+skinparam TitleFontColor #0F1A2E
+skinparam ArrowColor #0F1A2E
+skinparam ArrowFontColor #0F1A2E
+skinparam ArrowFontSize 12
+skinparam ArrowThickness 1.2
+skinparam actor {
+  BorderColor #0F1A2E
+  BackgroundColor #FF6A13
+  FontColor #0F1A2E
+  FontStyle bold
+}
+skinparam actor<<system>> {
+  BorderColor #0F1A2E
+  BackgroundColor #FFFFFF
+  FontStyle normal
+}
+skinparam usecase {
+  BorderColor #FF6A13
+  BackgroundColor #FFF4EC
+  FontColor #0F1A2E
+  BorderThickness 1.5
+}
+skinparam rectangle {
+  BorderColor #0F1A2E
+  BorderThickness 1.5
+  BackgroundColor #FFFFFF
+  FontColor #0F1A2E
+  FontStyle bold
+  FontSize 16
+}
+skinparam note {
+  BackgroundColor #FFF9F4
+  BorderColor #FF6A13
+  FontColor #0F1A2E
+  FontSize 12
+}
+skinparam actor<<external>> {
+  BorderColor #0F1A2E
+  BackgroundColor #FFFFFF
+  FontStyle normal
+}
