@@ -84,7 +84,9 @@ class RateLimitIT extends AbstractGatewayIT {
                 .expectStatus().isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
                 .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .expectHeader().valueEquals("X-RateLimit-Remaining", "0")
-                .expectHeader().exists("X-RateLimit-Burst-Capacity")
+                .expectHeader().valueEquals("X-RateLimit-Burst-Capacity", String.valueOf(RATE_LIMIT_BURST))
+                .expectHeader().valueEquals("X-RateLimit-Replenish-Rate", "1")
+                .expectHeader().valueEquals("X-RateLimit-Requested-Tokens", "1")
                 .expectBody()
                 .jsonPath("$.type").isEqualTo("https://swiftdrop.lk/problems/too-many-requests")
                 .jsonPath("$.status").isEqualTo(429)
@@ -125,6 +127,10 @@ class RateLimitIT extends AbstractGatewayIT {
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
                 .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectHeader().valueEquals("X-RateLimit-Remaining", "0")
+                .expectHeader().valueEquals("X-RateLimit-Burst-Capacity", String.valueOf(RATE_LIMIT_BURST))
+                .expectHeader().valueEquals("X-RateLimit-Replenish-Rate", "1")
+                .expectHeader().valueEquals("X-RateLimit-Requested-Tokens", "1")
                 .expectBody().jsonPath("$.type").isEqualTo("https://swiftdrop.lk/problems/too-many-requests");
     }
 
