@@ -36,17 +36,20 @@ public class ParcelService {
     private final PricingServiceClient pricingServiceClient;
     private final ParcelStateMachine parcelStateMachine;
     private final OutboxService outboxService;
+    private final PdfReceiptService pdfReceiptService;
 
     public ParcelService(ParcelRepository parcelRepository,
                          TrackingNumberGenerator trackingNumberGenerator,
                          PricingServiceClient pricingServiceClient,
                          ParcelStateMachine parcelStateMachine,
-                         OutboxService outboxService) {
+                         OutboxService outboxService,
+                         PdfReceiptService pdfReceiptService) {
         this.parcelRepository = parcelRepository;
         this.trackingNumberGenerator = trackingNumberGenerator;
         this.pricingServiceClient = pricingServiceClient;
         this.parcelStateMachine = parcelStateMachine;
         this.outboxService = outboxService;
+        this.pdfReceiptService = pdfReceiptService;
     }
 
     @Transactional
@@ -151,14 +154,27 @@ public class ParcelService {
 
     @Transactional(readOnly = true)
     public ParcelResponse getParcelForCustomer(UUID parcelId, UUID customerId, boolean isPrivileged) {
+        return ParcelResponse.fromEntity(findParcelVisibleTo(parcelId, customerId, isPrivileged));
+    }
+
+    /** The booking receipt PDF, with the same visibility rule as {@link #getParcelForCustomer}. */
+    @Transactional(readOnly = true)
+    public byte[] getReceiptPdf(UUID parcelId, UUID customerId, boolean isPrivileged) {
+        return pdfReceiptService.generateReceipt(findParcelVisibleTo(parcelId, customerId, isPrivileged));
+    }
+
+    /**
+     * The parcel if the caller booked it or is a dispatcher or admin. "Does not exist" and "not yours"
+     * are the same 404, so callers cannot find out which parcel IDs exist.
+     */
+    private Parcel findParcelVisibleTo(UUID parcelId, UUID customerId, boolean isPrivileged) {
         Parcel parcel = parcelRepository.findById(parcelId)
                 .orElseThrow(() -> new NotFoundException("Parcel not found: " + parcelId));
 
         if (!isPrivileged && (parcel.getCustomerId() == null || !parcel.getCustomerId().equals(customerId))) {
             throw new NotFoundException("Parcel not found: " + parcelId);
         }
-
-        return ParcelResponse.fromEntity(parcel);
+        return parcel;
     }
 
     /**

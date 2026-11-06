@@ -62,6 +62,8 @@ class ParcelServiceTest {
     private ParcelStateMachine parcelStateMachine;
     @Mock
     private OutboxService outboxService;
+    @Mock
+    private PdfReceiptService pdfReceiptService;
 
     @InjectMocks
     private ParcelService parcelService;
@@ -406,5 +408,58 @@ class ParcelServiceTest {
         ParcelResponse response = parcelService.getParcelForCustomer(sampleParcel.getId(), anotherUser, true);
 
         assertThat(response.id()).isEqualTo(sampleParcel.getId());
+    }
+
+    @Test
+    @DisplayName("The customer who booked a parcel gets its receipt")
+    void ownerGetsReceipt() {
+        byte[] pdf = {37, 80, 68, 70};
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        when(pdfReceiptService.generateReceipt(sampleParcel)).thenReturn(pdf);
+
+        assertThat(parcelService.getReceiptPdf(sampleParcel.getId(), customerId, false)).isSameAs(pdf);
+    }
+
+    @Test
+    @DisplayName("A customer cannot get another customer's receipt and gets 404, not 403")
+    void customerCannotGetAnotherCustomersReceipt() {
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        assertThatThrownBy(() -> parcelService.getReceiptPdf(sampleParcel.getId(), UUID.randomUUID(), false))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(pdfReceiptService);
+    }
+
+    @Test
+    @DisplayName("Nobody but dispatchers and admins gets the receipt of a merchant order")
+    void merchantOrderReceiptIsNotFoundForNonPrivilegedCaller() {
+        sampleParcel.setCustomerId(null);
+        sampleParcel.setMerchantId(UUID.randomUUID());
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        assertThatThrownBy(() -> parcelService.getReceiptPdf(sampleParcel.getId(), customerId, false))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(pdfReceiptService);
+    }
+
+    @Test
+    @DisplayName("The receipt of an unknown parcel is 404")
+    void receiptOfUnknownParcelIsNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(parcelRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.getReceiptPdf(unknownId, customerId, false))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(pdfReceiptService);
+    }
+
+    @Test
+    @DisplayName("Dispatchers and admins get the receipt of any parcel")
+    void privilegedCallerGetsAnyReceipt() {
+        byte[] pdf = {37, 80, 68, 70};
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        when(pdfReceiptService.generateReceipt(sampleParcel)).thenReturn(pdf);
+
+        assertThat(parcelService.getReceiptPdf(sampleParcel.getId(), UUID.randomUUID(), true)).isSameAs(pdf);
     }
 }

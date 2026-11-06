@@ -49,6 +49,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -317,7 +318,8 @@ class CustomerParcelControllerTest {
     @ParameterizedTest(name = "GET {0} without token returns 401")
     @ValueSource(strings = {
             "/api/v1/parcels",
-            "/api/v1/parcels/c41d0000-2222-4c2e-9a71-0d6f2b9c1e44"
+            "/api/v1/parcels/c41d0000-2222-4c2e-9a71-0d6f2b9c1e44",
+            "/api/v1/parcels/c41d0000-2222-4c2e-9a71-0d6f2b9c1e44/receipt"
     })
     void readEndpointsRequireToken(String path) throws Exception {
         mockMvc.perform(get(path))
@@ -496,5 +498,53 @@ class CustomerParcelControllerTest {
                         .header("Authorization", "Bearer customer-token"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/not-found"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/parcels/{id}/receipt returns the PDF inline for the owner")
+    void ownerDownloadsReceipt() throws Exception {
+        byte[] pdf = "%PDF-1.4 receipt".getBytes();
+        when(parcelService.getReceiptPdf(parcelId, customerId, false)).thenReturn(pdf);
+
+        mockMvc.perform(get("/api/v1/parcels/" + parcelId + "/receipt")
+                        .header("Authorization", "Bearer customer-token"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_PDF))
+                .andExpect(header().string("Content-Disposition", "inline; filename=\"receipt-" + parcelId + ".pdf\""))
+                .andExpect(content().bytes(pdf));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/parcels/{id}/receipt of another customer's parcel returns 404 ProblemDetail")
+    void customerCannotDownloadAnotherCustomersReceipt() throws Exception {
+        when(parcelService.getReceiptPdf(parcelId, customerId, false))
+                .thenThrow(new NotFoundException("Parcel not found: " + parcelId));
+
+        mockMvc.perform(get("/api/v1/parcels/" + parcelId + "/receipt")
+                        .header("Authorization", "Bearer customer-token"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/not-found"));
+    }
+
+    @ParameterizedTest(name = "{0} may download any receipt")
+    @ValueSource(strings = {"admin-token", "dispatcher-token"})
+    void privilegedCallersDownloadAnyReceipt(String token) throws Exception {
+        when(parcelService.getReceiptPdf(eq(parcelId), any(), eq(true))).thenReturn("%PDF-1.4".getBytes());
+
+        mockMvc.perform(get("/api/v1/parcels/" + parcelId + "/receipt")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/parcels/{id}/receipt with an ID that is not a UUID returns 400")
+    void receiptWithMalformedIdIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/parcels/not-a-uuid/receipt")
+                        .header("Authorization", "Bearer customer-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+
+        verifyNoInteractions(parcelService);
     }
 }

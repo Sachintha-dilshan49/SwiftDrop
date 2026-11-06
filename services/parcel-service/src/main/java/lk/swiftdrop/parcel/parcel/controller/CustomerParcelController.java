@@ -8,6 +8,9 @@ import lk.swiftdrop.parcel.parcel.dto.PageResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelSummaryResponse;
 import lk.swiftdrop.parcel.parcel.service.ParcelService;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -67,5 +70,20 @@ public class CustomerParcelController {
             @AuthenticationPrincipal Jwt jwt) {
         UUID customerId = JwtCaller.userId(jwt);
         return ResponseEntity.ok(parcelService.getParcelForCustomer(id, customerId, JwtCaller.isPrivileged(jwt)));
+    }
+
+    /** The booking receipt as a PDF, shown in the browser; same visibility rule as {@link #getParcel}. */
+    @GetMapping("/{id}/receipt")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<byte[]> getReceipt(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt) {
+        UUID customerId = JwtCaller.userId(jwt);
+        byte[] pdf = parcelService.getReceiptPdf(id, customerId, JwtCaller.isPrivileged(jwt));
+        ContentDisposition disposition = ContentDisposition.inline().filename("receipt-" + id + ".pdf").build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(pdf);
     }
 }
