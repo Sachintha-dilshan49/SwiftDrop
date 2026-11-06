@@ -6,28 +6,37 @@ import lk.swiftdrop.parcel.parcel.dto.PublicStatusHistoryResponse;
 import lk.swiftdrop.parcel.parcel.dto.PublicTrackingResponse;
 import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
 import lk.swiftdrop.parcel.parcel.service.ParcelService;
+import lk.swiftdrop.parcel.tracking.service.TooManySubscribersException;
+import lk.swiftdrop.parcel.tracking.service.TrackingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** Uses the real {@code swiftdrop.security.public-paths} from application.yml. */
@@ -41,6 +50,9 @@ class PublicTrackingControllerTest {
 
     @MockitoBean
     private ParcelService parcelService;
+
+    @MockitoBean
+    private TrackingService trackingService;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -108,6 +120,16 @@ class PublicTrackingControllerTest {
     }
 
     @Test
+    @DisplayName("An expired or invalid token does not block the public tracking page")
+    void trackingIgnoresAnExpiredToken() throws Exception {
+        when(parcelService.getPublicTracking(TRACKING_NO)).thenReturn(tracking);
+
+        mockMvc.perform(get("/api/v1/track/" + TRACKING_NO).header("Authorization", "Bearer expired-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.trackingNo").value(TRACKING_NO));
+    }
+
+    @Test
     @DisplayName("Tracking numbers are trimmed and upper-cased before the lookup")
     void trackingNumberIsNormalized() throws Exception {
         when(parcelService.getPublicTracking(TRACKING_NO)).thenReturn(tracking);
@@ -137,5 +159,52 @@ class PublicTrackingControllerTest {
                 .andExpect(jsonPath("$.errors[0].field").value("trackingNo"));
 
         verifyNoInteractions(parcelService);
+    }
+
+    @Test
+    @DisplayName("GET /stream opens a public event stream that starts from the current snapshot")
+    void streamOpensWithoutToken() throws Exception {
+        when(parcelService.getPublicTracking(TRACKING_NO)).thenReturn(tracking);
+        when(trackingService.subscribe(tracking)).thenReturn(new SseEmitter());
+
+        mockMvc.perform(get("/api/v1/track/" + TRACKING_NO + "/stream").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted())
+                .andExpect(content().contentType(MediaType.TEXT_EVENT_STREAM_VALUE));
+
+        verify(trackingService).subscribe(tracking);
+    }
+
+    @Test
+    @DisplayName("GET /stream for an unknown tracking number returns 404 and opens no stream")
+    void streamForUnknownTrackingNumberIsNotFound() throws Exception {
+        when(parcelService.getPublicTracking("SD-2222-2222"))
+                .thenThrow(new NotFoundException("Tracking number not found: SD-2222-2222"));
+
+        mockMvc.perform(get("/api/v1/track/SD-2222-2222/stream").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isNotFound());
+
+        verify(trackingService, never()).subscribe(any());
+    }
+
+    @Test
+    @DisplayName("GET /stream for a malformed tracking number returns 400 and opens no stream")
+    void streamForMalformedTrackingNumberIsBadRequest() throws Exception {
+        mockMvc.perform(get("/api/v1/track/not-a-number/stream").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(parcelService, trackingService);
+    }
+
+    @Test
+    @DisplayName("GET /stream returns 429 ProblemDetail when the connection limit is reached")
+    void streamOverConnectionLimitIsTooManyRequests() throws Exception {
+        when(parcelService.getPublicTracking(TRACKING_NO)).thenReturn(tracking);
+        when(trackingService.subscribe(tracking)).thenThrow(new TooManySubscribersException());
+
+        mockMvc.perform(get("/api/v1/track/" + TRACKING_NO + "/stream").accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/too-many-subscribers"));
     }
 }
