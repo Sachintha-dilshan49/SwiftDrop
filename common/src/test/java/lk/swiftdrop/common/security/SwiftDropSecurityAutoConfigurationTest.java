@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -20,10 +21,13 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -36,6 +40,9 @@ class SwiftDropSecurityAutoConfigurationTest {
     @Autowired
     private JwtAuthenticationConverter jwtAuthenticationConverter;
 
+    @Autowired
+    private BearerTokenResolver bearerTokenResolver;
+
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
@@ -44,8 +51,72 @@ class SwiftDropSecurityAutoConfigurationTest {
         given(jwtDecoder.decode(anyString())).willAnswer(invocation -> switch (invocation.<String>getArgument(0)) {
             case "admin-token" -> jwt("admin-token", "ADMIN");
             case "courier-token" -> jwt("courier-token", "COURIER");
+            case "expired-token" -> throw new JwtValidationException("Jwt expired",
+                    List.of(new OAuth2Error("invalid_token", "Jwt expired at 2026-01-01T00:00:00Z", null)));
             default -> throw new BadJwtException("Signed JWT rejected");
         });
+    }
+
+    @Test
+    void publicPathIgnoresExpiredToken() throws Exception {
+        mockMvc.perform(get("/test/public/info").header(HttpHeaders.AUTHORIZATION, "Bearer expired-token"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("public"));
+        then(jwtDecoder).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void publicPathIgnoresGarbageToken() throws Exception {
+        mockMvc.perform(get("/test/public/info").header(HttpHeaders.AUTHORIZATION, "Bearer not.a.jwt"))
+                .andExpect(status().isOk());
+        then(jwtDecoder).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void publicPathIgnoresMalformedAuthorizationHeader() throws Exception {
+        // DefaultBearerTokenResolver itself rejects "Bearer " with characters outside the token68 set
+        mockMvc.perform(get("/test/public/info").header(HttpHeaders.AUTHORIZATION, "Bearer !!!"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void alwaysPublicPathIgnoresInvalidToken() throws Exception {
+        // 404, not 401: no handler in this slice, but security let the request through
+        mockMvc.perform(get("/v3/api-docs").header(HttpHeaders.AUTHORIZATION, "Bearer expired-token"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void publicPathDoesNotAuthenticateEvenAValidToken() throws Exception {
+        // The token is not read on public paths, so a role check there always sees an anonymous caller
+        mockMvc.perform(get("/test/public/admin").header(HttpHeaders.AUTHORIZATION, "Bearer admin-token"))
+                .andExpect(status().isUnauthorized());
+        then(jwtDecoder).shouldHaveNoInteractions();
+    }
+
+    @Test
+    void protectedPathRejectsExpiredTokenWith401Problem() throws Exception {
+        String body = mockMvc.perform(get("/test/me").header(HttpHeaders.AUTHORIZATION, "Bearer expired-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/unauthorized"))
+                .andExpect(jsonPath("$.detail").value(SecurityExceptionHandler.UNAUTHORIZED_DETAIL))
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(body).doesNotContain("expired at");
+    }
+
+    @Test
+    void protectedPathRejectsGarbageTokenWith401Problem() throws Exception {
+        mockMvc.perform(get("/test/me").header(HttpHeaders.AUTHORIZATION, "Bearer not.a.jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/unauthorized"));
+    }
+
+    @Test
+    void defaultBearerTokenResolverIsThePublicPathAwareOne() {
+        assertThat(bearerTokenResolver).isInstanceOf(PublicPathBearerTokenResolver.class);
     }
 
     @Test
