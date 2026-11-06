@@ -12,6 +12,7 @@ import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.PageResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelSummaryResponse;
+import lk.swiftdrop.parcel.parcel.dto.PublicTrackingResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
@@ -97,6 +98,14 @@ public class ParcelService {
         Parcel parcel = parcelRepository.findById(parcelId)
                 .orElseThrow(() -> new NotFoundException("Parcel not found: " + parcelId));
         return RecipientContactsResponse.fromEntity(parcel);
+    }
+
+    /** The public view of a parcel for anyone with its (normalized) tracking number. */
+    @Transactional(readOnly = true)
+    public PublicTrackingResponse getPublicTracking(String trackingNo) {
+        Parcel parcel = parcelRepository.findByTrackingNo(trackingNo)
+                .orElseThrow(() -> new NotFoundException("Tracking number not found: " + trackingNo));
+        return PublicTrackingResponse.fromEntity(parcel);
     }
 
     /** Stores the quote's breakdown, the CREATED history row and the outbox event in the caller's transaction. */

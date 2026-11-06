@@ -15,11 +15,14 @@ import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
 import lk.swiftdrop.parcel.parcel.dto.PageResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
 import lk.swiftdrop.parcel.parcel.dto.ParcelSummaryResponse;
+import lk.swiftdrop.parcel.parcel.dto.PublicStatusHistoryResponse;
+import lk.swiftdrop.parcel.parcel.dto.PublicTrackingResponse;
 import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
 import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
 import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
 import lk.swiftdrop.parcel.parcel.entity.Parcel;
 import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
+import lk.swiftdrop.parcel.parcel.entity.ParcelStatusHistory;
 import lk.swiftdrop.parcel.parcel.entity.RouteType;
 import lk.swiftdrop.parcel.parcel.repository.ParcelRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +39,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -461,5 +465,56 @@ class ParcelServiceTest {
         when(pdfReceiptService.generateReceipt(sampleParcel)).thenReturn(pdf);
 
         assertThat(parcelService.getReceiptPdf(sampleParcel.getId(), UUID.randomUUID(), true)).isSameAs(pdf);
+    }
+
+    @Test
+    @DisplayName("Public tracking shows status, size, weight and each status change with its time only")
+    void publicTrackingShowsOnlyPublicFields() {
+        Instant created = Instant.parse("2026-11-06T09:00:00Z");
+        Instant pickedUp = Instant.parse("2026-11-06T10:30:00Z");
+        sampleParcel.setCreatedAt(created);
+        sampleParcel.setStatus(ParcelStatus.PICKED_UP);
+        sampleParcel.addStatusHistory(historyEntry(ParcelStatus.CREATED, created, null));
+        sampleParcel.addStatusHistory(historyEntry(ParcelStatus.PICKED_UP, pickedUp, "Gate code 4411, left with neighbour"));
+        when(parcelRepository.findByTrackingNo("SD-7K3Q-9P2M")).thenReturn(Optional.of(sampleParcel));
+
+        PublicTrackingResponse response = parcelService.getPublicTracking("SD-7K3Q-9P2M");
+
+        assertThat(response).isEqualTo(new PublicTrackingResponse("SD-7K3Q-9P2M", ParcelStatus.PICKED_UP,
+                ParcelSize.MEDIUM, new BigDecimal("2.50"), created, List.of(
+                new PublicStatusHistoryResponse(ParcelStatus.CREATED, created),
+                new PublicStatusHistoryResponse(ParcelStatus.PICKED_UP, pickedUp))));
+        assertThat(response.toString()).doesNotContain("Gate code", "Nimal Perera", "+94771234567", "Main St");
+    }
+
+    @Test
+    @DisplayName("Public tracking of an unknown tracking number is 404")
+    void publicTrackingOfUnknownTrackingNumberIsNotFound() {
+        when(parcelRepository.findByTrackingNo("SD-2222-2222")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.getPublicTracking("SD-2222-2222"))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("The public tracking records have no field for IDs, people, addresses, notes or failure reasons")
+    void publicTrackingRecordsExposeOnlyAgreedFields() {
+        assertThat(recordFields(PublicTrackingResponse.class))
+                .containsExactly("trackingNo", "status", "size", "weightKg", "createdAt", "history");
+        assertThat(recordFields(PublicStatusHistoryResponse.class))
+                .containsExactly("status", "occurredAt");
+    }
+
+    private ParcelStatusHistory historyEntry(ParcelStatus status, Instant at, String note) {
+        ParcelStatusHistory entry = new ParcelStatusHistory(UUID.randomUUID(), sampleParcel, status,
+                UUID.randomUUID(), "COURIER", note, null);
+        entry.setCreatedAt(at);
+        return entry;
+    }
+
+    private static List<String> recordFields(Class<? extends Record> type) {
+        return java.util.Arrays.stream(type.getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
     }
 }
