@@ -32,6 +32,14 @@ spring:
     # The outbox relay marks an event sent only after the broker confirms it and did not return it
     publisher-confirm-type: correlated
     publisher-returns: true
+    listener:
+      simple:
+        # tracking.q: a delivery that keeps failing is tried 3 times (1 + 2 retries), then dropped instead
+        # of being requeued forever; a tracking page that missed it gets a fresh snapshot when it reconnects
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-retries: 2
 
 server:
   port: 8083
