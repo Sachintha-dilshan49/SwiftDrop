@@ -29,4 +29,6 @@ public interface ParcelRepository extends JpaRepository<Parcel, UUID> {
     Page<Parcel> findByStatus(ParcelStatus status, Pageable pageable);
 
     boolean existsByTrackingNo(String trackingNo);
+
+    Optional<Parcel> findByTrackingNo(String trackingNo);
 }
