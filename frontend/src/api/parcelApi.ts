@@ -36,6 +36,37 @@ export interface PublicTrackingEvent {
   occurredAt: string;
 }
 
+/** One row of GET /api/v1/parcels. The status history is only in the parcel details. */
+export interface ParcelSummary {
+  id: string;
+  trackingNo: string;
+  status: ParcelStatus;
+  pickupAddress: string;
+  dropoffAddress: string;
+  recipientName: string;
+  recipientPhone: string;
+  size: ParcelSize;
+  weightKg: number;
+  feeAmount: number;
+  feeCurrency: string;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+/** Page envelope from docs/conventions.md §1. */
+export interface PageResponse<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+}
+
+export interface MyParcelsQuery {
+  page?: number;
+  size?: number;
+  status?: ParcelStatus;
+}
+
 export const TERMINAL_STATUSES: readonly ParcelStatus[] = ["DELIVERED", "FAILED"];
 
 /** An error response from parcel-service, with the ProblemDetail `detail` as message when there is one. */
@@ -66,6 +97,10 @@ function trackPath(trackingNo: string): string {
   return `${API_BASE}/v1/track/${encodeURIComponent(trackingNo)}`;
 }
 
+function withToken(token: string, accept: string): Record<string, string> {
+  return { Accept: accept, Authorization: `Bearer ${token}` };
+}
+
 export interface TrackingStreamHandlers {
   /** Sent first on every (re)connect; replace the page state with it, because missed events are not replayed. */
   onSnapshot: (snapshot: PublicTrackingResponse) => void;
@@ -83,6 +118,36 @@ function parseData<T>(event: Event): T | null {
 }
 
 export const parcelApi = {
+  /** The signed-in customer's parcels, newest first; dispatchers and admins get all parcels. */
+  async getMyParcels(
+    token: string,
+    { page = 0, size = 10, status }: MyParcelsQuery = {},
+  ): Promise<PageResponse<ParcelSummary>> {
+    const query = new URLSearchParams({ page: String(page), size: String(size), sort: "createdAt,desc" });
+    if (status) {
+      query.set("status", status);
+    }
+    const response = await fetch(`${API_BASE}/v1/parcels?${query}`, {
+      headers: withToken(token, "application/json"),
+    });
+    if (!response.ok) {
+      throw await toError(response, "Could not load your deliveries. Please try again.");
+    }
+    return (await response.json()) as PageResponse<ParcelSummary>;
+  },
+
+  /** The booking receipt (PDF) of one of the caller's parcels. */
+  async getReceipt(parcelId: string, token: string): Promise<Blob> {
+    const response = await fetch(`${API_BASE}/v1/parcels/${encodeURIComponent(parcelId)}/receipt`, {
+      // Errors come back as ProblemDetail JSON, so accept that too
+      headers: withToken(token, "application/pdf, application/problem+json"),
+    });
+    if (!response.ok) {
+      throw await toError(response, "Could not download the receipt. Please try again.");
+    }
+    return response.blob();
+  },
+
   /** Public tracking, no login and no Authorization header. */
   async getPublicTracking(trackingNo: string): Promise<PublicTrackingResponse> {
     const response = await fetch(trackPath(trackingNo), { headers: { Accept: "application/json" } });

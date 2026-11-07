@@ -21,6 +21,7 @@ import {
   userHasPortalRole,
 } from "./authPortals";
 import { RoleDashboard } from "../dashboard/RoleDashboard";
+import { MyDeliveriesPage } from "../features/deliveries/MyDeliveriesPage";
 
 type AuthMode = "login" | "signup";
 
@@ -154,7 +155,11 @@ export function AuthApp() {
       window.history.replaceState(null, "", destination);
     }
     if (dashboardRole) {
-      return <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut} />;
+      return (
+        <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
+          {dashboardRole === "CUSTOMER" ? <MyDeliveriesPage token={session.accessToken} /> : null}
+        </RoleDashboard>
+      );
     }
     return (
       <main className="page-shell">

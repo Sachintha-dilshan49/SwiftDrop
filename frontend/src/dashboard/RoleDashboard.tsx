@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { AuthUser } from "../auth/authApi";
 import { DashboardRole } from "../auth/authPortals";
 
@@ -105,9 +106,11 @@ type RoleDashboardProps = {
   role: DashboardRole;
   user: AuthUser;
   onSignOut: () => void;
+  /** The role's real screen; without it the dashboard shows its sample preview. */
+  children?: ReactNode;
 };
 
-export function RoleDashboard({ role, user, onSignOut }: RoleDashboardProps) {
+export function RoleDashboard({ role, user, onSignOut, children }: RoleDashboardProps) {
   const content = dashboardContent[role];
 
   return (
@@ -132,9 +135,11 @@ export function RoleDashboard({ role, user, onSignOut }: RoleDashboardProps) {
             <h1>Good morning, {user.fullName.split(/\s+/)[0]}</h1>
             <p>{content.description}</p>
           </div>
-          <span className="dashboard-data-note">Dashboard preview · sample data</span>
+          {!children && <span className="dashboard-data-note">Dashboard preview · sample data</span>}
         </div>
 
+        {children ?? (
+          <>
         <section className="dashboard-stats" aria-label="Dashboard summary">
           {content.stats.map((stat) => (
             <article className="dashboard-stat" key={stat.label}>
@@ -162,6 +167,8 @@ export function RoleDashboard({ role, user, onSignOut }: RoleDashboardProps) {
             ))}
           </div>
         </section>
+          </>
+        )}
       </main>
     </div>
   );
