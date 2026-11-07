@@ -35,6 +35,12 @@ const inTransit: PublicTrackingResponse = {
 let streamHandlers: TrackingStreamHandlers | undefined;
 const closeStream = vi.fn();
 
+/** The page opens the stream in an effect that runs after the data is shown, so wait for it. */
+async function openedStream(): Promise<TrackingStreamHandlers> {
+  await waitFor(() => expect(streamHandlers).toBeDefined());
+  return streamHandlers as TrackingStreamHandlers;
+}
+
 describe("PublicTrackingPage", () => {
   beforeEach(() => {
     getPublicTracking.mockReset();
@@ -59,6 +65,7 @@ describe("PublicTrackingPage", () => {
     expect(screen.getByText("2.5 kg")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Delivery progress" })).toBeInTheDocument();
     expect(getPublicTracking).toHaveBeenCalledWith("SD-7K3Q-9P2M");
+    await openedStream();
     expect(subscribeTrackingStream).toHaveBeenCalledWith("SD-7K3Q-9P2M", expect.any(Object));
   });
 
@@ -98,10 +105,11 @@ describe("PublicTrackingPage", () => {
     getPublicTracking.mockResolvedValue(inTransit);
     render(<PublicTrackingPage initialTrackingNo="SD-7K3Q-9P2M" />);
     await screen.findByRole("status");
+    const stream = await openedStream();
 
     act(() => {
-      streamHandlers?.onLiveChange?.(true);
-      streamHandlers?.onStatusChange({ trackingNo: "SD-7K3Q-9P2M", status: "OUT_FOR_DELIVERY",
+      stream.onLiveChange?.(true);
+      stream.onStatusChange({ trackingNo: "SD-7K3Q-9P2M", status: "OUT_FOR_DELIVERY",
         previousStatus: "IN_TRANSIT", occurredAt: "2026-11-06T14:00:00Z" });
     });
 
@@ -113,9 +121,10 @@ describe("PublicTrackingPage", () => {
     getPublicTracking.mockResolvedValue(inTransit);
     render(<PublicTrackingPage initialTrackingNo="SD-7K3Q-9P2M" />);
     await screen.findByRole("status");
+    const stream = await openedStream();
 
     act(() => {
-      streamHandlers?.onStatusChange({ trackingNo: "SD-7K3Q-9P2M", status: "DELIVERED",
+      stream.onStatusChange({ trackingNo: "SD-7K3Q-9P2M", status: "DELIVERED",
         previousStatus: "OUT_FOR_DELIVERY", occurredAt: "2026-11-06T15:00:00Z" });
     });
 
