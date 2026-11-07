@@ -1,0 +1,149 @@
+/* My deliveries. Mobile first; colours from the :root variables in src/style.css. */
+
+.deliveries {
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.deliveries-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.deliveries-heading h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+
+.deliveries-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.deliveries-filter select {
+  min-height: 36px;
+  padding: 0 8px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+}
+
+.deliveries-note {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.deliveries .alert { font-size: 13px; }
+
+.deliveries-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deliveries-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 0;
+  border-top: 1px solid #edf0f4;
+}
+
+.deliveries-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.deliveries-tracking {
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-decoration: none;
+}
+
+.deliveries-tracking:hover { color: var(--orange-dark); text-decoration: underline; }
+
+.deliveries-status {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  color: #315a83;
+  background: #edf4fb;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.deliveries-status-delivered { color: #1f6b3a; background: #e8f6ed; }
+.deliveries-status-failed { color: #963727; background: #fff3ef; }
+
+.deliveries-route,
+.deliveries-meta {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.deliveries-meta { color: var(--muted); font-size: 12px; }
+
+.deliveries-receipt {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.deliveries-receipt:hover:not(:disabled) { border-color: var(--orange); }
+
+.deliveries-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #edf0f4;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.deliveries-pages button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 650;
+}
+
+@media (min-width: 640px) {
+  .deliveries { padding: 18px 20px; }
+  .deliveries-item { grid-template-columns: 1fr auto; column-gap: 16px; }
+  .deliveries-item-top,
+  .deliveries-route,
+  .deliveries-meta { grid-column: 1; }
+  .deliveries-receipt { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+}

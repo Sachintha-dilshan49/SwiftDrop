@@ -39,6 +39,64 @@ class FakeEventSource {
   }
 }
 
+describe("parcelApi.getMyParcels", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("asks for one page of the caller's parcels, newest first, with the login token", async () => {
+    const page = { content: [], page: 2, size: 10, totalElements: 21 };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, page));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(parcelApi.getMyParcels("token-1", { page: 2, size: 10, status: "DELIVERED" })).resolves.toEqual(page);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/parcels?page=2&size=10&sort=createdAt%2Cdesc&status=DELIVERED");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer token-1" });
+  });
+
+  it("leaves out the status filter when there is none", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { content: [], page: 0, size: 10, totalElements: 0 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await parcelApi.getMyParcels("token-1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/parcels?page=0&size=10&sort=createdAt%2Cdesc");
+  });
+
+  it("reports an expired login as a 401 ParcelApiError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(401, { status: 401, detail: "Unauthorized" })));
+
+    await expect(parcelApi.getMyParcels("expired")).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+describe("parcelApi.getReceipt", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("downloads the receipt PDF with the login token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("%PDF-1.4", { status: 200, headers: { "Content-Type": "application/pdf" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pdf = await parcelApi.getReceipt("c41d0000-2222-4c2e-9a71-0d6f2b9c1e44", "token-1");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/parcels/c41d0000-2222-4c2e-9a71-0d6f2b9c1e44/receipt");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer token-1" });
+    expect(pdf.size).toBe("%PDF-1.4".length);
+  });
+
+  it("turns a 404 for someone else's parcel into a ParcelApiError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(404, { status: 404, detail: "Parcel not found" })));
+
+    await expect(parcelApi.getReceipt("other", "token-1")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
 describe("parcelApi.getPublicTracking", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
