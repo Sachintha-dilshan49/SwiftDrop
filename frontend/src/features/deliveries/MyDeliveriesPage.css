@@ -118,6 +118,12 @@
 
 .deliveries-receipt:hover:not(:disabled) { border-color: var(--orange); }
 
+.deliveries-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .deliveries-pages {
   display: flex;
   align-items: center;
@@ -145,5 +151,5 @@
   .deliveries-item-top,
   .deliveries-route,
   .deliveries-meta { grid-column: 1; }
-  .deliveries-receipt { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
+  .deliveries-actions { grid-column: 2; grid-row: 1 / span 3; align-self: center; }
 }

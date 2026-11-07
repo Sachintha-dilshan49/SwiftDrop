@@ -7,12 +7,13 @@ vi.mock("../../api/parcelApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/parcelApi")>();
   return {
     ...actual,
-    parcelApi: { getMyParcels: vi.fn(), getReceipt: vi.fn() },
+    parcelApi: { getMyParcels: vi.fn(), getReceipt: vi.fn(), getParcel: vi.fn() },
   };
 });
 
 const getMyParcels = vi.mocked(parcelApi.getMyParcels);
 const getReceipt = vi.mocked(parcelApi.getReceipt);
+const getParcel = vi.mocked(parcelApi.getParcel);
 
 function parcel(trackingNo: string, overrides: Partial<ParcelSummary> = {}): ParcelSummary {
   return {
@@ -131,5 +132,24 @@ describe("MyDeliveriesPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Download the receipt for SD-7K3Q-9P2M" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not download the receipt. Please try again.");
+  });
+
+  it("opens a delivery's details and goes back to the same filtered list", async () => {
+    getMyParcels.mockResolvedValue(page([parcel("SD-7K3Q-9P2M")]));
+    getParcel.mockReturnValue(new Promise(() => {}));
+    render(<MyDeliveriesPage token="token-1" />);
+    await screen.findByRole("link", { name: "SD-7K3Q-9P2M" });
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "IN_TRANSIT" } });
+    await screen.findByRole("link", { name: "SD-7K3Q-9P2M" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Show the details of SD-7K3Q-9P2M" }));
+
+    expect(screen.getByRole("heading", { name: "Delivery details" })).toBeInTheDocument();
+    expect(getParcel).toHaveBeenCalledWith("id-SD-7K3Q-9P2M", "token-1");
+
+    fireEvent.click(screen.getByRole("button", { name: "← Back to my deliveries" }));
+
+    expect(screen.getByRole("heading", { name: "My deliveries" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Status")).toHaveValue("IN_TRANSIT");
   });
 });
