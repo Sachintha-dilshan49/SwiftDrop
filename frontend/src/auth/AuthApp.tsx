@@ -21,7 +21,7 @@ import {
   userHasPortalRole,
 } from "./authPortals";
 import { RoleDashboard } from "../dashboard/RoleDashboard";
-import { MyDeliveriesPage } from "../features/deliveries/MyDeliveriesPage";
+import { CustomerHome } from "../features/booking/CustomerHome";
 
 type AuthMode = "login" | "signup";
 
@@ -157,7 +157,7 @@ export function AuthApp() {
     if (dashboardRole) {
       return (
         <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-          {dashboardRole === "CUSTOMER" ? <MyDeliveriesPage token={session.accessToken} /> : null}
+          {dashboardRole === "CUSTOMER" ? <CustomerHome token={session.accessToken} /> : null}
         </RoleDashboard>
       );
     }

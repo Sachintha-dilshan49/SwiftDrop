@@ -29,10 +29,12 @@ function saveFile(file: Blob, fileName: string) {
 type MyDeliveriesPageProps = {
   /** The signed-in customer's access token. */
   token: string;
+  /** Changing it loads the list again, for example after a new booking. */
+  refreshKey?: number;
 };
 
 /** The customer's delivery history (diagram seq-parcel-history-receipt, parts 1 and 3). */
-export function MyDeliveriesPage({ token }: MyDeliveriesPageProps) {
+export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProps) {
   const [status, setStatus] = useState<ParcelStatus | "">("");
   const [page, setPage] = useState(0);
   const [result, setResult] = useState<PageResponse<ParcelSummary> | null>(null);
@@ -65,7 +67,7 @@ export function MyDeliveriesPage({ token }: MyDeliveriesPageProps) {
     return () => {
       current = false;
     };
-  }, [token, page, status]);
+  }, [token, page, status, refreshKey]);
 
   async function downloadReceipt(parcel: ParcelSummary) {
     setDownloadingId(parcel.id);
