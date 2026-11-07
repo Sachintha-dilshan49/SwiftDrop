@@ -67,30 +67,94 @@ export interface MyParcelsQuery {
   status?: ParcelStatus;
 }
 
+export type DeliverySpeed = "EXPRESS" | "STANDARD" | "NEXT_DAY";
+
+/** POST /api/v1/parcels. The fee is never sent: parcel-service asks pricing-service for it. */
+export interface CreateParcelRequest {
+  pickupAddress: string;
+  pickupZone: string;
+  dropoffAddress: string;
+  dropoffZone: string;
+  recipientName: string;
+  recipientPhone: string;
+  size: ParcelSize;
+  weightKg: number;
+  speed: DeliverySpeed;
+  promoCode?: string;
+}
+
+export interface StatusHistoryItem {
+  status: ParcelStatus;
+  changedBy: string | null;
+  changedByRole: string | null;
+  note: string | null;
+  proofReference: string | null;
+  createdAt: string;
+}
+
+/** A parcel with its full history (the booking response and GET /api/v1/parcels/{id}). */
+export interface ParcelResponse {
+  id: string;
+  trackingNo: string;
+  customerId: string | null;
+  merchantId: string | null;
+  courierId: string | null;
+  pickupAddress: string;
+  dropoffAddress: string;
+  recipientName: string;
+  recipientPhone: string;
+  size: ParcelSize;
+  weightKg: number;
+  feeAmount: number;
+  feeCurrency: string;
+  status: ParcelStatus;
+  failureReason: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+  history: StatusHistoryItem[];
+}
+
+/** One entry of a ProblemDetail's `errors` list (400 validation errors). */
+export interface FieldError {
+  field: string;
+  message: string;
+}
+
 export const TERMINAL_STATUSES: readonly ParcelStatus[] = ["DELIVERED", "FAILED"];
 
 /** An error response from parcel-service, with the ProblemDetail `detail` as message when there is one. */
 export class ParcelApiError extends Error {
   readonly status: number;
+  readonly fieldErrors: FieldError[];
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, fieldErrors: FieldError[] = []) {
     super(message);
     this.name = "ParcelApiError";
     this.status = status;
+    this.fieldErrors = fieldErrors;
   }
+}
+
+function isFieldError(value: unknown): value is FieldError {
+  const candidate = value as Partial<FieldError> | null;
+  return typeof candidate?.field === "string" && typeof candidate.message === "string";
 }
 
 async function toError(response: Response, fallback: string): Promise<ParcelApiError> {
   let detail: string | undefined;
+  let fieldErrors: FieldError[] = [];
   try {
-    const body = (await response.json()) as { detail?: unknown };
+    const body = (await response.json()) as { detail?: unknown; errors?: unknown };
     if (typeof body.detail === "string") {
       detail = body.detail;
+    }
+    if (Array.isArray(body.errors)) {
+      fieldErrors = body.errors.filter(isFieldError);
     }
   } catch {
     // Not a ProblemDetail body; use the fallback message.
   }
-  return new ParcelApiError(response.status, detail ?? fallback);
+  return new ParcelApiError(response.status, detail ?? fallback, fieldErrors);
 }
 
 function trackPath(trackingNo: string): string {
@@ -118,6 +182,19 @@ function parseData<T>(event: Event): T | null {
 }
 
 export const parcelApi = {
+  /** Books a delivery for the signed-in customer; the response has the tracking number and the fee. */
+  async createParcel(request: CreateParcelRequest, token: string): Promise<ParcelResponse> {
+    const response = await fetch(`${API_BASE}/v1/parcels`, {
+      method: "POST",
+      headers: { ...withToken(token, "application/json"), "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    if (!response.ok) {
+      throw await toError(response, "Could not book the delivery. Please try again.");
+    }
+    return (await response.json()) as ParcelResponse;
+  },
+
   /** The signed-in customer's parcels, newest first; dispatchers and admins get all parcels. */
   async getMyParcels(
     token: string,

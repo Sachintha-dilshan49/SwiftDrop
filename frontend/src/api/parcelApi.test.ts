@@ -39,6 +39,48 @@ class FakeEventSource {
   }
 }
 
+describe("parcelApi.createParcel", () => {
+  const booking = {
+    pickupAddress: "123 Main St, Colombo", pickupZone: "COLOMBO_SOUTH", dropoffAddress: "456 High St, Kandy",
+    dropoffZone: "KANDY", recipientName: "Nimal Perera", recipientPhone: "0771234567", size: "MEDIUM" as const,
+    weightKg: 2.5, speed: "STANDARD" as const,
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("posts the booking as JSON with the login token and returns the created parcel", async () => {
+    const created = { id: "p-1", trackingNo: "SD-7K3Q-9P2M", feeAmount: 650, feeCurrency: "LKR" };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, created));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(parcelApi.createParcel(booking, "token-1")).resolves.toEqual(created);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/parcels");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer token-1", "Content-Type": "application/json" });
+    expect(JSON.parse(init.body as string)).toEqual(booking);
+  });
+
+  it("keeps the field errors of a 400 response so the form can show them", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(400, {
+      status: 400,
+      detail: "One or more fields are invalid.",
+      errors: [{ field: "recipientPhone", message: "Recipient phone must be 9 to 15 digits" }, { bad: true }],
+    })));
+
+    const error = await parcelApi.createParcel(booking, "token-1").catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ParcelApiError);
+    expect(error).toMatchObject({
+      status: 400,
+      fieldErrors: [{ field: "recipientPhone", message: "Recipient phone must be 9 to 15 digits" }],
+    });
+  });
+});
+
 describe("parcelApi.getMyParcels", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
