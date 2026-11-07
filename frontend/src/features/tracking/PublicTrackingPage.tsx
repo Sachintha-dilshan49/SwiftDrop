@@ -1,40 +1,17 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import {
   ParcelApiError,
-  ParcelSize,
   ParcelStatus,
   PublicTrackingEvent,
   PublicTrackingResponse,
   TERMINAL_STATUSES,
   parcelApi,
 } from "../../api/parcelApi";
+import { SIZE_LABELS, STATUS_LABELS, formatDateTime } from "../../lib/parcelFormat";
 import { isValidTrackingNo, normalizeTrackingNo, trackingPath } from "./trackingNumber";
 import "./PublicTrackingPage.css";
 
 const PROGRESS: ParcelStatus[] = ["CREATED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED"];
-
-const STATUS_LABELS: Record<ParcelStatus, string> = {
-  CREATED: "Booked",
-  PICKED_UP: "Picked up",
-  IN_TRANSIT: "In transit",
-  OUT_FOR_DELIVERY: "Out for delivery",
-  DELIVERED: "Delivered",
-  FAILED: "Delivery failed",
-};
-
-const SIZE_LABELS: Record<ParcelSize, string> = {
-  SMALL: "Small",
-  MEDIUM: "Medium",
-  LARGE: "Large",
-  EXTRA_LARGE: "Extra large",
-};
-
-const dateTimeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-
-function formatDateTime(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : dateTimeFormat.format(date);
-}
 
 /** Adds a live status change to the page state; ignores other parcels' events and ones already shown. */
 export function applyStatusChange(current: PublicTrackingResponse, event: PublicTrackingEvent): PublicTrackingResponse {
