@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PageResponse, ParcelApiError, ParcelStatus, ParcelSummary, parcelApi } from "../../api/parcelApi";
 import { STATUS_LABELS, formatDateTime, formatMoney } from "../../lib/parcelFormat";
 import { trackingPath } from "../tracking/trackingNumber";
+import { ParcelDetails } from "./ParcelDetails";
 import "./MyDeliveriesPage.css";
 
 export const PAGE_SIZE = 10;
@@ -41,6 +42,7 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [detailsId, setDetailsId] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -83,6 +85,18 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
 
   const parcels = result?.content ?? [];
   const totalPages = result ? Math.max(1, Math.ceil(result.totalElements / PAGE_SIZE)) : 1;
+
+  // The list keeps its filter and page while one delivery is open, so Back returns to the same place
+  if (detailsId) {
+    return (
+      <section className="deliveries" aria-labelledby="deliveries-title">
+        <div className="deliveries-heading">
+          <h2 id="deliveries-title">Delivery details</h2>
+        </div>
+        <ParcelDetails parcelId={detailsId} token={token} onBack={() => setDetailsId(null)} />
+      </section>
+    );
+  }
 
   return (
     <section className="deliveries" aria-labelledby="deliveries-title">
@@ -140,15 +154,25 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
                 To {parcel.recipientName} · {formatMoney(parcel.feeAmount, parcel.feeCurrency)} · Booked{" "}
                 {formatDateTime(parcel.createdAt)}
               </p>
-              <button
-                type="button"
-                className="deliveries-receipt"
-                onClick={() => void downloadReceipt(parcel)}
-                disabled={downloadingId === parcel.id}
-                aria-label={`Download the receipt for ${parcel.trackingNo}`}
-              >
-                {downloadingId === parcel.id ? "Downloading…" : "Receipt (PDF)"}
-              </button>
+              <div className="deliveries-actions">
+                <button
+                  type="button"
+                  className="deliveries-receipt"
+                  onClick={() => setDetailsId(parcel.id)}
+                  aria-label={`Show the details of ${parcel.trackingNo}`}
+                >
+                  Details
+                </button>
+                <button
+                  type="button"
+                  className="deliveries-receipt"
+                  onClick={() => void downloadReceipt(parcel)}
+                  disabled={downloadingId === parcel.id}
+                  aria-label={`Download the receipt for ${parcel.trackingNo}`}
+                >
+                  {downloadingId === parcel.id ? "Downloading…" : "Receipt (PDF)"}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

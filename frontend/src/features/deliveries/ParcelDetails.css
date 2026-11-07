@@ -1,0 +1,93 @@
+/* Delivery details inside My deliveries. Mobile first; colours from :root in src/style.css. */
+
+.parcel-details { display: grid; gap: 12px; }
+
+.parcel-details-back {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.parcel-details-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.parcel-details-label { margin: 0; color: var(--muted); font-size: 11px; }
+
+.parcel-details-number {
+  margin: 2px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 17px;
+  letter-spacing: .04em;
+}
+
+.parcel-details-failed {
+  margin: 0;
+  padding: 10px 12px;
+  color: #963727;
+  background: #fff3ef;
+  border: 1px solid #f6d2c7;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.parcel-details-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.parcel-details-facts dt { color: var(--muted); font-size: 11px; }
+.parcel-details-facts dd { margin: 2px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+
+.parcel-details-track {
+  justify-self: start;
+  color: var(--orange-dark);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.parcel-details-history-title { margin: 4px 0 0; font-size: 14px; }
+
+.parcel-details-history {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parcel-details-history li {
+  display: grid;
+  gap: 3px;
+  padding: 10px 0;
+  border-top: 1px solid #edf0f4;
+  font-size: 13px;
+}
+
+.parcel-details-history-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.parcel-details-history time,
+.parcel-details-by { margin: 0; color: var(--muted); font-size: 12px; }
+
+.parcel-details-note { margin: 0; overflow-wrap: anywhere; }
+
+@media (min-width: 640px) {
+  .parcel-details-facts { grid-template-columns: repeat(3, 1fr); }
+}
