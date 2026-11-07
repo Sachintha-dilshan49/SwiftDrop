@@ -9,14 +9,12 @@ export const WebhookSettingsPage: React.FC<Props> = ({ token }) => {
   const [settings, setSettings] = useState<WebhookSettingsResponse | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [rotateSecret, setRotateSecret] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedSecret, setSavedSecret] = useState<string | null>(null);
 
   const fetchSettings = async () => {
     try {
-      setLoading(true);
       setError(null);
       const data = await merchantApi.getWebhookSettings(token);
       setSettings(data);
@@ -24,8 +22,6 @@ export const WebhookSettingsPage: React.FC<Props> = ({ token }) => {
     } catch (err: any) {
       // 404 means not yet configured
       setSettings(null);
-    } finally {
-      setLoading(false);
     }
   };
 
