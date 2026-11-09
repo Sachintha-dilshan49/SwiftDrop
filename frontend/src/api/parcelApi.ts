@@ -195,6 +195,17 @@ export const parcelApi = {
     return (await response.json()) as ParcelResponse;
   },
 
+  /** One of the caller's parcels with its full status history; someone else's parcel is a 404. */
+  async getParcel(parcelId: string, token: string): Promise<ParcelResponse> {
+    const response = await fetch(`${API_BASE}/v1/parcels/${encodeURIComponent(parcelId)}`, {
+      headers: withToken(token, "application/json"),
+    });
+    if (!response.ok) {
+      throw await toError(response, "Could not load the delivery. Please try again.");
+    }
+    return (await response.json()) as ParcelResponse;
+  },
+
   /** The signed-in customer's parcels, newest first; dispatchers and admins get all parcels. */
   async getMyParcels(
     token: string,

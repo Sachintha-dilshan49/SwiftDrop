@@ -114,6 +114,30 @@ describe("parcelApi.getMyParcels", () => {
   });
 });
 
+describe("parcelApi.getParcel", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("loads one parcel with its history using the login token", async () => {
+    const parcel = { id: "p-1", trackingNo: "SD-7K3Q-9P2M", history: [] };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, parcel));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(parcelApi.getParcel("p-1", "token-1")).resolves.toEqual(parcel);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/parcels/p-1");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer token-1" });
+  });
+
+  it("reports someone else's or an unknown parcel as a 404", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(404, { status: 404, detail: "Parcel not found" })));
+
+    await expect(parcelApi.getParcel("other", "token-1")).rejects.toMatchObject({ status: 404 });
+  });
+});
+
 describe("parcelApi.getReceipt", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
