@@ -26,9 +26,11 @@ class RoutingIT extends AbstractGatewayIT {
                 Arguments.of("/login/oauth2/code/google?code=abc&state=xyz", "auth"),
                 Arguments.of("/api/v1/admin/users/42", "auth"),
                 Arguments.of("/api/v1/pricing/zones", "pricing"),
-                Arguments.of("/api/v1/pricing/estimate?fromZone=A&toZone=B&weightKg=1", "pricing"),
+                Arguments.of("/api/v1/pricing/estimate?pickupZone=A&dropoffZone=B&weightKg=1", "pricing"),
                 Arguments.of("/api/v1/admin/zones/7", "pricing"),
                 Arguments.of("/api/v1/admin/pricing-rules", "pricing"),
+                Arguments.of("/api/v1/admin/promo-codes", "pricing"),
+                Arguments.of("/api/v1/admin/promo-codes/9", "pricing"),
                 Arguments.of("/api/v1/parcels/c41d", "parcel"),
                 Arguments.of("/api/v1/track/SD-7K3Q-9P2M", "parcel"),
                 Arguments.of("/api/v1/dispatch/unassigned", "dispatch"),
@@ -65,6 +67,7 @@ class RoutingIT extends AbstractGatewayIT {
         String token = bearer(JWTS.valid());
         assertOwner("/api/v1/admin/users", "auth", token);
         assertOwner("/api/v1/admin/zones", "pricing", token);
+        assertOwner("/api/v1/admin/promo-codes", "pricing", token);
         assertOwner("/api/v1/admin/merchants/9/approve", "merchant", token);
         assertOwner("/api/v1/admin/webhook-deliveries/5/replay", "notification", token);
     }

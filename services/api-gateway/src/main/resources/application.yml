@@ -79,7 +79,7 @@ spring:
               uri: ${PRICING_SERVICE_URL:http://localhost:8082}
               order: -5
               predicates:
-                - Path=/api/v1/admin/zones/**,/api/v1/admin/pricing-rules/**
+                - Path=/api/v1/admin/zones/**,/api/v1/admin/pricing-rules/**,/api/v1/admin/promo-codes/**
             - id: merchant-admin
               uri: ${MERCHANT_SERVICE_URL:http://localhost:8085}
               order: -5
@@ -137,6 +137,7 @@ swiftdrop:
       - { path: /login/oauth2/** }
       - { path: /api/v1/track/** }
       - { method: GET, path: /api/v1/pricing/estimate }
+      - { method: GET, path: /api/v1/pricing/zones }
       - { method: POST, path: /api/v1/merchants/register }
       # API-key route: RequireApiKey rejects requests without X-API-Key, merchant-service verifies the key
       - { path: /api/v1/merchant-api/** }
