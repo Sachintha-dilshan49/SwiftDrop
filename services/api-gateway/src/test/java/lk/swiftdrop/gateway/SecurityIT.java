@@ -91,7 +91,8 @@ class SecurityIT extends AbstractGatewayIT {
                 Arguments.of(HttpMethod.GET, "/login/oauth2/code/google?code=c&state=s", "auth"),
                 Arguments.of(HttpMethod.GET, "/api/v1/track/SD-7K3Q-9P2M", "parcel"),
                 Arguments.of(HttpMethod.GET, "/api/v1/track/SD-7K3Q-9P2M/stream", "parcel"),
-                Arguments.of(HttpMethod.GET, "/api/v1/pricing/estimate?fromZone=A&toZone=B", "pricing"),
+                Arguments.of(HttpMethod.GET, "/api/v1/pricing/estimate?pickupZone=A&dropoffZone=B", "pricing"),
+                Arguments.of(HttpMethod.GET, "/api/v1/pricing/zones", "pricing"),
                 Arguments.of(HttpMethod.POST, "/api/v1/merchants/register", "merchant"));
     }
 
@@ -119,13 +120,22 @@ class SecurityIT extends AbstractGatewayIT {
 
     @ParameterizedTest
     @ValueSource(strings = {"GET /api/v1/auth/me", "POST /api/v1/pricing/estimate", "GET /api/v1/merchants/register",
-            "GET /api/v1/pricing/zones"})
+            "POST /api/v1/pricing/zones"})
     void publicRuleIsMethodSpecific(String request) {
         String[] parts = request.split(" ");
         client.method(HttpMethod.valueOf(parts[0])).uri(parts[1])
                 .exchange()
                 .expectStatus().isUnauthorized();
         SERVICES.values().forEach(server -> server.verify(0, anyRequestedFor(urlEqualTo(parts[1]))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/admin/zones", "/api/v1/admin/pricing-rules", "/api/v1/admin/promo-codes"})
+    void pricingAdminPathsNeedAToken(String path) {
+        client.get().uri(path)
+                .exchange()
+                .expectStatus().isUnauthorized();
+        SERVICES.values().forEach(server -> server.verify(0, anyRequestedFor(urlEqualTo(path))));
     }
 
     @Test

@@ -31,7 +31,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class RateLimitIT extends AbstractGatewayIT {
 
     private static final String ORDERS = "/api/v1/merchant-api/orders";
-    private static final String ESTIMATE = "/api/v1/pricing/estimate?fromZone=A&toZone=B&weightKg=1";
+    private static final String ESTIMATE = "/api/v1/pricing/estimate?pickupZone=A&dropoffZone=B&weightKg=1";
 
     @Autowired
     private ReactiveStringRedisTemplate redis;
