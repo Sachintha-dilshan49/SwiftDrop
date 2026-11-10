@@ -1,0 +1,35 @@
+---
+title: SwiftDrop - Courier use cases (Role 4)
+---
+flowchart LR
+    courier(["🧍 Courier"])
+    parcelSvc(["⚙️ parcel-service"])
+    minio(["🗄️ MinIO<br/>delivery-proofs"])
+
+    subgraph system["SwiftDrop - dispatch-service"]
+        direction TB
+        viewToday(["View today's assigned deliveries"])
+        viewDetails(["View delivery details"])
+        updateStatus(["Update delivery status<br/>(picked up, in transit,<br/>out for delivery, delivered)"])
+        addNote(["Add note / recipient name"])
+        uploadProof(["Upload or take proof photo"])
+        markFailed(["Mark delivery as failed"])
+        giveReason(["Give failure reason"])
+        checkOwner(["Verify assignment belongs<br/>to the logged-in courier"])
+    end
+
+    courier --- viewToday
+    courier --- viewDetails
+    courier --- updateStatus
+    courier --- markFailed
+
+    viewToday -. "&lt;&lt;include&gt;&gt;" .-> checkOwner
+    viewDetails -. "&lt;&lt;include&gt;&gt;" .-> checkOwner
+    updateStatus -. "&lt;&lt;include&gt;&gt;" .-> checkOwner
+    markFailed -. "&lt;&lt;include&gt;&gt;" .-> giveReason
+    markFailed -. "&lt;&lt;extend&gt;&gt;" .-> updateStatus
+    addNote -. "&lt;&lt;extend&gt;&gt;" .-> updateStatus
+    uploadProof -. "&lt;&lt;extend&gt;&gt;" .-> updateStatus
+
+    updateStatus --- parcelSvc
+    uploadProof --- minio

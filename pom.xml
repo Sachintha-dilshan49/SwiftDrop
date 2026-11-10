@@ -43,6 +43,7 @@
         <testcontainers.version>2.0.5</testcontainers.version>
         <springdoc-openapi.version>3.2.0</springdoc-openapi.version>
         <wiremock.version>3.13.2</wiremock.version>
+        <minio.version>8.5.17</minio.version>
         <openpdf.version>3.0.5</openpdf.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
@@ -88,6 +89,11 @@
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
                 <version>${springdoc-openapi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${minio.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.wiremock</groupId>

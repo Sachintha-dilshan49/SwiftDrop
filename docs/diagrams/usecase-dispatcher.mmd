@@ -1,0 +1,36 @@
+---
+title: SwiftDrop - Dispatcher and admin use cases (Role 4)
+---
+flowchart LR
+    dispatcher(["🧍 Dispatcher"])
+    admin(["🧍 Admin"])
+    parcelSvc(["⚙️ parcel-service"])
+    broker(["📨 RabbitMQ<br/>dispatch.q"])
+
+    admin == "inherits" ==> dispatcher
+
+    subgraph system["SwiftDrop - dispatch-service"]
+        direction TB
+        unassigned(["View unassigned parcels"])
+        assign(["Assign parcel to courier"])
+        chooseCourier(["Choose an available courier"])
+        preventDup(["Reject parcel already assigned"])
+        workload(["View courier workload<br/>(active deliveries per courier)"])
+        reports(["View delivery reports"])
+        perDay(["Deliveries per day"])
+        rate(["Success and failure rate"])
+        updateStats(["Update daily report counters"])
+    end
+
+    dispatcher --- unassigned
+    dispatcher --- assign
+    dispatcher --- workload
+    dispatcher --- reports
+
+    assign -. "&lt;&lt;include&gt;&gt;" .-> chooseCourier
+    assign -. "&lt;&lt;include&gt;&gt;" .-> preventDup
+    reports -. "&lt;&lt;include&gt;&gt;" .-> perDay
+    reports -. "&lt;&lt;include&gt;&gt;" .-> rate
+
+    unassigned --- parcelSvc
+    broker --- updateStats

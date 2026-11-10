@@ -96,3 +96,18 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 | `Refresh token flow.png` | Sequence — refresh token rotation | Role 2 | Current |
 | `Google OAuth login flow-original.png` | Sequence — Google login | Role 2 | Superseded by `sequence/seq-oauth2-google-login.mmd`: browser bypassed the gateway |
 | `Internal contact lookup flow-original.png` | Sequence — internal contact lookup | Role 2 | Superseded by `sequence/seq-internal-contact-lookup.mmd`: showed a bearer JWT instead of `X-Internal-Token` |
+
+## Role 4 working files (dispatch and courier)
+
+Drawn by Role 4 to match `services/dispatch-service`; use them to review `usecase/uc-courier.puml`,
+`usecase/uc-dispatcher-admin.puml` and `er/er-dispatch-db.mmd`.
+
+| File | Diagram |
+|---|---|
+| `usecase-courier.mmd` | Courier use cases: today's list, status update, proof photo, failed with reason; ownership check |
+| `usecase-dispatcher.mmd` | Dispatcher/admin use cases: unassigned parcels, assign, workload, reports |
+| `er-dispatch.mmd` | `dispatch_db` tables, matching `V1__create_dispatch_tables.sql` |
+| `seq-courier-status-dispatch.mmd` | Courier status update inside dispatch-service: 403/400 paths, proof photo to MinIO, `dispatch.q` counters |
+
+`parcel_id`, `user_id` and `assigned_by_user_id` have no foreign keys on purpose: they point
+to rows in `parcel_db` and `auth_db`, and each service talks only to its own database.
