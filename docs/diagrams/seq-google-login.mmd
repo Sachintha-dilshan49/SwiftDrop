@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor Customer
+    participant SPA as SwiftDrop SPA
+    participant Auth as auth-service
+    participant Google
+    participant DB as auth_db
+
+    Customer->>SPA: Click "Continue with Google"
+    SPA->>Auth: GET /oauth2/authorization/google
+    Auth-->>SPA: Redirect to Google (state + authorization request)
+    SPA->>Google: Authenticate and consent
+    Google-->>Auth: GET /login/oauth2/code/google?code&state
+    Auth->>Google: Exchange authorization code
+    Google-->>Auth: Verified profile (subject, email, name)
+    Auth->>DB: Find or create/link CUSTOMER + OAuth account
+    Auth->>DB: Store SHA-256(one-time login code), expires in 2 minutes
+    Auth-->>SPA: Redirect /auth/callback?code=...
+    SPA->>Auth: POST /api/v1/auth/token {code}
+    Auth->>DB: Lock, validate, and consume code once
+    Auth->>DB: Store hashed 7-day refresh token
+    Auth-->>SPA: 15-minute RS256 access token + refresh token

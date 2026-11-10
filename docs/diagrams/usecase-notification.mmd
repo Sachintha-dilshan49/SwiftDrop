@@ -1,0 +1,34 @@
+%% Use Case Diagram — notification-service (Role 6)
+%% Paste at https://mermaid.live to render
+
+graph TD
+    subgraph Actors
+        PS["parcel-service\n(event publisher)"]
+        Admin["Admin / Dispatcher"]
+        Merchant["Merchant system\n(webhook recipient)"]
+        Customer["Customer\n(email / SMS recipient)"]
+    end
+
+    subgraph notification-service
+        UC1["Receive ParcelStatusChanged event"]
+        UC2["Deduplicate event by eventId"]
+        UC3["Send email"]
+        UC4["Send SMS\n(OUT_FOR_DELIVERY · DELIVERED · FAILED)"]
+        UC5["Send signed webhook to merchant"]
+        UC6["Retry failed webhook\n10s → 1m → 5m → parked"]
+        UC7["List webhook deliveries"]
+        UC8["Replay parked webhook"]
+    end
+
+    PS -- "RabbitMQ: parcel.events" --> UC1
+    UC1 --> UC2
+    UC2 --> UC3
+    UC2 --> UC4
+    UC2 --> UC5
+    UC5 --> UC6
+    Admin --> UC7
+    Admin --> UC8
+    Customer -. "receives" .-> UC3
+    Customer -. "receives" .-> UC4
+    Merchant -. "receives" .-> UC5
+

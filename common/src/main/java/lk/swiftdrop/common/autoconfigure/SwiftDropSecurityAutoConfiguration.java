@@ -1,11 +1,13 @@
 package lk.swiftdrop.common.autoconfigure;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import lk.swiftdrop.common.security.ProblemDetailAccessDeniedHandler;
 import lk.swiftdrop.common.security.ProblemDetailAuthenticationEntryPoint;
+import lk.swiftdrop.common.security.PublicPathBearerTokenResolver;
 import lk.swiftdrop.common.security.SecurityExceptionHandler;
 import lk.swiftdrop.common.security.SwiftDropSecurityProperties;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -26,7 +28,11 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.servlet.DispatcherServlet;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -38,7 +44,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  *       (set from {@code JWT_JWK_SET_URI} in each service's application.yml).</li>
  *   <li>The {@code roles} claim becomes {@code ROLE_*} authorities, so {@code @PreAuthorize("hasRole('COURIER')")}
  *       works; method security is enabled.</li>
- *   <li>Health, OpenAPI and {@code swiftdrop.security.public-paths} are public; everything else needs a token.</li>
+ *   <li>Health, OpenAPI and {@code swiftdrop.security.public-paths} are public; everything else needs a token.
+ *       On public paths the {@code Authorization} header is ignored ({@link PublicPathBearerTokenResolver}),
+ *       so an expired or invalid token does not cause a 401 there.</li>
  *   <li>401/403 are ProblemDetail bodies.</li>
  * </ul>
  *
@@ -63,11 +71,11 @@ public class SwiftDropSecurityAutoConfiguration {
     @Order(FILTER_CHAIN_ORDER)
     @ConditionalOnMissingBean(name = "swiftDropSecurityFilterChain")
     public SecurityFilterChain swiftDropSecurityFilterChain(HttpSecurity http, SwiftDropSecurityProperties properties,
-            JwtAuthenticationConverter jwtAuthenticationConverter,
+            ObjectProvider<PathPatternRequestMatcher.Builder> matcherBuilder,
+            JwtAuthenticationConverter jwtAuthenticationConverter, BearerTokenResolver bearerTokenResolver,
             ProblemDetailAuthenticationEntryPoint entryPoint, ProblemDetailAccessDeniedHandler accessDeniedHandler)
             throws Exception {
-        List<String> publicPaths = new ArrayList<>(ALWAYS_PUBLIC);
-        publicPaths.addAll(properties.publicPaths());
+        RequestMatcher[] publicPaths = publicPathMatchers(properties, matcherBuilder).toArray(RequestMatcher[]::new);
 
         http.csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
@@ -75,9 +83,10 @@ public class SwiftDropSecurityAutoConfiguration {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers(publicPaths.toArray(String[]::new)).permitAll()
+                        .requestMatchers(publicPaths).permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
+                        .bearerTokenResolver(bearerTokenResolver)
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter))
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
@@ -85,6 +94,29 @@ public class SwiftDropSecurityAutoConfiguration {
                         .authenticationEntryPoint(entryPoint)
                         .accessDeniedHandler(accessDeniedHandler));
         return http.build();
+    }
+
+    /**
+     * Ignores the {@code Authorization} header on public paths, so a stale or broken token there does not turn
+     * into a 401. A service can replace it with its own {@link BearerTokenResolver} bean.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public BearerTokenResolver bearerTokenResolver(SwiftDropSecurityProperties properties,
+            ObjectProvider<PathPatternRequestMatcher.Builder> matcherBuilder) {
+        return new PublicPathBearerTokenResolver(new OrRequestMatcher(publicPathMatchers(properties, matcherBuilder)));
+    }
+
+    /**
+     * The one place the public paths are built, used by both the {@code permitAll} rule and the token resolver
+     * so they cannot drift apart. Uses the same matcher builder as {@code requestMatchers(String...)}.
+     */
+    static List<RequestMatcher> publicPathMatchers(SwiftDropSecurityProperties properties,
+            ObjectProvider<PathPatternRequestMatcher.Builder> matcherBuilder) {
+        PathPatternRequestMatcher.Builder builder = matcherBuilder.getIfUnique(PathPatternRequestMatcher::withDefaults);
+        return Stream.concat(ALWAYS_PUBLIC.stream(), properties.publicPaths().stream())
+                .<RequestMatcher>map(builder::matcher)
+                .toList();
     }
 
     @Bean

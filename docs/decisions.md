@@ -72,6 +72,8 @@ Format: **ID · title · status · date**, then context, decision, consequences.
 
 **Consequences.** Services stay independent, which is the point of ADR-001; a shared database would couple them and invite cross-service joins. Owners can explain their own tables in the viva. No single person blocks seven others. Consistency comes from `docs/conventions.md` §3 and the lead's review rather than from one author.
 
+**Reconfirmed** by the team on 2026-10-29; one database with a schema per service was considered and rejected.
+
 ## ADR-009 · Spring Boot 4.1 line · Accepted · 2026-10-25
 
 Supersedes ADR-007 (the version line only; the rest of ADR-007 still applies).
@@ -87,3 +89,19 @@ Supersedes ADR-007 (the version line only; the rest of ADR-007 still applies).
 - Spring Security 7 adds a `FACTOR_BEARER` authority to JWT logins and a `resource_metadata` parameter to the `WWW-Authenticate` header.
 - The gateway uses `spring-cloud-starter-gateway-server-webflux`.
 - Testcontainers 2 modules are named `testcontainers-<module>` and containers moved to module packages, e.g. `org.testcontainers.postgresql.PostgreSQLContainer`.
+
+## ADR-010 · Shared internal token for service-to-service calls · Accepted · 2026-10-29
+
+**Context.** Services call each other's `/internal/**` endpoints directly on the private network (contacts for notifications, webhook settings, parcel creation and status changes). The gateway never routes `/internal/**`, but anything on the network could still call them, and some calls (notification consumers, outbox relays) have no user JWT to forward. A user's JWT would also be the wrong credential: it would let a customer's token reach service-only endpoints.
+
+**Decision.** Every `/internal/**` request carries `X-Internal-Token`, equal to the environment variable `INTERNAL_API_TOKEN` (same value in all services). `common` enforces it in every servlet service with a dedicated security filter chain ordered before the JWT chain: constant-time comparison, `ROLE_INTERNAL_SERVICE` for the caller, 401 ProblemDetail otherwise; a JWT alone does not open `/internal/**`, and the internal token opens nothing else. Services refuse to start without the token. Outgoing calls use `InternalRestClientFactory`, which adds the token and request ID, applies the 2 s / 5 s timeouts and maps errors (404, 409, 503). Spring test contexts get a fixed test token automatically.
+
+**Consequences.** One small, testable mechanism the whole team can use now, with no extra infrastructure. It is coarse: every service can call every internal endpoint, there is no per-caller identity, and rotating the token means restarting all services together. The token is a secret (`.env` locally, a Kubernetes Secret in the cluster) and is never logged. A later upgrade is OAuth 2.0 client credentials: auth-service issues short-lived service tokens with per-service scopes, and the internal chain verifies them like user JWTs; callers would change only inside `InternalRestClientFactory`.
+
+## ADR-011 · Identity-only auth_db, public fee estimate, OAuth paths without prefix · Accepted · 2026-10-31
+
+**Context.** Role 2's first auth migration also created `merchant_profiles` and `courier_profiles`, which duplicate data owned by merchant-service and dispatch-service. The architecture listed the fee estimate as public in §8 but not in the gateway's public routes. Spring Security's Google login uses `/oauth2/authorization/google` and `/login/oauth2/code/google`, which did not match the gateway's `/api/v1/oauth2/**` route.
+
+**Decision.** `auth_db` holds identity only (users, roles, user roles, refresh tokens, Google accounts, one-time login codes); merchant details live in `merchant_db`, courier details in `dispatch_db`, and the two profile tables are removed in a later auth migration. `GET /api/v1/pricing/estimate` is public for guests and the AI assistant, rate-limited per client at the gateway; booking still needs a login. The gateway forwards `/oauth2/**` and `/login/oauth2/**` to auth-service unchanged, so Spring's default redirect URI works. The merchant order path is `/api/v1/merchant-api/orders`.
+
+**Consequences.** Each fact has one owning service (ADR-008). Guests can price a delivery before signing up. The OAuth paths are the only public routes without the `/api/v1` prefix. Follow-up work: an auth migration to drop the profile tables, the gateway routes, and the merchant controller path.

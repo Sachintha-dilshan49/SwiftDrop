@@ -1,0 +1,134 @@
+@startuml
+' newpage splits the diagram so each page fits landscape A4: PlantUML exports
+' seq-parcel-history-receipt.png, seq-parcel-history-receipt_001.png, ... (one file per page).
+title Sequence Diagram - Delivery History, Details and Receipt (1 of 4)
+caption SwiftDrop parcel-service (Role 3)
+
+hide footbox
+autonumber
+skinparam dpi 200
+skinparam shadowing false
+skinparam maxMessageSize 110
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam BoxPadding 6
+skinparam sequence {
+  ArrowColor black
+  LifeLineBorderColor #555555
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+  ActorBorderColor black
+  ActorBackgroundColor white
+  BoxBorderColor black
+  BoxBackgroundColor #F2F2F2
+  GroupBorderColor black
+  GroupBackgroundColor #E8E8E8
+  DividerBorderColor black
+  DividerBackgroundColor #E8E8E8
+}
+skinparam database {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+actor Customer
+actor "Visitor\n(no login)" as V
+participant "React SPA /\ntracking page" as FE
+participant "API Gateway\n:8080" as GW
+box "parcel-service :8083" #F2F2F2
+  participant "CustomerParcel\nController" as CTRL
+  participant "PublicTracking\nController" as PCTRL
+  participant "ParcelService" as SVC
+  participant "PdfReceipt\nService" as PDF
+end box
+database "parcel_db" as DB
+
+== 1. My deliveries (delivery history) ==
+Customer -> FE : open "My deliveries"
+FE -> GW : GET /api/v1/parcels\n?status&page&size&sort\n(Bearer JWT)
+GW -> CTRL : forward (JWT checked\nwith auth-service JWKS)
+CTRL -> CTRL : verify JWT again;\ncheck page, size, sort
+alt missing / invalid token
+  GW --> FE : 401 Unauthorized
+else page < 0, size < 1, or unknown sort field
+  CTRL --> FE : 400 ProblemDetail (via GW)
+end
+CTRL -> SVC : listParcels(caller,\nstatus, page)
+alt caller is DISPATCHER or ADMIN
+  SVC -> DB : SELECT all parcels\n(optional status filter)
+else any other caller
+  SVC -> DB : SELECT parcels WHERE\ncustomer_id = caller
+end
+SVC --> FE : 200 {content, page, size, totalElements}\n(via CTRL, GW)
+FE --> Customer : list of my parcels
+note over CTRL, DB
+  Newest first by default (sort=createdAt,desc). Page size is capped
+  at 100. List rows have no status history; it comes with the details.
+end note
+
+newpage Sequence Diagram - Delivery History, Details and Receipt (2 of 4)
+== 2. Parcel details ==
+Customer -> FE : open one parcel
+FE -> GW : GET /api/v1/parcels/{id}\n(Bearer JWT)
+GW -> CTRL : forward (JWT checked)
+CTRL -> SVC : getParcelForCustomer(\nid, caller)
+SVC -> DB : SELECT parcel and its\nstatus history
+alt no such parcel, or it belongs to another customer\n(and the caller is not DISPATCHER / ADMIN)
+  SVC --> FE : 404 Not Found (via CTRL, GW)
+else owner, DISPATCHER or ADMIN
+  SVC --> FE : 200 {trackingNo, status, addresses, recipient,\nsize, weightKg, fee, failureReason,\nhistory[status, who, role, note, proof, time]}\n(via CTRL, GW)
+  FE --> Customer : details and status timeline
+end
+note over SVC, DB
+  The same 404 is used for "does not exist" and "not yours",
+  so nobody can find out which parcel IDs exist.
+end note
+
+newpage Sequence Diagram - Delivery History, Details and Receipt (3 of 4)
+== 3. Download the receipt (PDF) ==
+Customer -> FE : Download receipt
+FE -> GW : GET /api/v1/parcels/{id}/receipt\n(Bearer JWT)
+GW -> CTRL : forward (JWT checked)
+CTRL -> SVC : getReceiptPdf(id, caller)
+SVC -> DB : SELECT parcel
+alt no such parcel, or not the owner (same rule as the details)
+  SVC --> FE : 404 Not Found (via CTRL, GW)
+end
+SVC -> PDF : generateReceipt(parcel)
+PDF -> PDF : build the PDF (OpenPDF):\ntracking number, booking date (UTC),\nstatus, addresses, recipient name,\nmasked recipient phone, size, weight,\nfee breakdown and total (LKR),\nlink to the tracking page
+PDF --> SVC : PDF bytes
+SVC --> FE : 200 application/pdf\nContent-Disposition: inline;\nfilename="receipt-{id}.pdf"\n(via CTRL, GW)
+FE --> Customer : open or save the receipt
+note over SVC, DB
+  Built from the saved parcel: the fee breakdown stored at booking
+  is shown, so the receipt stays the same even if the pricing rules
+  change later (architecture section 8).
+end note
+
+newpage Sequence Diagram - Delivery History, Details and Receipt (4 of 4)
+== 4. Public lookup by tracking number (no login) ==
+V -> FE : enter SD-7K3Q-9P2M
+FE -> GW : GET /api/v1/track/\nSD-7K3Q-9P2M\n(no JWT, public route)
+GW -> PCTRL : forward
+PCTRL -> PCTRL : trim, upper-case,\ncheck SD-XXXX-XXXX
+alt malformed tracking number
+  PCTRL --> FE : 400 Bad Request (via GW)
+end
+PCTRL -> SVC : getPublicTracking(\ntrackingNo)
+SVC -> DB : SELECT parcel and history\nby tracking_no
+alt unknown tracking number
+  SVC --> FE : 404 Not Found (via PCTRL, GW)
+end
+SVC --> FE : 200 {trackingNo, status, size, weightKg,\ncreatedAt, history[status, time]}\n(via PCTRL, GW)
+FE --> V : current status and timeline
+note over PCTRL, DB
+  Public data only: no internal IDs, names, phone numbers,
+  addresses, notes or failure reasons. For live updates the page
+  opens /track/{trackingNo}/stream (see seq-live-tracking).
+end note
+
+@enduml

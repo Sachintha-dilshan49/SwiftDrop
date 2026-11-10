@@ -41,6 +41,11 @@ class ProblemTestController {
         throw new ForbiddenException("This delivery is assigned to another courier.");
     }
 
+    @GetMapping("/unavailable")
+    String unavailable() {
+        throw new ServiceUnavailableException("pricing-service is not available right now. Please try again later.");
+    }
+
     @GetMapping("/business-validation")
     String businessValidation() {
         throw new ValidationException("Zone is not served.",

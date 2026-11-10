@@ -1,0 +1,520 @@
+package lk.swiftdrop.parcel.parcel.service;
+
+import lk.swiftdrop.common.error.ConflictException;
+import lk.swiftdrop.common.error.NotFoundException;
+import lk.swiftdrop.common.error.ServiceUnavailableException;
+import lk.swiftdrop.common.error.ValidationException;
+import lk.swiftdrop.common.event.ParcelStatus;
+import lk.swiftdrop.parcel.outbox.service.OutboxService;
+import lk.swiftdrop.parcel.parcel.client.PricingQuote;
+import lk.swiftdrop.parcel.parcel.client.PricingServiceClient;
+import lk.swiftdrop.parcel.parcel.client.QuoteRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.CreateInternalParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.CreateParcelRequest;
+import lk.swiftdrop.parcel.parcel.dto.PageResponse;
+import lk.swiftdrop.parcel.parcel.dto.ParcelResponse;
+import lk.swiftdrop.parcel.parcel.dto.ParcelSummaryResponse;
+import lk.swiftdrop.parcel.parcel.dto.PublicStatusHistoryResponse;
+import lk.swiftdrop.parcel.parcel.dto.PublicTrackingResponse;
+import lk.swiftdrop.parcel.parcel.dto.RecipientContactsResponse;
+import lk.swiftdrop.parcel.parcel.dto.UpdateParcelStatusRequest;
+import lk.swiftdrop.parcel.parcel.entity.DeliverySpeed;
+import lk.swiftdrop.parcel.parcel.entity.Parcel;
+import lk.swiftdrop.parcel.parcel.entity.ParcelSize;
+import lk.swiftdrop.parcel.parcel.entity.ParcelStatusHistory;
+import lk.swiftdrop.parcel.parcel.entity.RouteType;
+import lk.swiftdrop.parcel.parcel.repository.ParcelRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ParcelServiceTest {
+
+    @Mock
+    private ParcelRepository parcelRepository;
+    @Mock
+    private TrackingNumberGenerator trackingNumberGenerator;
+    @Mock
+    private PricingServiceClient pricingServiceClient;
+    @Mock
+    private ParcelStateMachine parcelStateMachine;
+    @Mock
+    private OutboxService outboxService;
+    @Mock
+    private PdfReceiptService pdfReceiptService;
+
+    @InjectMocks
+    private ParcelService parcelService;
+
+    private UUID customerId;
+    private Parcel sampleParcel;
+
+    @BeforeEach
+    void setUp() {
+        customerId = UUID.randomUUID();
+        sampleParcel = new Parcel(
+                UUID.randomUUID(),
+                "SD-7K3Q-9P2M",
+                customerId,
+                null,
+                "123 Main St, Colombo",
+                "456 High St, Kandy",
+                "Nimal Perera",
+                "+94771234567",
+                ParcelSize.MEDIUM,
+                new BigDecimal("2.50"),
+                new BigDecimal("650.00"),
+                "LKR"
+        );
+        sampleParcel.setStatus(ParcelStatus.CREATED);
+    }
+
+    /** Colombo South to inter-city, 2.5 kg, MEDIUM, with DROP100: 650 + 80 + 100 + 0 - 100 = 730. */
+    private static final PricingQuote QUOTE = new PricingQuote(RouteType.INTER_CITY, new BigDecimal("650.00"),
+            new BigDecimal("80.00"), new BigDecimal("100.00"), new BigDecimal("0.00"), new BigDecimal("100.00"),
+            new BigDecimal("730.00"), "LKR");
+
+    private static CreateParcelRequest customerRequest() {
+        return new CreateParcelRequest("123 Main St, Colombo", "COLOMBO_SOUTH", "456 High St, Kandy", "INTER_CITY",
+                "Nimal Perera", "+94771234567", ParcelSize.MEDIUM, new BigDecimal("2.50"), DeliverySpeed.STANDARD,
+                "DROP100");
+    }
+
+    private static CreateInternalParcelRequest merchantRequest(UUID merchantId) {
+        return new CreateInternalParcelRequest(merchantId, "Warehouse A, Colombo", "COLOMBO_SOUTH",
+                "Customer Home, Galle", "INTER_CITY", "Sunil Fernando", "+94712345678", "sunil@example.com",
+                ParcelSize.MEDIUM, new BigDecimal("2.50"), DeliverySpeed.EXPRESS);
+    }
+
+    private Parcel savedParcel() {
+        ArgumentCaptor<Parcel> saved = ArgumentCaptor.forClass(Parcel.class);
+        verify(parcelRepository).save(saved.capture());
+        return saved.getValue();
+    }
+
+    private static void assertStoresQuote(Parcel parcel) {
+        assertThat(parcel.getRouteType()).isEqualTo(RouteType.INTER_CITY);
+        assertThat(parcel.getBaseFee()).isEqualByComparingTo("650.00");
+        assertThat(parcel.getWeightFee()).isEqualByComparingTo("80.00");
+        assertThat(parcel.getSizeFee()).isEqualByComparingTo("100.00");
+        assertThat(parcel.getExpressFee()).isEqualByComparingTo("0.00");
+        assertThat(parcel.getDiscount()).isEqualByComparingTo("100.00");
+        assertThat(parcel.getFeeAmount()).isEqualByComparingTo("730.00");
+        assertThat(parcel.getFeeCurrency()).isEqualTo("LKR");
+        assertThat(parcel.getStatus()).isEqualTo(ParcelStatus.CREATED);
+    }
+
+    @Test
+    @DisplayName("createCustomerParcel stores the route, the quote's breakdown, the first history row and an outbox event")
+    void createCustomerParcelStoresQuoteHistoryAndEvent() {
+        when(pricingServiceClient.getQuote(new QuoteRequest("COLOMBO_SOUTH", "INTER_CITY", new BigDecimal("2.50"),
+                ParcelSize.MEDIUM, DeliverySpeed.STANDARD, "DROP100"))).thenReturn(QUOTE);
+        when(trackingNumberGenerator.generateUniqueTrackingNumber()).thenReturn("SD-7K3Q-9P2M");
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParcelResponse response = parcelService.createCustomerParcel(customerId, customerRequest());
+
+        assertThat(response.trackingNo()).isEqualTo("SD-7K3Q-9P2M");
+        assertThat(response.feeAmount()).isEqualByComparingTo("730.00");
+        assertThat(response.status()).isEqualTo(ParcelStatus.CREATED);
+
+        Parcel parcel = savedParcel();
+        assertStoresQuote(parcel);
+        assertThat(parcel.getCustomerId()).isEqualTo(customerId);
+        assertThat(parcel.getMerchantId()).isNull();
+        assertThat(parcel.getPickupZone()).isEqualTo("COLOMBO_SOUTH");
+        assertThat(parcel.getDropoffZone()).isEqualTo("INTER_CITY");
+        assertThat(parcel.getSpeed()).isEqualTo(DeliverySpeed.STANDARD);
+        assertThat(parcel.getPromoCode()).isEqualTo("DROP100");
+        assertThat(parcel.getRecipientEmail()).isNull();
+        assertThat(parcel.getStatusHistory()).singleElement().satisfies(history -> {
+            assertThat(history.getStatus()).isEqualTo(ParcelStatus.CREATED);
+            assertThat(history.getChangedBy()).isEqualTo(customerId);
+            assertThat(history.getChangedByRole()).isEqualTo("CUSTOMER");
+        });
+        verify(outboxService).enqueueStatusChangedEvent(parcel, null, "Delivery booking created");
+    }
+
+    @Test
+    @DisplayName("createCustomerParcel saves nothing and enqueues no event when pricing is unavailable")
+    void createCustomerParcelSavesNothingWhenPricingUnavailable() {
+        when(pricingServiceClient.getQuote(any()))
+                .thenThrow(new ServiceUnavailableException("pricing-service is not available right now."));
+
+        assertThatThrownBy(() -> parcelService.createCustomerParcel(customerId, customerRequest()))
+                .isInstanceOf(ServiceUnavailableException.class);
+
+        verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("createCustomerParcel saves nothing when pricing rejects the input")
+    void createCustomerParcelSavesNothingWhenPricingRejectsInput() {
+        when(pricingServiceClient.getQuote(any()))
+                .thenThrow(new ValidationException("Promo code DROP100 has expired"));
+
+        assertThatThrownBy(() -> parcelService.createCustomerParcel(customerId, customerRequest()))
+                .isInstanceOf(ValidationException.class);
+
+        verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("listParcels returns only the customer's own parcels as summaries")
+    void listParcelsScopesCustomersToTheirOwnParcels() {
+        Pageable pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+        when(parcelRepository.findByCustomerId(customerId, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 1));
+
+        PageResponse<ParcelSummaryResponse> page = parcelService.listParcels(customerId, false, null, pageable);
+
+        assertThat(page.content()).extracting(ParcelSummaryResponse::trackingNo).containsExactly("SD-7K3Q-9P2M");
+        assertThat(page.page()).isZero();
+        assertThat(page.size()).isEqualTo(20);
+        assertThat(page.totalElements()).isEqualTo(1);
+        verify(parcelRepository, never()).findAll(any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("listParcels filters a customer's parcels by status")
+    void listParcelsFiltersCustomerParcelsByStatus() {
+        Pageable pageable = PageRequest.of(0, 20);
+        when(parcelRepository.findByCustomerIdAndStatus(customerId, ParcelStatus.CREATED, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 1));
+
+        PageResponse<ParcelSummaryResponse> page =
+                parcelService.listParcels(customerId, false, ParcelStatus.CREATED, pageable);
+
+        assertThat(page.content()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("listParcels returns every parcel for dispatchers and admins, optionally by status")
+    void listParcelsReturnsAllParcelsForPrivilegedCallers() {
+        Pageable pageable = PageRequest.of(1, 5);
+        when(parcelRepository.findAll(pageable)).thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 6));
+        when(parcelRepository.findByStatus(ParcelStatus.CREATED, pageable))
+                .thenReturn(new PageImpl<>(List.of(sampleParcel), pageable, 6));
+
+        PageResponse<ParcelSummaryResponse> all = parcelService.listParcels(UUID.randomUUID(), true, null, pageable);
+        PageResponse<ParcelSummaryResponse> created =
+                parcelService.listParcels(UUID.randomUUID(), true, ParcelStatus.CREATED, pageable);
+
+        assertThat(all.page()).isEqualTo(1);
+        assertThat(all.totalElements()).isEqualTo(6);
+        assertThat(created.content()).hasSize(1);
+        verify(parcelRepository, never()).findByCustomerId(any(), any());
+    }
+
+    @Test
+    @DisplayName("createMerchantParcel takes the fee from pricing's quote and stores the recipient's email")
+    void createMerchantParcelTakesFeeFromQuote() {
+        UUID merchantId = UUID.randomUUID();
+        when(pricingServiceClient.getQuote(new QuoteRequest("COLOMBO_SOUTH", "INTER_CITY", new BigDecimal("2.50"),
+                ParcelSize.MEDIUM, DeliverySpeed.EXPRESS, null))).thenReturn(QUOTE);
+        when(trackingNumberGenerator.generateUniqueTrackingNumber()).thenReturn("SD-9B2N-4X1Z");
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateInternalParcelResponse response = parcelService.createMerchantParcel(merchantRequest(merchantId));
+
+        assertThat(response.trackingNo()).isEqualTo("SD-9B2N-4X1Z");
+        assertThat(response.status()).isEqualTo(ParcelStatus.CREATED);
+        assertThat(response.feeAmount()).isEqualByComparingTo("730.00");
+        assertThat(response.feeCurrency()).isEqualTo("LKR");
+
+        Parcel parcel = savedParcel();
+        assertThat(response.id()).isEqualTo(parcel.getId());
+        assertStoresQuote(parcel);
+        assertThat(parcel.getMerchantId()).isEqualTo(merchantId);
+        assertThat(parcel.getCustomerId()).isNull();
+        assertThat(parcel.getRecipientEmail()).isEqualTo("sunil@example.com");
+        assertThat(parcel.getSpeed()).isEqualTo(DeliverySpeed.EXPRESS);
+        assertThat(parcel.getPromoCode()).isNull();
+        assertThat(parcel.getStatusHistory()).singleElement().satisfies(history -> {
+            assertThat(history.getChangedBy()).isEqualTo(merchantId);
+            assertThat(history.getChangedByRole()).isEqualTo("MERCHANT");
+        });
+        verify(outboxService).enqueueStatusChangedEvent(parcel, null, "Merchant order created");
+    }
+
+    @Test
+    @DisplayName("createMerchantParcel saves nothing when pricing is unavailable")
+    void createMerchantParcelSavesNothingWhenPricingUnavailable() {
+        when(pricingServiceClient.getQuote(any()))
+                .thenThrow(new ServiceUnavailableException("pricing-service is not available right now."));
+
+        assertThatThrownBy(() -> parcelService.createMerchantParcel(merchantRequest(UUID.randomUUID())))
+                .isInstanceOf(ServiceUnavailableException.class);
+
+        verifyNoInteractions(parcelRepository, trackingNumberGenerator, outboxService);
+    }
+
+    @Test
+    @DisplayName("getRecipientContacts returns the recipient's name, phone and email")
+    void getRecipientContactsReturnsRecipientDetails() {
+        UUID parcelId = UUID.randomUUID();
+        Parcel parcel = new Parcel(parcelId, "SD-9B2N-4X1Z", null, UUID.randomUUID(), "Warehouse A, Colombo",
+                "Customer Home, Galle", "Sunil Fernando", "+94712345678", ParcelSize.SMALL, BigDecimal.ONE,
+                new BigDecimal("350.00"), "LKR");
+        parcel.setRecipientEmail("sunil@example.com");
+        when(parcelRepository.findById(parcelId)).thenReturn(Optional.of(parcel));
+
+        assertThat(parcelService.getRecipientContacts(parcelId))
+                .isEqualTo(new RecipientContactsResponse("Sunil Fernando", "+94712345678", "sunil@example.com"));
+    }
+
+    @Test
+    @DisplayName("getRecipientContacts of an unknown parcel is a 404")
+    void getRecipientContactsOfUnknownParcelIsNotFound() {
+        UUID parcelId = UUID.randomUUID();
+        when(parcelRepository.findById(parcelId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.getRecipientContacts(parcelId))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("updateParcelStatus validates state machine, updates status, records history and enqueues event")
+    void updateParcelStatusSuccess() {
+        UUID parcelId = sampleParcel.getId();
+        UUID courierId = UUID.randomUUID();
+        UpdateParcelStatusRequest request = new UpdateParcelStatusRequest(
+                ParcelStatus.PICKED_UP,
+                courierId,
+                "Picked up from sender",
+                null,
+                null,
+                courierId,
+                "ROLE_COURIER"
+        );
+
+        when(parcelRepository.findByIdForUpdate(parcelId)).thenReturn(Optional.of(sampleParcel));
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParcelResponse response = parcelService.updateParcelStatus(parcelId, request);
+
+        assertThat(response.status()).isEqualTo(ParcelStatus.PICKED_UP);
+        assertThat(response.courierId()).isEqualTo(courierId);
+        verify(parcelRepository, never()).findById(any());
+        verify(parcelStateMachine).validateTransition(sampleParcel, ParcelStatus.PICKED_UP, null);
+        verify(parcelStateMachine).validateAuthorization(sampleParcel, courierId, "ROLE_COURIER");
+        verify(outboxService).enqueueStatusChangedEvent(sampleParcel, ParcelStatus.CREATED, "Picked up from sender");
+    }
+
+    @Test
+    @DisplayName("updateParcelStatus of an unknown parcel is a 404 and changes nothing")
+    void updateParcelStatusOfUnknownParcelIsNotFound() {
+        UUID parcelId = UUID.randomUUID();
+        when(parcelRepository.findByIdForUpdate(parcelId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.updateParcelStatus(parcelId, dispatcherUpdate(ParcelStatus.PICKED_UP, null)))
+                .isInstanceOf(NotFoundException.class);
+
+        verify(parcelRepository, never()).save(any());
+        verifyNoInteractions(parcelStateMachine, outboxService);
+    }
+
+    @Test
+    @DisplayName("A rejected status change leaves the parcel as it was and enqueues no event")
+    void rejectedStatusChangeChangesNothing() {
+        when(parcelRepository.findByIdForUpdate(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        doThrow(new ConflictException("invalid-status-transition", "Invalid status transition",
+                "Parcel cannot move from CREATED to DELIVERED."))
+                .when(parcelStateMachine).validateTransition(sampleParcel, ParcelStatus.DELIVERED, null);
+
+        assertThatThrownBy(() -> parcelService.updateParcelStatus(sampleParcel.getId(),
+                dispatcherUpdate(ParcelStatus.DELIVERED, null)))
+                .isInstanceOf(ConflictException.class);
+
+        assertThat(sampleParcel.getStatus()).isEqualTo(ParcelStatus.CREATED);
+        assertThat(sampleParcel.getStatusHistory()).isEmpty();
+        verify(parcelRepository, never()).save(any());
+        verifyNoInteractions(outboxService);
+    }
+
+    @Test
+    @DisplayName("updateParcelStatus to FAILED stores the failure reason, a history row and the event")
+    void failedStatusStoresReasonHistoryAndEvent() {
+        sampleParcel.setStatus(ParcelStatus.OUT_FOR_DELIVERY);
+        when(parcelRepository.findByIdForUpdate(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        when(parcelRepository.save(any(Parcel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParcelResponse response = parcelService.updateParcelStatus(sampleParcel.getId(),
+                dispatcherUpdate(ParcelStatus.FAILED, "Recipient not available"));
+
+        assertThat(response.status()).isEqualTo(ParcelStatus.FAILED);
+        assertThat(response.failureReason()).isEqualTo("Recipient not available");
+        assertThat(sampleParcel.getStatusHistory()).singleElement().satisfies(history -> {
+            assertThat(history.getStatus()).isEqualTo(ParcelStatus.FAILED);
+            assertThat(history.getChangedByRole()).isEqualTo("DISPATCHER");
+        });
+        verify(outboxService).enqueueStatusChangedEvent(sampleParcel, ParcelStatus.OUT_FOR_DELIVERY, "Dispatcher update");
+    }
+
+    private static UpdateParcelStatusRequest dispatcherUpdate(ParcelStatus status, String failureReason) {
+        return new UpdateParcelStatusRequest(status, null, "Dispatcher update", null, failureReason,
+                UUID.randomUUID(), "DISPATCHER");
+    }
+
+    @Test
+    @DisplayName("getParcelForCustomer succeeds when caller is owner")
+    void getParcelForCustomerSuccess() {
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        ParcelResponse response = parcelService.getParcelForCustomer(sampleParcel.getId(), customerId, false);
+
+        assertThat(response.id()).isEqualTo(sampleParcel.getId());
+    }
+
+    @Test
+    @DisplayName("Customer cannot see another customer's parcel - throws NotFoundException (404)")
+    void customerCannotSeeAnotherCustomersParcel() {
+        UUID anotherCustomer = UUID.randomUUID();
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        assertThatThrownBy(() -> parcelService.getParcelForCustomer(sampleParcel.getId(), anotherCustomer, false))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("Parcel not found");
+    }
+
+    @Test
+    @DisplayName("Privileged role (admin/dispatcher) can view any parcel")
+    void privilegedRoleCanViewAnyParcel() {
+        UUID anotherUser = UUID.randomUUID();
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        ParcelResponse response = parcelService.getParcelForCustomer(sampleParcel.getId(), anotherUser, true);
+
+        assertThat(response.id()).isEqualTo(sampleParcel.getId());
+    }
+
+    @Test
+    @DisplayName("The customer who booked a parcel gets its receipt")
+    void ownerGetsReceipt() {
+        byte[] pdf = {37, 80, 68, 70};
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        when(pdfReceiptService.generateReceipt(sampleParcel)).thenReturn(pdf);
+
+        assertThat(parcelService.getReceiptPdf(sampleParcel.getId(), customerId, false)).isSameAs(pdf);
+    }
+
+    @Test
+    @DisplayName("A customer cannot get another customer's receipt and gets 404, not 403")
+    void customerCannotGetAnotherCustomersReceipt() {
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        assertThatThrownBy(() -> parcelService.getReceiptPdf(sampleParcel.getId(), UUID.randomUUID(), false))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(pdfReceiptService);
+    }
+
+    @Test
+    @DisplayName("Nobody but dispatchers and admins gets the receipt of a merchant order")
+    void merchantOrderReceiptIsNotFoundForNonPrivilegedCaller() {
+        sampleParcel.setCustomerId(null);
+        sampleParcel.setMerchantId(UUID.randomUUID());
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+
+        assertThatThrownBy(() -> parcelService.getReceiptPdf(sampleParcel.getId(), customerId, false))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(pdfReceiptService);
+    }
+
+    @Test
+    @DisplayName("The receipt of an unknown parcel is 404")
+    void receiptOfUnknownParcelIsNotFound() {
+        UUID unknownId = UUID.randomUUID();
+        when(parcelRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.getReceiptPdf(unknownId, customerId, false))
+                .isInstanceOf(NotFoundException.class);
+        verifyNoInteractions(pdfReceiptService);
+    }
+
+    @Test
+    @DisplayName("Dispatchers and admins get the receipt of any parcel")
+    void privilegedCallerGetsAnyReceipt() {
+        byte[] pdf = {37, 80, 68, 70};
+        when(parcelRepository.findById(sampleParcel.getId())).thenReturn(Optional.of(sampleParcel));
+        when(pdfReceiptService.generateReceipt(sampleParcel)).thenReturn(pdf);
+
+        assertThat(parcelService.getReceiptPdf(sampleParcel.getId(), UUID.randomUUID(), true)).isSameAs(pdf);
+    }
+
+    @Test
+    @DisplayName("Public tracking shows status, size, weight and each status change with its time only")
+    void publicTrackingShowsOnlyPublicFields() {
+        Instant created = Instant.parse("2026-11-06T09:00:00Z");
+        Instant pickedUp = Instant.parse("2026-11-06T10:30:00Z");
+        sampleParcel.setCreatedAt(created);
+        sampleParcel.setStatus(ParcelStatus.PICKED_UP);
+        sampleParcel.addStatusHistory(historyEntry(ParcelStatus.CREATED, created, null));
+        sampleParcel.addStatusHistory(historyEntry(ParcelStatus.PICKED_UP, pickedUp, "Gate code 4411, left with neighbour"));
+        when(parcelRepository.findByTrackingNo("SD-7K3Q-9P2M")).thenReturn(Optional.of(sampleParcel));
+
+        PublicTrackingResponse response = parcelService.getPublicTracking("SD-7K3Q-9P2M");
+
+        assertThat(response).isEqualTo(new PublicTrackingResponse("SD-7K3Q-9P2M", ParcelStatus.PICKED_UP,
+                ParcelSize.MEDIUM, new BigDecimal("2.50"), created, List.of(
+                new PublicStatusHistoryResponse(ParcelStatus.CREATED, created),
+                new PublicStatusHistoryResponse(ParcelStatus.PICKED_UP, pickedUp))));
+        assertThat(response.toString()).doesNotContain("Gate code", "Nimal Perera", "+94771234567", "Main St");
+    }
+
+    @Test
+    @DisplayName("Public tracking of an unknown tracking number is 404")
+    void publicTrackingOfUnknownTrackingNumberIsNotFound() {
+        when(parcelRepository.findByTrackingNo("SD-2222-2222")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> parcelService.getPublicTracking("SD-2222-2222"))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("The public tracking records have no field for IDs, people, addresses, notes or failure reasons")
+    void publicTrackingRecordsExposeOnlyAgreedFields() {
+        assertThat(recordFields(PublicTrackingResponse.class))
+                .containsExactly("trackingNo", "status", "size", "weightKg", "createdAt", "history");
+        assertThat(recordFields(PublicStatusHistoryResponse.class))
+                .containsExactly("status", "occurredAt");
+    }
+
+    private ParcelStatusHistory historyEntry(ParcelStatus status, Instant at, String note) {
+        ParcelStatusHistory entry = new ParcelStatusHistory(UUID.randomUUID(), sampleParcel, status,
+                UUID.randomUUID(), "COURIER", note, null);
+        entry.setCreatedAt(at);
+        return entry;
+    }
+
+    private static List<String> recordFields(Class<? extends Record> type) {
+        return java.util.Arrays.stream(type.getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName)
+                .toList();
+    }
+}

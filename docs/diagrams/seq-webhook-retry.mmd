@@ -1,0 +1,58 @@
+%% Sequence Diagram — Webhook delivery with retry (Role 6)
+%% Paste at https://mermaid.live to render
+
+sequenceDiagram
+    participant RMQ as RabbitMQ
+    participant WC as WebhookConsumer
+    participant IS as IdempotencyService
+    participant MERCH as merchant-service
+    participant WS as WebhookSender
+    participant WSG as WebhookSigningService
+    participant MWH as Merchant Webhook URL
+    participant WDS as WebhookDeliveryService
+    participant DB as notification_db
+
+    RMQ->>WC: ParcelStatusChanged (webhook.q, x-retry-count=N)
+    WC->>WC: check merchantId != null
+    alt merchantId is null
+        WC-->>RMQ: ACK (skip)
+    else merchantId present
+        WC->>IS: isAlreadyProcessed(eventId, "webhook") [attempt 1 only]
+        alt Already processed
+            IS-->>WC: true
+            WC-->>RMQ: ACK (skip)
+        else Not processed
+            IS-->>WC: false
+            WC->>MERCH: GET /internal/merchants/{merchantId}/webhook
+            alt No webhook config
+                MERCH-->>WC: 404 / empty
+                WC->>WDS: recordParked(...)
+                WDS->>DB: save WebhookDelivery (PARKED)
+                WC-->>RMQ: ACK
+            else Config found
+                MERCH-->>WC: MerchantWebhookResponse (url, secret)
+                WC->>WS: send(url, body, secret, eventId)
+                WS->>WSG: sign(body, secret)
+                WSG-->>WS: "sha256=<hex>"
+                WS->>MWH: POST with X-SwiftDrop-Signature · X-SwiftDrop-Event-Id · X-SwiftDrop-Timestamp
+                alt 2xx response
+                    MWH-->>WS: 200 OK
+                    WS-->>WC: WebhookSendResult(success=true)
+                    WC->>WDS: recordSuccess(...)
+                    WDS->>DB: save WebhookDelivery (SUCCESS)
+                    WC->>IS: markProcessed(eventId, "webhook")
+                    IS->>DB: INSERT INTO processed_events
+                    WC-->>RMQ: ACK
+                else Non-2xx or timeout
+                    MWH-->>WS: 5xx / timeout
+                    WS-->>WC: WebhookSendResult(success=false)
+                    WC->>WDS: recordFailure(...)
+                    WDS->>DB: save WebhookDelivery (FAILED)
+                    note over WC,RMQ: attempt 1 → retry.10s (TTL 10s)<br/>attempt 2 → retry.1m (TTL 60s)<br/>attempt 3 → retry.5m (TTL 300s)<br/>attempt 4 → webhook.parking
+                    WC->>RMQ: publish to TTL retry queue or parking
+                    WC-->>RMQ: ACK
+                end
+            end
+        end
+    end
+

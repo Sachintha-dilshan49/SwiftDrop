@@ -1,0 +1,143 @@
+' Two diagrams in one file so each page fits A4: PlantUML exports
+' activity-parcel-status-update.png (part 1) and activity-parcel-status-update_001.png (part 2).
+
+@startuml
+title Activity Diagram - Parcel Status Update (1 of 2)
+caption SwiftDrop parcel-service (Role 3)
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor black
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  DiamondBackgroundColor white
+  DiamondBorderColor black
+  StartColor black
+  EndColor black
+}
+skinparam partition {
+  BorderColor black
+  BackgroundColor #F7F7F7
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+start
+:Receive PATCH /internal/parcels/{id}/status
+{status, note, failureReason, proofReference,
+courierId, changedBy, changedByRole};
+
+partition "Authentication and request validation" {
+  if (X-Internal-Token valid?\n(checked by common, ADR-010)) then (no)
+    :401 Unauthorized; <<#FFDDDD>>
+    floating note right
+      Errors are RFC 7807 ProblemDetail
+      responses with no personal data.
+    end note
+    stop
+  endif
+  if (Request body valid?\n(Bean Validation)) then (no)
+    :400 Bad Request; <<#FFDDDD>>
+    stop
+  endif
+  :Load the parcel and lock its row
+  (SELECT ... FOR UPDATE) so two updates
+  to the same parcel run one after another;
+  if (Parcel found?) then (no)
+    :404 Not Found; <<#FFDDDD>>
+    stop
+  endif
+}
+
+partition "State machine (State pattern)" {
+  if (Target status allowed from current status?\nCREATED -> PICKED_UP -> IN_TRANSIT ->\nOUT_FOR_DELIVERY -> DELIVERED or FAILED) then (no)
+    :409 Conflict:
+    invalid status transition; <<#FFDDDD>>
+    stop
+  endif
+  if (Target is FAILED\nand no failure reason?) then (yes)
+    :400 Bad Request:
+    reason required for FAILED; <<#FFDDDD>>
+    stop
+  elseif (Failure reason given\nfor another status?) then (yes)
+    :400 Bad Request:
+    reason only allowed with FAILED; <<#FFDDDD>>
+    stop
+  endif
+}
+(A)
+detach
+@enduml
+
+@startuml
+title Activity Diagram - Parcel Status Update (2 of 2)
+caption SwiftDrop parcel-service (Role 3)
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor black
+skinparam activity {
+  BackgroundColor white
+  BorderColor black
+  DiamondBackgroundColor white
+  DiamondBorderColor black
+  StartColor black
+  EndColor black
+}
+skinparam partition {
+  BorderColor black
+  BackgroundColor #F7F7F7
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+(A)
+partition "Authorization" {
+  if (Role is ADMIN or DISPATCHER?) then (yes)
+  elseif (Role is COURIER?) then (yes)
+    if (Parcel assigned to a\ndifferent courier?) then (yes)
+      :403 Forbidden; <<#FFDDDD>>
+      stop
+    endif
+  else (other role)
+    :403 Forbidden; <<#FFDDDD>>
+    stop
+  endif
+}
+
+partition "One database transaction" {
+  if (courierId given?) then (yes)
+    :Set courier_id;
+  endif
+  if (Status is FAILED?) then (yes)
+    :Store failure_reason;
+  endif
+  :Set parcels.status = new status;
+  note right
+    Any error rolls back the transaction:
+    no status change, no history row, no event.
+  end note
+  :Insert parcel_status_history row
+  (who, role, note, proof reference, time);
+  :Insert outbox_events row
+  ParcelStatusChanged, PENDING,
+  routing key parcel.status.<new status>;
+  note right
+    OutboxRelay publishes the event to RabbitMQ
+    within about 1 second -> email/SMS,
+    merchant webhook, reports, live tracking.
+  end note
+  :COMMIT;
+}
+:Return 200 OK with ParcelResponse;
+stop
+@enduml

@@ -1,0 +1,34 @@
+---
+config:
+  layout: elk
+---
+%% Flowchart — merchant webhook delivery with retry and replay · Role 1 with Role 6
+%% Source: docs/architecture.md v1.1 §6.3 "Webhook retry"; matches seq-webhook-retry.mmd and seq-webhook-replay.mmd (Role 6)
+flowchart TD
+  classDef ok fill:#e8f5e9,stroke:#2e7d32
+  classDef err fill:#fdecea,stroke:#c62828
+  classDef q fill:#eef3fb,stroke:#3b5b92
+  classDef step fill:#ffffff,stroke:#444
+
+  S([ParcelStatusChanged arrives on webhook.q]):::q --> M{merchantId set?}
+  M -- No --> ACK0[ACK and skip<br/>customer booking]:::ok
+  M -- Yes --> D{eventId already<br/>delivered?}
+  D -- Yes --> ACK0
+  D -- No --> CFG[GET /internal/merchants/id/webhook<br/>X-Internal-Token]:::step
+  CFG --> CF{Webhook configured<br/>and active?}
+  CF -- No --> PK0[Record PARKED,<br/>ACK]:::err
+  CF -- Yes --> SIGN[Sign body: HMAC-SHA256 with merchant secret<br/>headers X-SwiftDrop-Signature, -Event-Id, -Timestamp]:::step
+  SIGN --> POST[POST to merchant webhook URL<br/>attempt n]:::step
+  POST --> R{2xx before timeout?}
+  R -- Yes --> OK[Record SUCCESS, mark eventId processed, ACK]:::ok
+  R -- No --> FAIL[Record FAILED with status code and attempt n]:::err
+  FAIL --> N{Attempt number}
+  N -- "1" --> Q10[webhook.retry.10s]:::q
+  N -- "2" --> Q1M[webhook.retry.1m]:::q
+  N -- "3" --> Q5M[webhook.retry.5m]:::q
+  N -- "4" --> PARK[webhook.parking<br/>record PARKED]:::err
+  Q10 & Q1M & Q5M -- "TTL expires, dead-letter back to webhook.q" --> POST
+  PARK --> ADM[Dispatcher / Admin lists deliveries<br/>GET /api/v1/admin/webhook-deliveries]:::step
+  ADM --> RP{Replay?}
+  RP -- No --> END([Stays parked])
+  RP -- Yes --> REPLAY[POST /api/v1/admin/webhook-deliveries/id/replay]:::step --> SIGN

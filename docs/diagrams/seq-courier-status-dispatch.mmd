@@ -1,0 +1,62 @@
+---
+title: SwiftDrop - Courier status update triggers notifications (Role 4 + Role 6)
+---
+sequenceDiagram
+    autonumber
+    actor Courier
+    participant UI as Courier phone UI
+    participant GW as api-gateway
+    participant DISP as dispatch-service
+    participant S3 as MinIO (delivery-proofs)
+    participant PARCEL as parcel-service
+    participant MQ as RabbitMQ (parcel.events)
+    participant NOTIF as notification-service
+    actor Customer
+
+    Courier->>UI: Choose new status, note, optional photo
+    UI->>GW: POST /api/v1/courier/deliveries/{id}/status<br/>Bearer JWT, multipart
+    GW->>GW: Verify JWT (JWKS)
+    GW->>DISP: Forward request
+    DISP->>DISP: @PreAuthorize COURIER<br/>check assignment.courier = caller
+
+    alt Assignment belongs to another courier
+        DISP-->>GW: 403 ProblemDetail
+        GW-->>UI: 403 Forbidden
+    else FAILED without a reason
+        DISP-->>GW: 400 ProblemDetail
+        GW-->>UI: 400 Validation error
+    else Valid request
+        opt Photo attached
+            DISP->>S3: PUT object (generated key)
+            S3-->>DISP: object_key
+        end
+        DISP->>PARCEL: PATCH /internal/parcels/{parcelId}/status<br/>toStatus, note, proofRef
+        PARCEL->>PARCEL: State machine validates transition
+
+        alt Transition not allowed
+            PARCEL-->>DISP: 409 Conflict
+            DISP-->>GW: 409 ProblemDetail
+            GW-->>UI: 409 Conflict
+        else Transition allowed
+            Note over PARCEL: One transaction:<br/>update parcel + status history + outbox row
+            PARCEL-->>DISP: 200 OK
+            DISP->>DISP: Save delivery_proof,<br/>update assignment status
+            DISP-->>GW: 200 OK
+            GW-->>UI: 200 Updated delivery
+
+            Note over PARCEL,MQ: Asynchronous from here
+            PARCEL->>MQ: Outbox relay publishes ParcelStatusChanged v1<br/>routing key parcel.status.<status>
+            par notification.q and webhook.q
+                MQ-)NOTIF: Deliver event
+                NOTIF->>NOTIF: Skip if eventId already processed
+                NOTIF-)Customer: Email (SMS for OUT_FOR_DELIVERY, DELIVERED, FAILED)
+                NOTIF->>NOTIF: Signed webhook to merchant, retry on failure
+            and dispatch.q
+                MQ-)DISP: Deliver event
+                DISP->>DISP: Skip if eventId in processed_events,<br/>else increment daily_stats
+            and tracking.q
+                MQ-)PARCEL: Deliver event
+                PARCEL-)Customer: SSE push to open tracking page
+            end
+        end
+    end

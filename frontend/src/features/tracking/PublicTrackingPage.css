@@ -1,0 +1,205 @@
+/* Public tracking page. Mobile first; colours from the :root variables in src/style.css. */
+
+.tracking-page {
+  min-height: 100vh;
+  background: #f3f5f8;
+  color: var(--ink);
+}
+
+.tracking-header {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: white;
+  border-bottom: 1px solid var(--line);
+}
+
+.tracking-main {
+  width: min(560px, 100%);
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+.tracking-title {
+  margin: 0 0 14px;
+  font-size: 22px;
+  letter-spacing: -.02em;
+}
+
+.tracking-search label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.tracking-search-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tracking-search-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 15px;
+  letter-spacing: .04em;
+}
+
+.tracking-button {
+  min-height: 44px;
+  padding: 0 18px;
+  color: var(--ink);
+  background: var(--orange);
+  border: 0;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.tracking-button:hover:not(:disabled) { background: #ff7b2c; }
+
+.tracking-main .alert { font-size: 13px; }
+
+.tracking-card {
+  margin-top: 18px;
+  padding: 18px 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.tracking-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tracking-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.tracking-number {
+  margin: 2px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 18px;
+  letter-spacing: .04em;
+}
+
+.tracking-status {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  color: #315a83;
+  background: #edf4fb;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tracking-status-delivered { color: #1f6b3a; background: #e8f6ed; }
+.tracking-status-failed { color: #963727; background: #fff3ef; }
+
+.tracking-live {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tracking-live-on { color: #1f6b3a; }
+.tracking-live-on::before { content: "● "; }
+
+.tracking-failed {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  color: #963727;
+  background: #fff3ef;
+  border: 1px solid #f6d2c7;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.tracking-steps {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tracking-step {
+  position: relative;
+  padding-left: 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tracking-step::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: white;
+}
+
+.tracking-step-done { color: var(--ink); }
+.tracking-step-done::before { border-color: var(--orange); background: var(--orange); }
+.tracking-step[aria-current="step"] { font-weight: 700; }
+
+.tracking-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.tracking-facts dt { color: var(--muted); font-size: 11px; }
+.tracking-facts dd { margin: 2px 0 0; font-size: 13px; font-weight: 650; }
+
+.tracking-history-title {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.tracking-history {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tracking-history li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 9px 0;
+  border-top: 1px solid #edf0f4;
+  font-size: 13px;
+}
+
+.tracking-history time { color: var(--muted); font-size: 12px; }
+
+@media (min-width: 640px) {
+  .tracking-header { padding: 0 5vw; }
+  .tracking-main { padding-top: 36px; }
+  .tracking-card { padding: 22px 24px; }
+  .tracking-steps { grid-template-columns: repeat(5, 1fr); }
+  .tracking-step { padding: 22px 0 0; text-align: center; font-size: 12px; }
+  .tracking-step::before { top: 0; left: calc(50% - 7px); }
+}

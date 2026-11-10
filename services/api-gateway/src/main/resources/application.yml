@@ -1,6 +1,149 @@
+# api-gateway: the single entry point (docs/architecture.md §6.1).
+# Routes keep the /api/v1 prefix; services see the full path. /internal/** is never routed.
 spring:
   application:
     name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # Short timeouts so the rate limiter fails open quickly when Redis is unreachable
+      timeout: 2s
+      connect-timeout: 2s
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Fetched lazily on the first token and cached; refetched on an unknown kid
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+  web:
+    resources:
+      add-mappings: false
+  cloud:
+    gateway:
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: ${GATEWAY_HTTP_CONNECT_TIMEOUT_MS:2000}
+            response-timeout: ${GATEWAY_HTTP_RESPONSE_TIMEOUT:10s}
+          default-filters:
+            # Only services may send the internal token; never trust one from outside
+            - RemoveRequestHeader=X-Internal-Token
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Access-Control-Expose-Headers, RETAIN_FIRST
+          # Lower order wins. Specific routes (SSE, rate-limited, /admin/<x>) come before the broad ones.
+          routes:
+            # ─── Specific routes ───────────────────────────────────────────
+            - id: parcel-tracking-stream
+              uri: ${PARCEL_SERVICE_URL:http://localhost:8083}
+              order: -10
+              predicates:
+                - Path=/api/v1/track/{trackingNo}/stream
+                - Method=GET
+              metadata:
+                # SSE: no response timeout; the body is streamed as it arrives
+                response-timeout: -1
+            - id: merchant-api
+              uri: ${MERCHANT_SERVICE_URL:http://localhost:8085}
+              order: -5
+              predicates:
+                - Path=/api/v1/merchant-api/**
+              filters:
+                - RequireApiKey
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@merchantApiKeyResolver}"
+                    redis-rate-limiter.replenish-rate: ${GATEWAY_MERCHANT_RATE_LIMIT_REPLENISH:10}
+                    redis-rate-limiter.burst-capacity: ${GATEWAY_MERCHANT_RATE_LIMIT_BURST:20}
+                    redis-rate-limiter.requested-tokens: 1
+                    throw-on-limit: true
+            - id: pricing-estimate
+              uri: ${PRICING_SERVICE_URL:http://localhost:8082}
+              order: -5
+              predicates:
+                - Path=/api/v1/pricing/estimate
+                - Method=GET
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@clientIpKeyResolver}"
+                    redis-rate-limiter.replenish-rate: ${GATEWAY_ESTIMATE_RATE_LIMIT_REPLENISH:5}
+                    redis-rate-limiter.burst-capacity: ${GATEWAY_ESTIMATE_RATE_LIMIT_BURST:20}
+                    redis-rate-limiter.requested-tokens: 1
+                    throw-on-limit: true
+            - id: auth-admin
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              order: -5
+              predicates:
+                - Path=/api/v1/admin/users/**
+            - id: pricing-admin
+              uri: ${PRICING_SERVICE_URL:http://localhost:8082}
+              order: -5
+              predicates:
+                - Path=/api/v1/admin/zones/**,/api/v1/admin/pricing-rules/**
+            - id: merchant-admin
+              uri: ${MERCHANT_SERVICE_URL:http://localhost:8085}
+              order: -5
+              predicates:
+                - Path=/api/v1/admin/merchants/**
+            - id: notification-admin
+              uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8086}
+              order: -5
+              predicates:
+                - Path=/api/v1/admin/webhook-deliveries/**
+            # ─── Service routes ────────────────────────────────────────────
+            - id: auth-service
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/api/v1/auth/**,/api/v1/oauth2/**
+            - id: auth-google-oauth
+              # Spring Security's Google login paths, forwarded unchanged without the prefix (ADR-011)
+              uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+              predicates:
+                - Path=/oauth2/**,/login/oauth2/**
+            - id: pricing-service
+              uri: ${PRICING_SERVICE_URL:http://localhost:8082}
+              predicates:
+                - Path=/api/v1/pricing/**
+            - id: parcel-service
+              uri: ${PARCEL_SERVICE_URL:http://localhost:8083}
+              predicates:
+                - Path=/api/v1/parcels/**,/api/v1/track/**
+            - id: dispatch-service
+              uri: ${DISPATCH_SERVICE_URL:http://localhost:8084}
+              predicates:
+                - Path=/api/v1/dispatch/**,/api/v1/courier/**,/api/v1/reports/**
+            - id: merchant-service
+              uri: ${MERCHANT_SERVICE_URL:http://localhost:8085}
+              predicates:
+                - Path=/api/v1/merchants/**
+            - id: ai-assistant
+              uri: ${AI_ASSISTANT_URL:http://localhost:8087}
+              predicates:
+                - Path=/api/v1/assistant/**
+
+swiftdrop:
+  gateway:
+    # Requests matching these need no JWT. A path without a method matches every method.
+    # CORS preflight requests are always public. Services still apply their own rules.
+    public-paths:
+      - { method: POST, path: /api/v1/auth/login }
+      - { method: POST, path: /api/v1/auth/signup }
+      - { method: POST, path: /api/v1/auth/register }
+      - { method: POST, path: /api/v1/auth/refresh }
+      - { method: POST, path: /api/v1/auth/logout }
+      - { method: POST, path: /api/v1/auth/token }
+      - { path: /api/v1/oauth2/** }
+      - { path: /oauth2/** }
+      - { path: /login/oauth2/** }
+      - { path: /api/v1/track/** }
+      - { method: GET, path: /api/v1/pricing/estimate }
+      - { method: POST, path: /api/v1/merchants/register }
+      # API-key route: RequireApiKey rejects requests without X-API-Key, merchant-service verifies the key
+      - { path: /api/v1/merchant-api/** }
+      - { path: /actuator/health }
+      - { path: /actuator/health/** }
+    cors:
+      allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
 
 server:
   port: 8080
@@ -10,7 +153,14 @@ management:
     web:
       exposure:
         include: health
+      # No /actuator links page; everything but /actuator/health/** answers 404
+      discovery:
+        enabled: false
   endpoint:
     health:
       probes:
         enabled: true
+  health:
+    # The rate limiter fails open without Redis, so Redis being down must not mark the gateway unhealthy
+    redis:
+      enabled: false

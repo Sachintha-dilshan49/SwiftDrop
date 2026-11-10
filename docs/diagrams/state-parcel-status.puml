@@ -1,0 +1,85 @@
+@startuml
+title State Diagram - Parcel Status Lifecycle
+caption SwiftDrop parcel-service (Role 3)
+
+hide empty description
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor black
+skinparam state {
+  BackgroundColor white
+  BorderColor black
+  StartColor black
+  EndColor black
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+state CREATED
+state PICKED_UP
+state IN_TRANSIT
+state OUT_FOR_DELIVERY
+state DELIVERED #C8E6C9
+state FAILED #FFCDD2
+
+CREATED : tracking number SD-XXXX-XXXX issued
+CREATED : fee calculated by pricing-service
+DELIVERED : final state
+FAILED : final state
+FAILED : failure_reason stored
+
+[*] -down-> CREATED : customer booking (POST /api/v1/parcels)\nor merchant API order (POST /internal/parcels)
+CREATED -down-> PICKED_UP : courier collects the parcel
+PICKED_UP -down-> IN_TRANSIT : parcel moving between hubs
+IN_TRANSIT -down-> OUT_FOR_DELIVERY : courier out on the delivery run
+OUT_FOR_DELIVERY -down-> DELIVERED : recipient receives it\n[optional note / proof photo]
+OUT_FOR_DELIVERY -right-> FAILED : delivery unsuccessful\n[failure reason required]
+DELIVERED -down-> [*]
+FAILED -down-> [*]
+
+note left of PICKED_UP
+  <b>On every transition (one database transaction)</b>
+  - update parcels.status
+  - insert a parcel_status_history row
+    (who, role, when, note, proof reference)
+  - insert an outbox event ParcelStatusChanged
+    with routing key parcel.status.<new status>
+  - the event later triggers email/SMS, the merchant
+    webhook, report counters and the live tracking
+    page (SSE)
+end note
+
+note right of PICKED_UP
+  <b>Who can change status</b>
+  After CREATED: the assigned courier,
+  a dispatcher or an admin
+  (via PATCH /internal/parcels/{id}/status,
+  enforced by ParcelStateMachine)
+end note
+
+note right of IN_TRANSIT
+  <b>Rejected requests (RFC 7807 ProblemDetail)</b>
+  - missing or wrong X-Internal-Token
+    -> 401 Unauthorized
+  - transition not drawn here (skipping a state,
+    going back, leaving DELIVERED or FAILED)
+    -> 409 Conflict
+  - FAILED without a reason, or a reason with
+    any other status -> 400 Bad Request
+  - courier not assigned to this parcel, or a role
+    other than COURIER/DISPATCHER/ADMIN
+    -> 403 Forbidden
+  - unknown parcel id -> 404 Not Found
+end note
+
+note bottom of FAILED
+  Reason is free text, e.g. recipient
+  not available, wrong address,
+  refused by recipient.
+end note
+
+@enduml

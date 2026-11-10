@@ -62,6 +62,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsServiceUnavailableExceptionTo503() throws Exception {
+        mockMvc.perform(get("/test/unavailable"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.type").value("https://swiftdrop.lk/problems/service-unavailable"))
+                .andExpect(jsonPath("$.title").value("Service unavailable"));
+    }
+
+    @Test
     void includesFieldErrorsFromDomainValidationException() throws Exception {
         mockMvc.perform(get("/test/business-validation"))
                 .andExpect(status().isBadRequest())

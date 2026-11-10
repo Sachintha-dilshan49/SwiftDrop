@@ -1,0 +1,39 @@
+@startuml UC-02_customer_booking
+!include _style.iuml
+left to right direction
+title SwiftDrop – Book a Delivery
+
+actor "Customer" as Customer
+
+rectangle "SwiftDrop Platform" {
+  usecase "Book a delivery" as C05
+  usecase "Enter pickup and\ndrop-off address" as C06
+  usecase "Enter package size\nand weight" as C07
+  usecase "Get fee estimate" as C08
+  usecase "Confirm booking" as C09
+  usecase "Receive tracking number\n(e.g. SD-7K3Q-9P2M)" as C09a
+  usecase "Show validation errors" as C09b
+}
+
+Customer --> C05
+Customer --> C08
+
+C05 ..> C06 : <<include>>
+C05 ..> C07 : <<include>>
+C05 ..> C08 : <<include>>
+C05 ..> C09 : <<include>>
+C09 ..> C09a : <<include>>
+C09b .> C05 : <<extend>>\n[invalid address,\nsize or weight]
+
+note as N1
+  Fee comes from the pricing service:
+  zone + base fare + per-km rate.
+  The customer sees the fee before
+  confirming (e.g. 2 kg Colombo → Kandy).
+end note
+note as N2
+  Parcel is created with status CREATED
+  and a ParcelStatusChanged event is
+  published for notifications.
+end note
+@enduml

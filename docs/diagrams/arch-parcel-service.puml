@@ -1,0 +1,113 @@
+@startuml
+title Component Diagram - parcel-service (Role 3)
+caption SwiftDrop parcel-service (Role 3)
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ArrowColor black
+skinparam nodesep 20
+skinparam ranksep 35
+skinparam component {
+  BackgroundColor white
+  BorderColor black
+}
+skinparam package {
+  BorderColor black
+  BackgroundColor #F7F7F7
+}
+skinparam database {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam queue {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+package "Callers" {
+  [merchant-service :8085] as MS
+  [dispatch-service :8084] as DS
+  [notification-service :8086] as NS
+  [React SPA\n(customer screens,\npublic tracking page)] as SPA
+  [ai-assistant :8087\n(MCP tools my_parcels,\ntrack_parcel)] as AI
+  [api-gateway :8080\n(JWT check, routing,\nSSE pass-through)] as GW
+}
+
+package "parcel-service :8083" {
+  package "Controllers" {
+    [InternalParcelController\nPOST /internal/parcels\nPATCH /internal/parcels/{id}/status\nGET /internal/parcels/{id}/contacts] as IPC
+    [CustomerParcelController\nPOST /api/v1/parcels\nGET /api/v1/parcels\nGET /api/v1/parcels/{id}\nGET /api/v1/parcels/{id}/receipt] as CPC
+    [PublicTrackingController\nGET /api/v1/track/{trackingNo}\nGET /api/v1/track/{trackingNo}/stream] as PTC
+  }
+
+  package "Business logic" {
+    [ParcelService] as PS
+    [ParcelStateMachine\n(State pattern)] as SM
+    [TrackingNumberGenerator] as TNG
+    [PricingServiceClient] as PC
+    [PdfReceiptService\n(OpenPDF)] as PDF
+    [OutboxService] as OS
+  }
+
+  package "Events and live tracking" {
+    [OutboxRelay\n(every 1 s)] as OR
+    [TrackingEventConsumer\n(idempotent)] as TEC
+    [TrackingService\n(SSE streams,\nheartbeat every 20 s)] as TS
+  }
+
+  [Repositories\n(Spring Data JPA)] as REPO
+
+  note as SEC
+    <b>Before any controller</b> (common module):
+    /api/v1/** needs a user JWT, checked with
+    auth-service's JWKS (/track/** is public);
+    /internal/** needs X-Internal-Token (ADR-010).
+    Errors are RFC 7807 ProblemDetail.
+  end note
+}
+
+database "parcel_db (PostgreSQL)\nparcels\nparcel_status_history\noutbox_events\nprocessed_events" as DB
+[pricing-service :8082\nPOST /internal/pricing/quote] as PR
+queue "RabbitMQ\nparcel.events\n(topic exchange)" as EX
+queue "tracking.q" as TQ
+queue "notification.q, webhook.q\n-> notification-service\ndispatch.q\n-> dispatch-service" as OQ
+
+SPA -right-> GW : REST + SSE
+AI -left-> GW : REST with the\nuser's token
+GW --> CPC : /api/v1/parcels/**
+GW --> PTC : /api/v1/track/**
+MS --> IPC : create parcel
+DS --> IPC : change status
+NS --> IPC : recipient contacts
+
+CPC --> PS
+PTC --> PS
+PTC --> TS : open stream
+IPC --> PS
+
+PS --> SM : check transition
+PS --> TNG
+PS --> PC
+PS --> PDF
+PS --> OS : event row in the\nsame transaction
+PS --> REPO
+OS --> REPO
+PC --> PR : quote\n(X-Internal-Token)
+
+REPO --> DB
+OR --> DB : read PENDING events
+OR --> EX : publish\nParcelStatusChanged
+EX --> TQ : parcel.status.#
+EX --> OQ : parcel.status.#
+TQ --> TEC
+TEC --> REPO : processed_events
+TEC --> TS : push update
+
+@enduml

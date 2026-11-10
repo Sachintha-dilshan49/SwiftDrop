@@ -1,0 +1,131 @@
+@startuml
+' newpage splits the diagram so each page fits landscape A4: PlantUML exports
+' seq-create-delivery.png, seq-create-delivery_001.png, ... (one file per page).
+title Sequence Diagram - Customer Creates a Delivery (1 of 5)
+caption SwiftDrop parcel-service (Role 3)
+
+hide footbox
+autonumber
+skinparam dpi 200
+skinparam shadowing false
+skinparam maxMessageSize 110
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam BoxPadding 6
+skinparam sequence {
+  ArrowColor black
+  LifeLineBorderColor #555555
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+  ActorBorderColor black
+  ActorBackgroundColor white
+  BoxBorderColor black
+  BoxBackgroundColor #F2F2F2
+  GroupBorderColor black
+  GroupBackgroundColor #E8E8E8
+  DividerBorderColor black
+  DividerBackgroundColor #E8E8E8
+}
+skinparam database {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam queue {
+  BorderColor black
+  BackgroundColor white
+}
+skinparam note {
+  BorderColor black
+  BackgroundColor white
+}
+
+actor Customer
+participant "React SPA" as FE
+participant "API Gateway\n:8080" as GW
+box "parcel-service :8083" #F2F2F2
+  participant "CustomerParcel\nController" as CTRL
+  participant "ParcelService" as SVC
+  participant "PricingService\nClient" as PC
+  participant "OutboxRelay" as RELAY
+end box
+participant "pricing-service\n:8082" as PR
+database "parcel_db\n(PostgreSQL)" as DB
+queue "RabbitMQ\nparcel.events" as MQ
+
+== 1. Fee estimate before confirming ==
+Customer -> FE : Fill booking form (pickup and drop-off address and zone, recipient name and phone, size, weight in kg, speed, optional promo code)
+FE -> GW : GET /api/v1/pricing/estimate\n?fromZone&toZone&weightKg\n&size&speed&promoCode
+GW -> PR : forward
+PR --> GW : 200 estimated fee and breakdown (LKR)
+GW --> FE : 200 estimated fee
+FE --> Customer : show estimated fee
+
+newpage Sequence Diagram - Customer Creates a Delivery (2 of 5)
+== 2. Confirm booking ==
+Customer -> FE : Confirm
+FE -> GW : POST /api/v1/parcels\n(Authorization: Bearer JWT, booking details)
+GW -> GW : verify JWT signature\n(RS256, auth-service public key from JWKS)
+GW -> CTRL : forward
+CTRL -> CTRL : verify JWT again,\n@PreAuthorize CUSTOMER or ADMIN,\n@Valid CreateParcelRequest
+alt missing / invalid token
+  GW --> FE : 401 Unauthorized
+else wrong role
+  CTRL --> FE : 403 Forbidden (via GW)
+else invalid fields
+  CTRL --> FE : 400 ProblemDetail with field errors (via GW)
+end
+CTRL -> SVC : createCustomerParcel(\ncustomerId from JWT, request)
+
+newpage Sequence Diagram - Customer Creates a Delivery (3 of 5)
+== 3. Binding fee from pricing (the client's fee is never trusted) ==
+SVC -> PC : getQuote(pickupZone, dropoffZone,\nweightKg, size, speed, promoCode)
+PC -> PR : POST /internal/pricing/quote\nX-Internal-Token (InternalRestClientFactory)\n{pickupZone, dropoffZone, weightKg, size, speed, promoCode}\ndirect service-to-service call, not via gateway;\ntimeouts 2 s connect / 5 s read
+alt valid quote
+  PR --> PC : 200 {routeType, baseFee, weightFee, sizeFee,\nexpressFee, discount, total, currency: "LKR"}
+  PC --> SVC : quote (total + breakdown)
+else unknown or expired promo code, or weight does not fit size
+  PR --> PC : 400 ProblemDetail
+  PC --> FE : 400 validation error (via SVC, CTRL, GW)\nnothing saved
+else pricing down, slow or unreachable
+  PR --> PC : 5xx / timeout / connection refused
+  PC --> FE : 503 Service Unavailable (via SVC, CTRL, GW)\nnothing saved, no fallback price
+end
+
+newpage Sequence Diagram - Customer Creates a Delivery (4 of 5)
+== 4. Save in one transaction ==
+SVC -> DB : generate tracking number SD-XXXX-XXXX\n(e.g. SD-7K3Q-9P2M) and check it is not\nalready used (regenerate if taken)
+group One transaction (@Transactional)
+  SVC -> DB : INSERT parcels\n(status = CREATED, fee_amount = quote total,\nplus the fee breakdown)
+  SVC -> DB : INSERT parcel_status_history\n(CREATED, changed_by = customerId, role CUSTOMER,\nnote "Delivery booking created")
+  SVC -> DB : INSERT outbox_events\n(ParcelStatusChanged v1, status PENDING,\nrouting key parcel.status.created)
+  SVC -> DB : COMMIT
+end
+note over SVC, DB
+  Saved together or not at all: the event is never lost and never
+  sent for an unsaved parcel (transactional outbox pattern).
+end note
+SVC --> CTRL : created parcel
+CTRL --> GW : 201 Created\nLocation: /api/v1/parcels/{id}\n{trackingNo, status, fee}
+GW --> FE : 201 Created
+FE --> Customer : show booking confirmation and tracking number
+
+newpage Sequence Diagram - Customer Creates a Delivery (5 of 5)
+== 5. Outbox relay publishes the event (asynchronous) ==
+loop every 1 s, up to 50 events
+  RELAY -> DB : SELECT oldest due PENDING event of each parcel\nFOR UPDATE SKIP LOCKED
+  RELAY -> MQ : publish ParcelStatusChanged\n(routing key parcel.status.created, messageId = eventId)
+  alt broker confirms (ack) and routes it
+    MQ --> RELAY : ack
+    RELAY -> DB : UPDATE status = SENT, sent_at = now
+  else nack, unroutable, no confirm within 5 s, or broker down
+    RELAY -> DB : retry_count + 1,\nnext_attempt_at = now + backoff (1 s, 2 s, 4 s ... max 60 s),\nlast_error
+  end
+end
+note over RELAY, MQ
+  Topic exchange fans out to notification.q,
+  webhook.q, dispatch.q and tracking.q.
+  The event carries IDs only: no names,
+  phone numbers or addresses.
+end note
+
+@enduml

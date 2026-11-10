@@ -1,0 +1,51 @@
+@startuml uc-notification
+' Use case — notification-service
+' Based on usecase-notification.mmd by Thisaru Ramanayaka (Role 6); corrected against docs/architecture.md v1.2 §6.3 "Who is notified"
+' Changes: Recipient added as a separate actor; email/SMS targets depend on who booked; contact look-ups shown
+' Layout: "Base <.. Extension" keeps the base use case next to the actor; the arrow still points at the base.
+!include _style.iuml
+left to right direction
+title SwiftDrop – notification-service
+
+actor "parcel-service\n(publishes via outbox)" as PS <<system>>
+actor "Dispatcher / Admin" as Admin
+
+rectangle "SwiftDrop – notification-service :8086" {
+  usecase "Receive ParcelStatusChanged\n(notification.q, webhook.q)" as U1
+  usecase "Skip duplicate eventId" as U2
+  usecase "Look up contacts\n(auth, parcel, merchant /internal APIs)" as U3
+  usecase "Send email\n(every status)" as U4
+  usecase "Send SMS (OUT_FOR_DELIVERY,\nDELIVERED, FAILED)" as U5
+  usecase "Send HMAC-signed webhook\n(merchant bookings)" as U6
+  usecase "Retry failed webhook\n10 s → 1 min → 5 min → parked" as U7
+  usecase "List webhook deliveries" as U8
+  usecase "Replay parked webhook" as U9
+}
+
+actor "Customer" as Customer
+actor "Recipient" as Recipient
+actor "Merchant store\nserver" as Store <<system>>
+
+PS -- U1
+Admin -- U8
+U1 ..> U2 : <<include>>
+U1 ..> U3 : <<include>>
+U1 ..> U4 : <<include>>
+U1 <.. U5 : <<extend>>\n[status needs SMS]
+U1 <.. U6 : <<extend>>\n[merchantId set]
+' layout only: the trailing non-breaking spaces move the label left of the vertical arrow
+U6 <. U7 : "<<extend>> [non-2xx or timeout]<U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0><U+00A0>"
+U8 <.. U9 : <<extend>>
+U6 -- Store
+U5 -- Recipient
+U4 -- Recipient
+U4 -- Customer
+' layout only: retry stays in the webhook's column (single dot), receivers ordered top to bottom
+Store -[hidden] Customer
+Customer -[hidden] Recipient
+
+legend bottom right
+  Customer booking: email to the customer.
+  Merchant booking: email to the recipient.
+endlegend
+@enduml

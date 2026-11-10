@@ -12,6 +12,7 @@ server:
   port: 8087
 
 swiftdrop:
+  internal.token: ${INTERNAL_API_TOKEN:}   # shared /internal/** token, ADR-010; startup fails if unset
   security:
     # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
     public-paths: []
