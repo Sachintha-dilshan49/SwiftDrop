@@ -34,6 +34,27 @@ describe("dispatchApi", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer token-1");
   });
 
+  it("sends a courier status update as multipart with the photo and without blank fields", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { assignmentId: "a-1" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const photo = new File(["jpeg"], "door.jpg", { type: "image/jpeg" });
+
+    await dispatchApi.updateDeliveryStatus("a-1", {
+      status: "DELIVERED", note: "  ", recipientName: " Nimal ", photo,
+    }, "token-1");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("/api/v1/courier/deliveries/a-1/status");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toEqual({ Accept: "application/json", Authorization: "Bearer token-1" });
+    const form = init.body as FormData;
+    expect(form.get("status")).toBe("DELIVERED");
+    expect(form.get("recipientName")).toBe("Nimal");
+    expect(form.has("note")).toBe(false);
+    expect(form.has("failureReason")).toBe(false);
+    expect((form.get("photo") as File).name).toBe("door.jpg");
+  });
+
   it("uses the ProblemDetail detail as the error message", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(409, {
       type: "https://swiftdrop.lk/problems/courier-unavailable", status: 409, detail: "Courier is offline.",

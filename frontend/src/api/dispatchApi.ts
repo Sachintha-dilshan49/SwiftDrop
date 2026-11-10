@@ -1,6 +1,6 @@
 // Client for dispatch-service through the gateway. VITE_API_BASE_URL is the gateway prefix ("/api" by
 // default, like the other clients); every path below adds "/v1/...".
-import type { ParcelSize } from "./parcelApi";
+import type { ParcelSize, ParcelStatus } from "./parcelApi";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
@@ -36,6 +36,33 @@ export interface Assignment {
   assignedByUserId: string;
   status: AssignmentStatus;
   assignedAt: string;
+}
+
+/**
+ * One of the signed-in courier's deliveries. parcelStatus is the parcel's status as last accepted by
+ * parcel-service; it and the parcel fields are null for deliveries assigned before they were recorded.
+ */
+export interface CourierDelivery {
+  assignmentId: string;
+  parcelId: string;
+  status: AssignmentStatus;
+  parcelStatus: ParcelStatus | null;
+  assignedAt: string;
+  trackingNo: string | null;
+  pickupAddress: string | null;
+  dropoffAddress: string | null;
+  recipientName: string | null;
+  size: ParcelSize | null;
+  weightKg: number | null;
+}
+
+/** The courier's status change; the photo is optional proof (JPEG, PNG or WebP, at most 5 MB). */
+export interface DeliveryStatusUpdate {
+  status: ParcelStatus;
+  note?: string;
+  recipientName?: string;
+  failureReason?: string;
+  photo?: File;
 }
 
 /** An error response from dispatch-service, with the ProblemDetail `detail` as message when there is one. */
@@ -98,5 +125,39 @@ export const dispatchApi = {
       throw await toError(response, "Could not assign the parcel. Please try again.");
     }
     return (await response.json()) as Assignment;
+  },
+
+  /** The courier's open deliveries plus any finished today, oldest assignment first. */
+  getTodaysDeliveries(token: string): Promise<CourierDelivery[]> {
+    return getJson("/courier/deliveries/today", token, "Could not load your deliveries.");
+  },
+
+  /** Moves the parcel one step through parcel-service, with optional proof photo (multipart). */
+  async updateDeliveryStatus(
+    assignmentId: string,
+    update: DeliveryStatusUpdate,
+    token: string,
+  ): Promise<CourierDelivery> {
+    const form = new FormData();
+    form.append("status", update.status);
+    for (const field of ["note", "recipientName", "failureReason"] as const) {
+      const value = update[field]?.trim();
+      if (value) {
+        form.append(field, value);
+      }
+    }
+    if (update.photo) {
+      form.append("photo", update.photo);
+    }
+    // No Content-Type header: the browser sets multipart/form-data with its boundary
+    const response = await fetch(`${API_BASE}/v1/courier/deliveries/${encodeURIComponent(assignmentId)}/status`, {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!response.ok) {
+      throw await toError(response, "Could not update the delivery. Please try again.");
+    }
+    return (await response.json()) as CourierDelivery;
   },
 };

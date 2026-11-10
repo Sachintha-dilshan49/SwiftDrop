@@ -23,6 +23,7 @@ import {
 } from "./authPortals";
 import { RoleDashboard } from "../dashboard/RoleDashboard";
 import { CustomerHome } from "../features/booking/CustomerHome";
+import { CourierHome } from "../features/courier/CourierHome";
 import { DispatchHome } from "../features/dispatch/DispatchHome";
 
 type AuthMode = "login" | "signup";
@@ -32,6 +33,8 @@ function roleScreen(role: DashboardRole, token: string) {
   switch (role) {
     case "CUSTOMER":
       return <CustomerHome token={token} />;
+    case "COURIER":
+      return <CourierHome token={token} />;
     case "DISPATCHER":
       return <DispatchHome token={token} />;
     default:
