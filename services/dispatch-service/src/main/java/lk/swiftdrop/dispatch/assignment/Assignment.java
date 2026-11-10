@@ -1,6 +1,7 @@
 package lk.swiftdrop.dispatch.assignment;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -31,6 +32,9 @@ public class Assignment {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     private AssignmentStatus status = AssignmentStatus.ASSIGNED;
+
+    @Embedded
+    private ParcelDetails parcelDetails;
 
     @Column(name = "assigned_at", nullable = false, updatable = false)
     private Instant assignedAt;
@@ -91,6 +95,15 @@ public class Assignment {
 
     public void setStatus(AssignmentStatus status) {
         this.status = status;
+    }
+
+    /** Null for assignments made before parcel details were copied (V2). */
+    public ParcelDetails getParcelDetails() {
+        return parcelDetails;
+    }
+
+    public void setParcelDetails(ParcelDetails parcelDetails) {
+        this.parcelDetails = parcelDetails;
     }
 
     public Instant getAssignedAt() {

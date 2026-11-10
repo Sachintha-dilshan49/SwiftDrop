@@ -106,7 +106,7 @@ Drawn by Role 4 to match `services/dispatch-service`; use them to review `usecas
 |---|---|
 | `usecase-courier.mmd` | Courier use cases: today's list, status update, proof photo, failed with reason; ownership check |
 | `usecase-dispatcher.mmd` | Dispatcher/admin use cases: unassigned parcels, assign, workload, reports |
-| `er-dispatch.mmd` | `dispatch_db` tables, matching `V1__create_dispatch_tables.sql` |
+| `er-dispatch.mmd` | `dispatch_db` tables, matching the Flyway migrations (V1, V2) |
 | `seq-courier-status-dispatch.mmd` | Courier status update inside dispatch-service: 403/400 paths, proof photo to MinIO, `dispatch.q` counters |
 
 `parcel_id`, `user_id` and `assigned_by_user_id` have no foreign keys on purpose: they point

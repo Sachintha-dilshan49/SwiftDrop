@@ -15,13 +15,15 @@ import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import lk.swiftdrop.common.error.NotFoundException;
 import lk.swiftdrop.common.error.ServiceUnavailableException;
+import lk.swiftdrop.common.event.ParcelStatus;
 import lk.swiftdrop.dispatch.config.RestClientConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
 /** Runs the client against a fake parcel-service over real HTTP. */
-class ParcelListClientTest {
+class ParcelLookupClientTest {
 
     @RegisterExtension
     static WireMockExtension parcelService = WireMockExtension.newInstance()
@@ -81,7 +83,40 @@ class ParcelListClientTest {
                 .isInstanceOf(ServiceUnavailableException.class);
     }
 
-    private static ParcelListClient clientFor(String baseUrl) {
-        return new ParcelListClient(new RestClientConfig().parcelServiceUserRestClient(baseUrl));
+    @Test
+    void readsOneParcelWithTheDispatchersOwnToken() {
+        parcelService.stubFor(get(urlPathEqualTo(PATH + "/" + PARCEL_ID)).willReturn(okJson("""
+                {"id":"%s","trackingNo":"SD-0001","status":"CREATED","pickupAddress":"Liberty Plaza",
+                 "dropoffAddress":"Rajagiriya Flyover","recipientName":"Nimal","recipientPhone":"0711234567",
+                 "size":"SMALL","weightKg":1.20,"history":[]}
+                """.formatted(PARCEL_ID))));
+
+        AssignableParcel parcel = clientFor(parcelService.baseUrl()).getParcel(PARCEL_ID, "dispatcher-token");
+
+        assertThat(parcel.status()).isEqualTo(ParcelStatus.CREATED);
+        assertThat(parcel.recipientName()).isEqualTo("Nimal");
+        assertThat(parcel.toString()).doesNotContain("Nimal", "Liberty Plaza");
+        parcelService.verify(getRequestedFor(urlPathEqualTo(PATH + "/" + PARCEL_ID))
+                .withHeader("Authorization", equalTo("Bearer dispatcher-token")));
+    }
+
+    @Test
+    void unknownParcelBecomesNotFound() {
+        parcelService.stubFor(get(urlPathEqualTo(PATH + "/" + PARCEL_ID)).willReturn(aResponse().withStatus(404)));
+
+        assertThatThrownBy(() -> clientFor(parcelService.baseUrl()).getParcel(PARCEL_ID, "t"))
+                .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    void parcelDetailsServerErrorBecomesServiceUnavailable() {
+        parcelService.stubFor(get(urlPathEqualTo(PATH + "/" + PARCEL_ID)).willReturn(aResponse().withStatus(503)));
+
+        assertThatThrownBy(() -> clientFor(parcelService.baseUrl()).getParcel(PARCEL_ID, "t"))
+                .isInstanceOf(ServiceUnavailableException.class);
+    }
+
+    private static ParcelLookupClient clientFor(String baseUrl) {
+        return new ParcelLookupClient(new RestClientConfig().parcelServiceUserRestClient(baseUrl));
     }
 }
