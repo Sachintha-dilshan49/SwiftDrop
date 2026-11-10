@@ -32,4 +32,14 @@ class PricingApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
     }
+
+    /** springdoc.paths-to-exclude keeps the service-to-service quote out of the public API docs. */
+    @Test
+    void publicApiDocsListPublicEndpointsButNotTheInternalQuote() throws Exception {
+        mockMvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/pricing/estimate']").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/pricing/zones']").exists())
+                .andExpect(jsonPath("$.paths['/internal/pricing/quote']").doesNotExist());
+    }
 }
