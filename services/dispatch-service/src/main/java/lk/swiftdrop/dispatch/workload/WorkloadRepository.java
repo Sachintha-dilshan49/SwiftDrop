@@ -13,12 +13,12 @@ public interface WorkloadRepository extends Repository<Courier, UUID> {
 
     /** Every courier with the number of their assignments in {@code statuses}, least busy first. */
     @Query("""
-            select new lk.swiftdrop.dispatch.workload.CourierWorkloadResponse(
+            select new lk.swiftdrop.dispatch.workload.CourierLoad(
                 c.id, c.userId, c.status, count(a.id))
             from Courier c
             left join Assignment a on a.courierId = c.id and a.status in :statuses
             group by c.id, c.userId, c.status
             order by count(a.id), c.id
             """)
-    List<CourierWorkloadResponse> findWorkload(@Param("statuses") Collection<AssignmentStatus> statuses);
+    List<CourierLoad> findWorkload(@Param("statuses") Collection<AssignmentStatus> statuses);
 }
