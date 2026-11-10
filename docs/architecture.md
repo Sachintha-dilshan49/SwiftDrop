@@ -1,6 +1,8 @@
 # SwiftDrop Architecture
 
-Version 1.2 · 31 October 2026 · Owner: Role 1 (team lead)
+Version 1.3 · 10 November 2026 · Owner: Role 1 (team lead)
+
+Changes in 1.3: pricing-service is built (§8): zone codes, the estimate's `pickupZone` / `dropoffZone` parameters (were `fromZone` / `toZone`), the public zone list and the promo-code admin endpoints (§5, §6.1).
 
 Changes in 1.2: table names match the Flyway migrations (§4); merchant and auth endpoints match the code (§5); the fee estimate is public and the Google OAuth paths are forwarded without the `/api/v1` prefix (§6.1, §10.4); `auth_db` holds identity data only (§4, ADR-011).
 
@@ -147,7 +149,7 @@ All public routes are prefixed `/api/v1` and go through the gateway. The excepti
 | Service | Endpoints |
 |---|---|
 | auth | `POST /auth/signup` · `POST /auth/login` (email or mobile number) · `POST /auth/refresh` · `POST /auth/logout` · `GET /oauth2/authorization/google` and `GET /login/oauth2/code/google` (no `/api/v1` prefix, only when `AUTH_GOOGLE_ENABLED=true`) · `POST /auth/token` (exchange one-time code) · `GET, PATCH /admin/users` · internal `GET /.well-known/jwks.json` (no `/api/v1` prefix) · internal `GET /internal/users/{id}/contact` |
-| pricing | `GET /pricing/estimate?fromZone&toZone&weightKg&size&speed&promoCode` · CRUD `/admin/zones` · CRUD `/admin/pricing-rules` · internal `POST /internal/pricing/quote` (rules in [§8](#8-pricing)) |
+| pricing | `GET /pricing/estimate?pickupZone&dropoffZone&weightKg&size&speed&promoCode` (public) · `GET /pricing/zones` (public) · CRUD `/admin/zones` (`DELETE` sets the zone inactive) · `GET /admin/pricing-rules`, `PUT /admin/pricing-rules/{id}` · CRUD `/admin/promo-codes` · internal `POST /internal/pricing/quote` (rules in [§8](#8-pricing)) |
 | parcel | `POST /parcels` · `GET /parcels` (mine) · `GET /parcels/{id}` · `GET /parcels/{id}/receipt` (PDF) · `GET /track/{trackingNo}` (public) · `GET /track/{trackingNo}/stream` (SSE, public) · internal `POST /internal/parcels` · internal `PATCH /internal/parcels/{id}/status` · internal `GET /internal/parcels/{id}/contacts` |
 | dispatch | `GET /dispatch/unassigned` · `POST /dispatch/assignments` · `GET /dispatch/workload` · `GET /reports/daily?from&to` · `GET /courier/deliveries/today` · `GET /courier/deliveries/{id}` (own only) · `POST /courier/deliveries/{id}/status` (multipart, optional photo) |
 | merchant | `POST /merchants/register` · `GET /merchants/me` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `PATCH /admin/merchants/{id}/reject` · `POST, GET /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `GET, PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key, full path `/api/v1/merchant-api/orders`) · `GET /merchants/me/orders` · `GET /merchants/me/orders/{id}` · internal `GET /internal/merchants/{id}/webhook` |
@@ -180,7 +182,7 @@ The gateway does:
 - **`X-Request-Id`**: kept if the client sent a safe one, otherwise a new one replaces it; forwarded to the service, returned on every response (including the gateway's own 401/404), and logged. One access-log line per request: method, path, status, duration and request ID (no query strings, tokens, API keys or cookies).
 - **Rate limiting** with Redis (`RequestRateLimiter` + `RedisRateLimiter`): `/api/v1/merchant-api/**` per API key and the public `GET /api/v1/pricing/estimate` per client IP. Buckets are `merchant-api:<sha256(key)>` and `pricing-estimate:<sha256(ip)>`, so raw keys and IPs never reach Redis. The client IP is the last `X-Forwarded-For` entry (the one nginx appends; one trusted hop), or the remote address without the header. Over the limit → `429` ProblemDetail with the `X-RateLimit-*` headers. If Redis is unreachable the limiter **fails open** (requests pass) and the gateway stays healthy.
 - **SSE pass-through** for `GET /api/v1/track/{trackingNo}/stream`: its own route with no response timeout and no buffering, so events arrive as they are sent.
-- **Public routes** (no JWT): `POST /api/v1/auth/signup`, `/register`, `/login`, `/refresh`, `/logout` and `/token`; `GET /api/v1/pricing/estimate` (guests and the AI assistant, rate-limited; booking still needs a login); `POST /api/v1/merchants/register`; `/api/v1/track/**`; the Google OAuth paths `/oauth2/**` and `/login/oauth2/**`, forwarded unchanged without the `/api/v1` prefix so Spring Security's default redirect URI works (`/api/v1/oauth2/**` is routed and public too); CORS preflight; `/actuator/health/**`. The list is `swiftdrop.gateway.public-paths` in the gateway's `application.yml`. On public routes the gateway ignores any token it is sent and forwards it as is.
+- **Public routes** (no JWT): `POST /api/v1/auth/signup`, `/register`, `/login`, `/refresh`, `/logout` and `/token`; `GET /api/v1/pricing/estimate` (guests and the AI assistant, rate-limited; booking still needs a login); `GET /api/v1/pricing/zones` (not rate-limited); `POST /api/v1/merchants/register`; `/api/v1/track/**`; the Google OAuth paths `/oauth2/**` and `/login/oauth2/**`, forwarded unchanged without the `/api/v1` prefix so Spring Security's default redirect URI works (`/api/v1/oauth2/**` is routed and public too); CORS preflight; `/actuator/health/**`. The list is `swiftdrop.gateway.public-paths` in the gateway's `application.yml`. On public routes the gateway ignores any token it is sent and forwards it as is.
 - **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT. The gateway rejects requests without a non-blank `X-API-Key` header (`401`, "Missing X-API-Key header") and rate-limits per key; merchant-service verifies the key itself.
 - **Errors** are ProblemDetails from the gateway's own handler: `404` no route, `503` service unreachable ("Service temporarily unavailable"), `504` service too slow, `429` over the limit. Bodies never contain exception messages, hostnames or ports. Error responses from a service pass through untouched.
 
@@ -190,7 +192,7 @@ The gateway does **not** contain business logic or ownership checks (those are i
 |---|---|
 | `/api/v1/auth/**`, `/api/v1/oauth2/**`, `/api/v1/admin/users/**` | `auth-service:8081` |
 | `/oauth2/**`, `/login/oauth2/**` (forwarded unchanged, no prefix) | `auth-service:8081` |
-| `/api/v1/pricing/**`, `/api/v1/admin/zones/**`, `/api/v1/admin/pricing-rules/**` | `pricing-service:8082` |
+| `/api/v1/pricing/**`, `/api/v1/admin/zones/**`, `/api/v1/admin/pricing-rules/**`, `/api/v1/admin/promo-codes/**` | `pricing-service:8082` |
 | `/api/v1/parcels/**`, `/api/v1/track/**` | `parcel-service:8083` |
 | `/api/v1/dispatch/**`, `/api/v1/courier/**`, `/api/v1/reports/**` | `dispatch-service:8084` |
 | `/api/v1/merchants/**`, `/api/v1/merchant-api/**`, `/api/v1/admin/merchants/**` | `merchant-service:8085` |
@@ -216,7 +218,6 @@ The gateway does not need `INTERNAL_API_TOKEN`: it never calls `/internal/**`, a
 #### Open items
 
 - merchant-service serves `/merchant-api/orders` without the `/api/v1` prefix, so `POST /api/v1/merchant-api/orders` through the gateway returns `404` until Role 5 moves it (required by ADR-011).
-- pricing-service does not list `GET /api/v1/pricing/estimate` as public yet, so guests get `401` from the service (Role 1, task 4).
 - The frontend calls auth-service directly for Google login (`VITE_AUTH_BASE_URL`); it can switch to the gateway's `/oauth2/**` route (Roles 2 and 7).
 - Swagger UI aggregation in the gateway (§5) is not built yet.
 - The per-IP limit trusts one proxy hop. Port 8080 is also published in Docker Compose for development; clients that call it directly can set `X-Forwarded-For` themselves, so the limit only holds behind nginx or the Ingress.
@@ -333,10 +334,11 @@ The fee is calculated **only in pricing-service**. A price sent by the browser o
 
 | Endpoint | Who calls it | Purpose |
 |---|---|---|
-| `GET /api/v1/pricing/estimate` (public, through the gateway, rate-limited per client) | Guests, booking screen, AI assistant (`estimate_fee`) | Show the expected fee before booking |
+| `GET /api/v1/pricing/estimate?pickupZone&dropoffZone&weightKg&size&speed&promoCode` (public, through the gateway, rate-limited per client) | Guests, booking screen, AI assistant (`estimate_fee`) | Show the expected fee before booking |
 | `POST /internal/pricing/quote` (internal, `X-Internal-Token`) | parcel-service, for customer bookings and merchant orders | The binding fee when the parcel is created |
+| `GET /api/v1/pricing/zones` (public) | Booking screen, guests | The active zones: `code`, `name`, `group`, `districts` |
 
-Both use the same rules below. parcel-service stores the quote's `total` **and** its breakdown with the parcel, so the receipt shows how the fee was made up even if the rules change later.
+Both the estimate and the quote take the same fields and return the same response, and use the same rules below. parcel-service stores the quote's `total` **and** its breakdown with the parcel, so the receipt shows how the fee was made up even if the rules change later.
 
 ```json
 // POST /internal/pricing/quote
@@ -348,19 +350,30 @@ Both use the same rules below. parcel-service stores the quote's `total` **and**
   "expressFee": 100.00, "discount": 100.00, "total": 390.00, "currency": "LKR" }
 ```
 
-`promoCode` is optional. An unknown or expired promo code, or a weight that does not fit the size, returns `400` ProblemDetail.
+`promoCode` is optional. These return `400` ProblemDetail with a `detail` that is safe to show the customer (parcel-service passes it on) and the field in `errors`:
+
+- an unknown or inactive zone ("Pickup zone X is not served.")
+- a weight over 40 kg, or a weight that does not fit the size
+- a size or speed whose rule an admin has deactivated
+- an unknown, inactive, expired or not-yet-valid promo code (unknown and inactive get the same answer)
+
+Every amount comes from `pricing_rules` and `promo_codes`, so an admin change applies to the next quote. Admins edit a rule's amount and active flag; `ROUTE_BASE` and `EXTRA_KG` rules are needed by every quote and cannot be deactivated (`409`).
 
 ### Zones
 
-| Zone | Areas | Group |
-|---|---|---|
-| Colombo Central | Colombo 01–03 | `COLOMBO` |
-| Colombo South | Colombo 04–06 | `COLOMBO` |
-| Colombo North | Colombo 07–15 | `COLOMBO` |
-| Kotte & Rajagiriya | | `SUBURBS` |
-| Nugegoda & Maharagama | | `SUBURBS` |
-| Dehiwala & Mt Lavinia | | `SUBURBS` |
-| Inter-city | Kandy, Galle, Negombo | `INTER_CITY` |
+Reference data seeded by Flyway. The codes are what clients send and what parcel-service stores with each parcel, so they never change; deleting a zone sets it inactive. They match `frontend/src/features/booking/bookingOptions.ts`.
+
+| Code | Name | Areas | Group |
+|---|---|---|---|
+| `COLOMBO_CENTRAL` | Colombo Central | Colombo 01–03 | `COLOMBO` |
+| `COLOMBO_SOUTH` | Colombo South | Colombo 04–06 | `COLOMBO` |
+| `COLOMBO_NORTH` | Colombo North | Colombo 07–15 | `COLOMBO` |
+| `KOTTE_RAJAGIRIYA` | Kotte & Rajagiriya | Kotte, Rajagiriya | `SUBURBS` |
+| `NUGEGODA_MAHARAGAMA` | Nugegoda & Maharagama | Nugegoda, Maharagama | `SUBURBS` |
+| `DEHIWALA_MT_LAVINIA` | Dehiwala & Mt Lavinia | Dehiwala, Mount Lavinia | `SUBURBS` |
+| `KANDY` | Kandy | Kandy | `INTER_CITY` |
+| `GALLE` | Galle | Galle | `INTER_CITY` |
+| `NEGOMBO` | Negombo | Negombo | `INTER_CITY` |
 
 ### Route base fee
 
@@ -399,7 +412,7 @@ The weight must fit the size; otherwise the request fails with `400` (validation
 
 ### Promo codes
 
-A promo code in `promo_codes` takes a fixed amount off, e.g. `DROP100` = −100. The fee never goes below 0: the `discount` is at most the fee before the promo.
+A promo code in `promo_codes` takes a fixed amount off, e.g. `DROP100` = −100. The fee never goes below 0: the `discount` is at most the fee before the promo. Codes are stored in upper case and matched without regard to case; each has `valid_from` and an optional `valid_to` (none = no end date).
 
 ### Worked example
 

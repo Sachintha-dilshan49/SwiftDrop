@@ -8,14 +8,37 @@ spring:
           # auth-service JWKS, called directly (not through the gateway)
           jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
 
+  datasource:
+    url: ${PRICING_DB_URL:jdbc:postgresql://localhost:5432/pricing_db}
+    username: ${PRICING_DB_USER:pricing}
+    password: ${PRICING_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+
+  jpa:
+    open-in-view: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
 server:
   port: 8082
 
 swiftdrop:
   internal.token: ${INTERNAL_API_TOKEN:}   # shared /internal/** token, ADR-010; startup fails if unset
   security:
-    # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
-    public-paths: []
+    # Paths that need no token (any token sent is ignored). Health and /v3/api-docs are always public.
+    # Only GET is mapped on both; the gateway also limits them to GET and rate-limits the estimate.
+    public-paths:
+      - /api/v1/pricing/estimate
+      - /api/v1/pricing/zones
+
+springdoc:
+  # Service-to-service endpoints stay out of the public API docs (the gateway aggregates /v3/api-docs)
+  paths-to-exclude: /internal/**
 
 management:
   endpoints:
