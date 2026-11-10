@@ -63,7 +63,6 @@ class CourierDeliveryServiceTest {
 
     private CourierDeliveryService service;
 
-    private static final String TOKEN = "access-token";
     private static final ProofPhoto JPEG = new ProofPhoto(new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01});
 
     private final Courier me = courier();
@@ -133,12 +132,13 @@ class CourierDeliveryServiceTest {
         Assignment assignment = ownAssignment();
         given(assignmentRepository.save(assignment)).willReturn(assignment);
 
-        CourierDeliveryResponse response = service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        CourierDeliveryResponse response = service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, "Left at the door", "Nimali", null), null);
 
         assertThat(response.status()).isEqualTo(AssignmentStatus.COMPLETED);
         verify(parcelServiceClient).updateStatus(assignment.getParcelId(), new ParcelStatusUpdate(
-                ParcelStatus.DELIVERED, "Left at the door", "Nimali", null, me.getId(), null), TOKEN);
+                ParcelStatus.DELIVERED, me.getId(), "Received by: Nimali. Left at the door", null, null,
+                me.getUserId(), "COURIER"));
     }
 
     @Test
@@ -146,7 +146,7 @@ class CourierDeliveryServiceTest {
         Assignment assignment = ownAssignment();
         given(assignmentRepository.save(assignment)).willReturn(assignment);
 
-        CourierDeliveryResponse response = service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        CourierDeliveryResponse response = service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.PICKED_UP, null, null, null), null);
 
         assertThat(response.status()).isEqualTo(AssignmentStatus.IN_PROGRESS);
@@ -157,7 +157,7 @@ class CourierDeliveryServiceTest {
         Assignment assignment = ownAssignment();
         given(assignmentRepository.save(assignment)).willReturn(assignment);
 
-        CourierDeliveryResponse response = service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        CourierDeliveryResponse response = service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.FAILED, null, null, "Nobody at home"), null);
 
         assertThat(response.status()).isEqualTo(AssignmentStatus.FAILED);
@@ -167,7 +167,7 @@ class CourierDeliveryServiceTest {
     void failedStatusWithoutReasonIsRejected() {
         UUID assignmentId = UUID.randomUUID();
 
-        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), TOKEN, assignmentId,
+        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), assignmentId,
                 new UpdateDeliveryStatusRequest(ParcelStatus.FAILED, "note", null, "  "), null))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("needs a reason");
@@ -180,7 +180,7 @@ class CourierDeliveryServiceTest {
         given(courierRepository.findByUserId(me.getUserId())).willReturn(Optional.of(me));
         given(assignmentRepository.findById(othersAssignment.getId())).willReturn(Optional.of(othersAssignment));
 
-        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), TOKEN, othersAssignment.getId(),
+        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), othersAssignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.PICKED_UP, null, null, null), null))
                 .isInstanceOf(ForbiddenException.class);
         verifyNoInteractions(parcelServiceClient);
@@ -191,7 +191,7 @@ class CourierDeliveryServiceTest {
         Assignment assignment = ownAssignment();
         assignment.setStatus(AssignmentStatus.COMPLETED);
 
-        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, null, null, null), null))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("already COMPLETED");
@@ -202,9 +202,9 @@ class CourierDeliveryServiceTest {
     void assignmentIsUnchangedWhenParcelServiceRejectsTheMove() {
         Assignment assignment = ownAssignment();
         willThrow(new ConflictException("invalid-status-transition", "Invalid", "no"))
-                .given(parcelServiceClient).updateStatus(eq(assignment.getParcelId()), any(), eq(TOKEN));
+                .given(parcelServiceClient).updateStatus(eq(assignment.getParcelId()), any());
 
-        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, null, null, null), null))
                 .isInstanceOf(ConflictException.class);
         assertThat(assignment.getStatus()).isEqualTo(AssignmentStatus.ASSIGNED);
@@ -217,11 +217,12 @@ class CourierDeliveryServiceTest {
         given(proofStorage.store(assignment.getId(), JPEG, ProofPhoto.ImageType.JPEG)).willReturn("proof-key");
         given(assignmentRepository.save(assignment)).willReturn(assignment);
 
-        service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, null, "Nimali", null), JPEG);
 
         verify(parcelServiceClient).updateStatus(assignment.getParcelId(), new ParcelStatusUpdate(
-                ParcelStatus.DELIVERED, null, "Nimali", null, me.getId(), "proof-key"), TOKEN);
+                ParcelStatus.DELIVERED, me.getId(), "Received by: Nimali", "proof-key", null,
+                me.getUserId(), "COURIER"));
         ArgumentCaptor<DeliveryProof> proof = ArgumentCaptor.forClass(DeliveryProof.class);
         verify(deliveryProofRepository).save(proof.capture());
         assertThat(proof.getValue().getAssignmentId()).isEqualTo(assignment.getId());
@@ -232,7 +233,7 @@ class CourierDeliveryServiceTest {
     void photoThatIsNotAnImageIsRejected() {
         ProofPhoto notAnImage = new ProofPhoto("#!/bin/sh".getBytes());
 
-        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), TOKEN, UUID.randomUUID(),
+        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), UUID.randomUUID(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, null, null, null), notAnImage))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("JPEG, PNG or WebP");
@@ -244,9 +245,9 @@ class CourierDeliveryServiceTest {
         Assignment assignment = ownAssignment();
         given(proofStorage.store(assignment.getId(), JPEG, ProofPhoto.ImageType.JPEG)).willReturn("proof-key");
         willThrow(new ConflictException("invalid-status-transition", "Invalid", "no"))
-                .given(parcelServiceClient).updateStatus(eq(assignment.getParcelId()), any(), eq(TOKEN));
+                .given(parcelServiceClient).updateStatus(eq(assignment.getParcelId()), any());
 
-        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), TOKEN, assignment.getId(),
+        assertThatThrownBy(() -> service.updateStatus(me.getUserId(), assignment.getId(),
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, null, null, null), JPEG))
                 .isInstanceOf(ConflictException.class);
         verify(proofStorage).delete("proof-key");

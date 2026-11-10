@@ -45,6 +45,6 @@ public class CourierDeliveryController {
             @RequestPart(name = "photo", required = false) MultipartFile photo) throws IOException {
         ProofPhoto proof = photo == null || photo.isEmpty() ? null : new ProofPhoto(photo.getBytes());
         return courierDeliveryService.updateStatus(
-                UUID.fromString(jwt.getSubject()), jwt.getTokenValue(), assignmentId, request, proof);
+                UUID.fromString(jwt.getSubject()), assignmentId, request, proof);
     }
 }

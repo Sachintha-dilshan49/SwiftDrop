@@ -74,7 +74,7 @@ public class CourierDeliveryService {
      *
      * @param photo the proof photo, or {@code null} when the courier sent none
      */
-    public CourierDeliveryResponse updateStatus(UUID userId, String accessToken, UUID assignmentId,
+    public CourierDeliveryResponse updateStatus(UUID userId, UUID assignmentId,
             UpdateDeliveryStatusRequest request, ProofPhoto photo) {
         if (request.status() == ParcelStatus.FAILED
                 && (request.failureReason() == null || request.failureReason().isBlank())) {
@@ -93,9 +93,9 @@ public class CourierDeliveryService {
 
         String proofKey = photo == null ? null : proofStorage.store(assignmentId, photo, photoType);
         try {
-            parcelServiceClient.updateStatus(assignment.getParcelId(), new ParcelStatusUpdate(request.status(),
-                    request.note(), request.recipientName(), request.failureReason(), assignment.getCourierId(),
-                    proofKey), accessToken);
+            parcelServiceClient.updateStatus(assignment.getParcelId(), ParcelStatusUpdate.byCourier(request.status(),
+                    assignment.getCourierId(), userId, request.note(), request.recipientName(),
+                    request.failureReason(), proofKey));
         } catch (RuntimeException e) {
             if (proofKey != null) {
                 proofStorage.delete(proofKey);

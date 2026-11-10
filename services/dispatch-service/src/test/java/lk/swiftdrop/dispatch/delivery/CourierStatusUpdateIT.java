@@ -122,7 +122,7 @@ class CourierStatusUpdateIT {
         assertThat(storageClient().statObject(StatObjectArgs.builder().bucket(BUCKET).object(key).build())
                 .contentType()).isEqualTo("image/jpeg");
         parcelService.verify(patchRequestedFor(urlMatching("/internal/parcels/" + assignment.getParcelId() + "/status"))
-                .withRequestBody(matchingJsonPath("$.proofObjectKey", equalTo(key))));
+                .withRequestBody(matchingJsonPath("$.proofReference", equalTo(key))));
         assertThat(assignmentRepository.findById(assignment.getId()).orElseThrow().getStatus())
                 .isEqualTo(AssignmentStatus.COMPLETED);
     }

@@ -34,7 +34,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class CourierDeliveryControllerTest {
 
     private static final UUID USER_ID = UUID.randomUUID();
-    private static final String TOKEN = "courier-token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -105,7 +104,7 @@ class CourierDeliveryControllerTest {
         UUID assignmentId = UUID.randomUUID();
         UpdateDeliveryStatusRequest request =
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, "At the gate", "Nimali", null);
-        given(courierDeliveryService.updateStatus(USER_ID, TOKEN, assignmentId, request, null)).willReturn(
+        given(courierDeliveryService.updateStatus(USER_ID, assignmentId, request, null)).willReturn(
                 new CourierDeliveryResponse(assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now()));
 
         mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", assignmentId)
@@ -119,7 +118,7 @@ class CourierDeliveryControllerTest {
     void photoIsPassedToTheServiceAsProof() throws Exception {
         UUID assignmentId = UUID.randomUUID();
         byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01};
-        given(courierDeliveryService.updateStatus(eq(USER_ID), eq(TOKEN), eq(assignmentId), any(), any()))
+        given(courierDeliveryService.updateStatus(eq(USER_ID), eq(assignmentId), any(), any()))
                 .willReturn(new CourierDeliveryResponse(
                         assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now()));
 
@@ -129,7 +128,7 @@ class CourierDeliveryControllerTest {
                 .andExpect(status().isOk());
 
         ArgumentCaptor<ProofPhoto> photo = ArgumentCaptor.forClass(ProofPhoto.class);
-        verify(courierDeliveryService).updateStatus(eq(USER_ID), eq(TOKEN), eq(assignmentId), any(), photo.capture());
+        verify(courierDeliveryService).updateStatus(eq(USER_ID), eq(assignmentId), any(), photo.capture());
         assertThat(photo.getValue().content()).isEqualTo(jpeg);
     }
 
@@ -159,7 +158,7 @@ class CourierDeliveryControllerTest {
     }
 
     private static RequestPostProcessor user(String role) {
-        return jwt().jwt(token -> token.subject(USER_ID.toString()).tokenValue(TOKEN))
+        return jwt().jwt(token -> token.subject(USER_ID.toString()))
                 .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }
