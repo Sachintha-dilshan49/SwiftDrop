@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { merchantApi, RegisterMerchantRequest } from '../../api/merchantApi';
+import './merchant.css';
 
 interface Props {
   onBackToSignIn?: () => void;

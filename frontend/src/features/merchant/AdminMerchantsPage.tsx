@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { merchantApi, MerchantResponse } from '../../api/merchantApi';
+import './merchant.css';
 
 interface Props {
   adminToken?: string;

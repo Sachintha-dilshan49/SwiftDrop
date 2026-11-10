@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { merchantApi, MerchantOrderResponse } from '../../api/merchantApi';
+import './merchant.css';
 
 interface Props {
   token?: string;
