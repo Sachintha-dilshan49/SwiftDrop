@@ -125,7 +125,8 @@ class CourierStatusUpdateIT {
                         .param("status", "DELIVERED").param("recipientName", "Nimali")
                         .with(signedInAs(courier)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.parcelStatus").value("DELIVERED"));
 
         List<DeliveryProof> proofs = deliveryProofRepository.findByAssignmentId(assignment.getId());
         assertThat(proofs).hasSize(1);

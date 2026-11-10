@@ -58,6 +58,7 @@ public class AssignmentService {
         assignment.setCourierId(courier.getId());
         assignment.setAssignedByUserId(assignedByUserId);
         assignment.setStatus(AssignmentStatus.ASSIGNED);
+        assignment.setParcelStatus(ParcelStatus.CREATED);
         assignment.setParcelDetails(new ParcelDetails(parcel.trackingNo(), parcel.pickupAddress(),
                 parcel.dropoffAddress(), parcel.recipientName(), parcel.size(), parcel.weightKg()));
 

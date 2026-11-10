@@ -48,7 +48,7 @@ class CourierDeliveryControllerTest {
     void courierGetsOwnListForToday() throws Exception {
         UUID assignmentId = UUID.randomUUID();
         given(courierDeliveryService.getTodaysDeliveries(USER_ID)).willReturn(List.of(new CourierDeliveryResponse(
-                assignmentId, UUID.randomUUID(), AssignmentStatus.ASSIGNED, Instant.now(), null, null, null, null, null, null)));
+                assignmentId, UUID.randomUUID(), AssignmentStatus.ASSIGNED, null, Instant.now(), null, null, null, null, null, null)));
 
         mockMvc.perform(get("/api/v1/courier/deliveries/today").with(user("COURIER")))
                 .andExpect(status().isOk())
@@ -60,7 +60,7 @@ class CourierDeliveryControllerTest {
     void courierGetsOwnDelivery() throws Exception {
         UUID assignmentId = UUID.randomUUID();
         given(courierDeliveryService.getDelivery(USER_ID, assignmentId)).willReturn(new CourierDeliveryResponse(
-                assignmentId, UUID.randomUUID(), AssignmentStatus.IN_PROGRESS, Instant.now(), null, null, null, null, null, null));
+                assignmentId, UUID.randomUUID(), AssignmentStatus.IN_PROGRESS, null, Instant.now(), null, null, null, null, null, null));
 
         mockMvc.perform(get("/api/v1/courier/deliveries/{id}", assignmentId).with(user("COURIER")))
                 .andExpect(status().isOk())
@@ -105,7 +105,7 @@ class CourierDeliveryControllerTest {
         UpdateDeliveryStatusRequest request =
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, "At the gate", "Nimali", null);
         given(courierDeliveryService.updateStatus(USER_ID, assignmentId, request, null)).willReturn(
-                new CourierDeliveryResponse(assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now(), null, null, null, null, null, null));
+                new CourierDeliveryResponse(assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, null, Instant.now(), null, null, null, null, null, null));
 
         mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", assignmentId)
                         .param("status", "DELIVERED").param("note", "At the gate").param("recipientName", "Nimali")
@@ -120,7 +120,7 @@ class CourierDeliveryControllerTest {
         byte[] jpeg = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01};
         given(courierDeliveryService.updateStatus(eq(USER_ID), eq(assignmentId), any(), any()))
                 .willReturn(new CourierDeliveryResponse(
-                        assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, Instant.now(), null, null, null, null, null, null));
+                        assignmentId, UUID.randomUUID(), AssignmentStatus.COMPLETED, null, Instant.now(), null, null, null, null, null, null));
 
         mockMvc.perform(multipart("/api/v1/courier/deliveries/{id}/status", assignmentId)
                         .file(new MockMultipartFile("photo", "door.jpg", "image/jpeg", jpeg))

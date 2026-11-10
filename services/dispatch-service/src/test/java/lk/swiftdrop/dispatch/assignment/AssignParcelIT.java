@@ -88,6 +88,7 @@ class AssignParcelIT {
                                 .authorities(new SimpleGrantedAuthority("ROLE_COURIER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].trackingNo").value("SD-0001"))
+                .andExpect(jsonPath("$[0].parcelStatus").value("CREATED"))
                 .andExpect(jsonPath("$[0].pickupAddress").value("Liberty Plaza"))
                 .andExpect(jsonPath("$[0].dropoffAddress").value("Rajagiriya Flyover"))
                 .andExpect(jsonPath("$[0].recipientName").value("Nimal"))

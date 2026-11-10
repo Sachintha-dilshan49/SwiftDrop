@@ -73,6 +73,7 @@ class AssignmentServiceTest {
 
         ArgumentCaptor<Assignment> saved = ArgumentCaptor.forClass(Assignment.class);
         verify(assignmentRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getParcelStatus()).isEqualTo(ParcelStatus.CREATED);
         assertThat(saved.getValue().getParcelDetails()).isEqualTo(new ParcelDetails(
                 "SD-0001", "Liberty Plaza", "Rajagiriya Flyover", "Nimal", "SMALL", new BigDecimal("1.20")));
     }

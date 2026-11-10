@@ -11,6 +11,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import lk.swiftdrop.common.event.ParcelStatus;
 
 @Entity
 @Table(name = "assignments")
@@ -35,6 +36,10 @@ public class Assignment {
 
     @Embedded
     private ParcelDetails parcelDetails;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "parcel_status", length = 32)
+    private ParcelStatus parcelStatus;
 
     @Column(name = "assigned_at", nullable = false, updatable = false)
     private Instant assignedAt;
@@ -104,6 +109,15 @@ public class Assignment {
 
     public void setParcelDetails(ParcelDetails parcelDetails) {
         this.parcelDetails = parcelDetails;
+    }
+
+    /** The parcel's status as last accepted by parcel-service; null for assignments made before V3. */
+    public ParcelStatus getParcelStatus() {
+        return parcelStatus;
+    }
+
+    public void setParcelStatus(ParcelStatus parcelStatus) {
+        this.parcelStatus = parcelStatus;
     }
 
     public Instant getAssignedAt() {
