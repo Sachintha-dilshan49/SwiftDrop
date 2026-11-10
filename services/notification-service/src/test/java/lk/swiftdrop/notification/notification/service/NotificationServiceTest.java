@@ -174,6 +174,20 @@ class NotificationServiceTest {
     }
 
     @Test
+    void merchantOrder_savedNotificationHasNullCustomerId() {
+        // parcel-service sets customerId=null for merchant orders; the notifications table
+        // allows this (V4 migration drops the NOT NULL on customer_id — architecture §6.3).
+        when(parcelServiceClient.getRecipientContacts(PARCEL_ID))
+                .thenReturn(Optional.of(RECIPIENT_CONTACT));
+
+        service.processStatusChange(buildMerchantEvent(ParcelStatus.CREATED, ParcelStatus.PICKED_UP));
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getCustomerId()).isNull();
+    }
+
+    @Test
     void merchantOrder_sendsSmsToRecipientOnOutForDelivery() {
         when(parcelServiceClient.getRecipientContacts(PARCEL_ID))
                 .thenReturn(Optional.of(RECIPIENT_CONTACT));
@@ -225,9 +239,11 @@ class NotificationServiceTest {
     }
 
     private ParcelStatusChanged buildMerchantEvent(ParcelStatus from, ParcelStatus to) {
+        // Merchant orders have no customerId — the parcel was placed via API key, not a customer account.
+        // parcel-service sets customerId = null for merchant parcels (architecture §6.3).
         return new ParcelStatusChanged(
                 UUID.randomUUID(), ParcelStatusChanged.TYPE, ParcelStatusChanged.VERSION,
-                Instant.now(), PARCEL_ID, "SD-TEST-1234", CUSTOMER_ID,
+                Instant.now(), PARCEL_ID, "SD-TEST-1234", null,
                 MERCHANT_ID, null, from, to, null, null);
     }
 }
