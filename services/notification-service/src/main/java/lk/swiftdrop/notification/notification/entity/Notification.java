@@ -29,7 +29,7 @@ public class Notification {
     @Column(name = "tracking_no", nullable = false, length = 20)
     private String trackingNo;
 
-    @Column(name = "customer_id", nullable = false)
+    @Column(name = "customer_id")   // nullable — null for merchant orders (architecture §6.3)
     private UUID customerId;
 
     @Enumerated(EnumType.STRING)
