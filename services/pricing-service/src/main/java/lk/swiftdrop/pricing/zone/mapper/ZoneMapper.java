@@ -1,5 +1,6 @@
 package lk.swiftdrop.pricing.zone.mapper;
 
+import lk.swiftdrop.pricing.zone.dto.AdminZoneResponse;
 import lk.swiftdrop.pricing.zone.dto.ZoneResponse;
 import lk.swiftdrop.pricing.zone.entity.Zone;
 
@@ -11,5 +12,10 @@ public final class ZoneMapper {
 
     public static ZoneResponse toResponse(Zone zone) {
         return new ZoneResponse(zone.getCode(), zone.getName(), zone.getGroup(), zone.getDistricts());
+    }
+
+    public static AdminZoneResponse toAdminResponse(Zone zone) {
+        return new AdminZoneResponse(zone.getId(), zone.getCode(), zone.getName(), zone.getGroup(), zone.isActive(),
+                zone.getDistricts(), zone.getCreatedAt(), zone.getUpdatedAt());
     }
 }
