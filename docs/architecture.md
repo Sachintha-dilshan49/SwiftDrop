@@ -440,7 +440,7 @@ Colombo South → Colombo Central, 1.2 kg, `SMALL`, `EXPRESS`:
 | Service-to-service | `/internal/**` requires `X-Internal-Token` = `INTERNAL_API_TOKEN`, compared in constant time; callers get `ROLE_INTERNAL_SERVICE`. A user JWT does not open it. Services refuse to start without the token (ADR-010). |
 | Merchant API | `X-API-Key`, shown once, stored as SHA-256 hash, prefix kept for lookup, rate-limited per key in the gateway. Merchant must be APPROVED. |
 | Google login | Authorization Code flow handled by auth-service; SPA receives a one-time code and exchanges it for our tokens. |
-| Input | Bean Validation on all DTOs; frontend validates with zod too. |
+| Input | Bean Validation on all DTOs; the frontend mirrors the same rules with hand-written validation (ADR-012). |
 | Errors | RFC 7807 ProblemDetail from the shared handler; no stack traces, SQL or personal data. |
 | Logs | Logback masking for phone numbers, emails and addresses; request ID in every line. |
 | Secrets | Environment variables (`.env` locally, Kubernetes Secrets in the cluster). Nothing in Git. |
@@ -523,7 +523,7 @@ All containers have health checks; services wait for their dependencies to be he
 
 | Area | Choice |
 |---|---|
-| Frontend | React 18, Vite, TypeScript, Tailwind, React Router, TanStack Query, react-hook-form + zod, Recharts |
+| Frontend | React 18, Vite, TypeScript (strict); plain CSS, `fetch` API clients and an in-house router, no other runtime libraries (ADR-012) |
 | Backend | Java 21, Spring Boot 4.1.x, Spring Security, Spring Cloud Gateway (2025.1.x), Spring Data JPA, Spring AMQP, Flyway, OpenPDF, springdoc-openapi |
 | AI | Spring AI 2.x with MCP server |
 | Data | PostgreSQL 16, Redis 7, MinIO |
