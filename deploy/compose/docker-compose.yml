@@ -61,7 +61,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: swiftdrop-minio
     command: server /data --console-address ":9001"
     environment:
@@ -81,7 +81,7 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: swiftdrop-minio-init
     depends_on:
       minio:
@@ -290,6 +290,7 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      GATEWAY_URL: ${GATEWAY_URL:-http://api-gateway:8080}
     depends_on:
       auth-service:
         condition: service_healthy
