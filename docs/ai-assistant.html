@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwiftDrop AI Assistant — Design &amp; Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Same tokens as docs/diagrams/architecture-overview.html so the two pages read as one set. */
+:root{
+  --bg:#F4F6F8;--surface:#FFFFFF;--ink:#141B24;--ink-2:#2B3542;--muted:#5A6676;--line:#D9DEE5;--line-strong:#A9B3C1;
+  --accent:#2350C8;--async:#B86E00;--ext:#0B7F72;--code-bg:#EEF1F5;--warn-bg:#FFF6E6;--warn-line:#E0A447;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;--f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0F141B;--surface:#161D27;--ink:#E8EDF3;--ink-2:#C9D2DD;--muted:#9AA6B5;--line:#2A3441;--line-strong:#465365;
+  --accent:#8FB0FF;--async:#F0A93A;--ext:#4CC9B6;--code-bg:#1B2330;--warn-bg:#2A2214;--warn-line:#9A7030;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;padding:32px max(16px,env(safe-area-inset-left,0px)) 64px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-direction:column;gap:10px}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4vw,40px);line-height:1.1;margin:0;letter-spacing:-.01em}
+h2{font-family:var(--f-display);font-weight:600;font-size:22px;margin:0}
+h3{font-family:var(--f-display);font-weight:600;font-size:16px;margin:8px 0 0}
+p{margin:0}
+.lede{color:var(--muted);max-width:75ch}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--f-mono);font-size:12px;padding:3px 10px;border:1px solid var(--line-strong);border-radius:999px;color:var(--ink-2);background:var(--surface)}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px;display:flex;flex-direction:column;gap:14px;min-width:0;scroll-margin-top:16px}
+.num{font-family:var(--f-mono);color:var(--accent);margin-right:8px}
+nav.toc{columns:3 220px;font-size:14px}
+nav.toc a{display:block;color:var(--ink-2);text-decoration:none;padding:2px 0}
+nav.toc a:hover{color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.table-scroll{overflow-x:auto}
+code{font-family:var(--f-mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px}
+pre.code{font-family:var(--f-mono);font-size:13px;background:var(--code-bg);padding:14px 16px;border-radius:8px;overflow-x:auto;margin:0;line-height:1.5}
+.diagram{overflow-x:auto;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.diagram pre.mermaid{margin:0;display:flex;justify-content:center;font-size:14px}
+.caption{font-size:13px;color:var(--muted)}
+.note{border-left:3px solid var(--warn-line);background:var(--warn-bg);padding:10px 14px;border-radius:0 6px 6px 0;font-size:14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+ul{margin:0;padding-left:20px}
+li{margin:2px 0}
+footer{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">SwiftDrop · services/ai-assistant · Role 9 · Draft v1 · 29 Oct 2026</div>
+  <h1>AI Assistant — Design &amp; Architecture</h1>
+  <p class="lede">A chatbot for SwiftDrop users that answers with <strong>live data through tools</strong> (track a parcel, estimate a fee, list my parcels) and with <strong>help-centre knowledge through RAG</strong> (shipping rules, prohibited items, delivery times). The same tools are exposed over <strong>MCP</strong> so external AI clients can use them. The LLM provider is configurable; <strong>Groq</strong> is the default.</p>
+  <div class="chips">
+    <span class="chip">port 8087</span><span class="chip">lk.swiftdrop.ai</span><span class="chip">Spring Boot 4.1</span><span class="chip">Spring AI 2.0.2</span>
+    <span class="chip">LLM + tools</span><span class="chip">LLM + RAG</span><span class="chip">MCP server</span><span class="chip">no database</span>
+  </div>
+  <p class="note">Status: design only. The module is still a skeleton, and so are the services its tools call (gateway, parcel, pricing). Until they exist, tools are built and tested against the contracts in <code>docs/architecture.md</code> using WireMock.</p>
+</header>
+
+<section class="card">
+  <h2>Contents</h2>
+  <nav class="toc">
+    <a href="#s1">1. Responsibility</a><a href="#s2">2. Approach and why</a><a href="#s3">3. System context</a>
+    <a href="#s4">4. Use cases</a><a href="#s5">5. Component architecture</a><a href="#s6">6. API surface</a>
+    <a href="#s7">7. Tools (live data)</a><a href="#s8">8. Knowledge base (RAG)</a><a href="#s9">9. Model registry</a>
+    <a href="#s10">10. Class structure</a><a href="#s11">11. Sequence diagrams</a><a href="#s12">12. Activity flow</a>
+    <a href="#s13">13. State machines</a><a href="#s14">14. Security &amp; privacy</a><a href="#s15">15. Deployment</a>
+    <a href="#s16">16. Configuration</a><a href="#s17">17. Testing strategy</a><a href="#s18">18. Design decisions</a>
+    <a href="#s19">19. Delivery plan</a><a href="#s20">20. Risks &amp; open questions</a>
+  </nav>
+</section>
+
+<!-- 1 -->
+<section class="card" id="s1">
+  <h2><span class="num">1</span>Responsibility</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Does</th><th>Detail</th></tr>
+    <tr><td>Chat</td><td><code>POST /api/v1/assistant/chat</code> (and a streaming variant) for any signed-in user, in the SPA.</td></tr>
+    <tr><td>Live answers through tools</td><td><code>track_parcel</code>, <code>estimate_fee</code>, <code>my_parcels</code> call the public API through the gateway <strong>with the caller's JWT</strong>.</td></tr>
+    <tr><td>Knowledge answers through RAG</td><td>Help articles (Markdown in the service) are split, embedded and searched; matching passages are added to the prompt.</td></tr>
+    <tr><td>MCP server</td><td><code>/mcp</code> exposes the same tools plus <code>search_help_articles</code> to external MCP clients (Claude Desktop, Cursor, …).</td></tr>
+    <tr><td>Configurable models</td><td>Several named models in config, Groq by default; a request may pick one by name.</td></tr>
+    <tr><td>Conversation memory</td><td>Short in-memory window per user + conversation.</td></tr>
+  </table></div>
+  <div class="table-scroll"><table>
+    <tr><th>Does not</th><th>Why</th></tr>
+    <tr><td>Change any data (create parcels, change status, assign couriers)</td><td>Tools are read-only to limit prompt-injection damage. Status is owned by parcel-service.</td></tr>
+    <tr><td>Own a database</td><td>Architecture: ai-assistant has no database. Memory and vectors are in memory.</td></tr>
+    <tr><td>Check ownership itself</td><td>It acts as the user; parcel/pricing services enforce ownership on the forwarded JWT.</td></tr>
+    <tr><td>Call services directly</td><td>All tool calls go through the gateway's public API, so routing, rate limits and auth stay in one place.</td></tr>
+    <tr><td>Log prompts or replies</td><td>They can contain addresses and phone numbers.</td></tr>
+  </table></div>
+</section>
+
+<!-- 2 -->
+<section class="card" id="s2">
+  <h2><span class="num">2</span>Approach and why</h2>
+  <p>An LLM API on its own guesses. Each question type needs a different grounding technique, so the assistant combines them:</p>
+  <div class="table-scroll"><table>
+    <tr><th>Question type</th><th>Example</th><th>Technique</th></tr>
+    <tr><td>Live, per-user data</td><td>"Where is SD-7K3Q-9P2M?" · "What does 2 kg Colombo→Kandy cost?" · "Show my parcels"</td><td><strong>Tool calling</strong>: the model asks to call a function, we run it with the user's token and return real data.</td></tr>
+    <tr><td>Static knowledge</td><td>"What can't I send?" · "What happens if I'm not home?"</td><td><strong>RAG</strong>: retrieve relevant help-article passages and put them in the prompt.</td></tr>
+    <tr><td>Out of scope</td><td>"Write me a poem"</td><td><strong>System prompt</strong> refuses politely and points back to SwiftDrop help.</td></tr>
+  </table></div>
+  <p>Alternatives considered and rejected: a rule/intent bot (too rigid), a raw LLM call (hallucinates), and a hosted agent platform such as Bedrock Agents (vendor lock-in, harder to test, less to explain in the viva). See <a href="#s18">§18</a>.</p>
+</section>
+
+<!-- 3 -->
+<section class="card" id="s3">
+  <h2><span class="num">3</span>System context</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  U["Signed-in user (SPA)"]
+  X["External MCP client (Claude Desktop, Cursor)"]
+  GW["api-gateway :8080"]
+  AI["ai-assistant :8087"]
+  AUTH["auth-service :8081 (JWKS)"]
+  PARCEL["parcel-service :8083"]
+  PRICE["pricing-service :8082"]
+  LLM[("LLM provider: Groq (default), OpenAI, Ollama")]
+  EMB[("Local embedding model (ONNX, in-process)")]
+
+  U -- "REST / SSE + JWT" --> GW
+  X -- "MCP over HTTP + JWT" --> GW
+  GW -- "/api/v1/assistant/**, /mcp" --> AI
+  AI -- "tool calls with caller's JWT" --> GW
+  GW --> PARCEL
+  GW --> PRICE
+  AI -. "verify JWT" .-> AUTH
+  AI -- "chat completions + tool calls" --> LLM
+  AI --- EMB
+  </pre></div>
+  <p class="caption">The assistant calls the <em>public</em> API through the gateway, never other services' internals. Only the LLM provider is outside our network.</p>
+</section>
+
+<!-- 4 -->
+<section class="card" id="s4">
+  <h2><span class="num">4</span>Use cases</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  C(["Customer"])
+  M(["Merchant"])
+  D(["Dispatcher / Admin"])
+  K(["Courier"])
+  X(["External MCP client"])
+  S(["System at startup"])
+  L(["LLM provider"])
+
+  subgraph AI["ai-assistant"]
+    UC1["Ask a question in chat"]
+    UC2["Track a parcel by tracking number"]
+    UC3["Estimate a delivery fee"]
+    UC4["List my parcels"]
+    UC5["Ask a help / policy question (RAG)"]
+    UC6["Choose a model"]
+    UC7["See streamed reply"]
+    UC8["Clear a conversation"]
+    UC9["List / call tools over MCP"]
+    UC10["Load help articles at startup"]
+  end
+
+  C --> UC1
+  M --> UC1
+  D --> UC1
+  K --> UC1
+  UC1 -. "include" .-> UC2
+  UC1 -. "include" .-> UC3
+  UC1 -. "include" .-> UC4
+  UC1 -. "include" .-> UC5
+  UC1 -. "extend" .-> UC6
+  UC1 -. "extend" .-> UC7
+  C --> UC8
+  M --> UC8
+  X --> UC9
+  UC9 -. "include" .-> UC2
+  UC9 -. "include" .-> UC3
+  UC9 -. "include" .-> UC4
+  UC9 -. "include" .-> UC5
+  S --> UC10
+  UC1 -- "generates reply" --> L
+  </pre></div>
+  <div class="table-scroll"><table>
+    <tr><th>Use case</th><th>Actor</th><th>Notes</th></tr>
+    <tr><td>Track a parcel</td><td>Any role</td><td>Public endpoint, so it works for any tracking number.</td></tr>
+    <tr><td>Estimate a fee</td><td>Any role</td><td>Needs from/to zone, weight, size; the model asks for missing values.</td></tr>
+    <tr><td>List my parcels</td><td>Customer, Merchant</td><td>parcel-service returns only the caller's parcels.</td></tr>
+    <tr><td>Help question</td><td>Any role</td><td>Answers only from retrieved help passages, with sources.</td></tr>
+    <tr><td>Tools over MCP</td><td>External client with a SwiftDrop JWT</td><td>No LLM on our side; the client brings its own model.</td></tr>
+  </table></div>
+</section>
+
+<!-- 5 -->
+<section class="card" id="s5">
+  <h2><span class="num">5</span>Component architecture</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TB
+  subgraph IN["Inbound (via api-gateway)"]
+    CHAT["POST /api/v1/assistant/chat"]
+    STREAM["POST /api/v1/assistant/chat/stream (SSE)"]
+    MODELS["GET /api/v1/assistant/models"]
+    CLEAR["DELETE /api/v1/assistant/conversations/{id}"]
+    MCP["/mcp (MCP server)"]
+  end
+
+  subgraph SVC["ai-assistant :8087"]
+    CTRL["AssistantController"]
+    AS["AssistantService"]
+    REG["ChatModelRegistry"]
+    MEM["ConversationMemory (MessageWindowChatMemory)"]
+    RAG["RetrievalAugmentationAdvisor"]
+    VS["SimpleVectorStore (in memory)"]
+    ING["KnowledgeIngestor"]
+    EMB["EmbeddingModel (local ONNX)"]
+    TOOLS["SwiftDropTools (@Tool)"]
+    HELP["HelpArticleTools (@Tool)"]
+    GC["GatewayClient (RestClient, 2s/5s)"]
+    KB[("classpath: knowledge/*.md")]
+  end
+
+  subgraph OUT["Outbound"]
+    GW["api-gateway → parcel, pricing"]
+    LLM[("Groq / OpenAI / Ollama")]
+  end
+
+  CHAT --> CTRL
+  STREAM --> CTRL
+  MODELS --> CTRL
+  CLEAR --> CTRL
+  CTRL --> AS
+  AS --> REG
+  AS --> MEM
+  AS --> RAG
+  RAG --> VS
+  AS --> TOOLS
+  REG --> LLM
+  TOOLS --> GC
+  GC --> GW
+  MCP --> TOOLS
+  MCP --> HELP
+  HELP --> VS
+  ING --> KB
+  ING --> EMB
+  ING --> VS
+  VS --> EMB
+  </pre></div>
+  <ul>
+    <li><strong>One tool layer, two front doors:</strong> <code>SwiftDropTools</code> is registered with the chat client and with the MCP server, so the logic exists once.</li>
+    <li><strong>RAG in chat is an advisor</strong> (always retrieves, deterministic); over MCP it is a tool (<code>search_help_articles</code>) because MCP clients run their own model.</li>
+    <li><strong>No database:</strong> memory and vectors live in memory and are rebuilt on restart. The knowledge base is small and ships in the jar.</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section class="card" id="s6">
+  <h2><span class="num">6</span>API surface</h2>
+  <p>All routes need a valid JWT with one of <code>CUSTOMER</code>, <code>MERCHANT</code>, <code>COURIER</code>, <code>DISPATCHER</code>, <code>ADMIN</code>. Errors are RFC 7807 ProblemDetail from <code>common</code>.</p>
+  <div class="table-scroll"><table>
+    <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Responses</th></tr>
+    <tr><td>POST</td><td><code>/api/v1/assistant/chat</code></td><td>Send a message, get a full reply</td><td>200 · 400 invalid / unknown model · 401 · 403 · 503 LLM unavailable</td></tr>
+    <tr><td>POST</td><td><code>/api/v1/assistant/chat/stream</code></td><td>Same, streamed as SSE events <code>token</code>, <code>done</code>, <code>error</code></td><td>200 text/event-stream · 400 · 401 · 403</td></tr>
+    <tr><td>GET</td><td><code>/api/v1/assistant/models</code></td><td>Enabled model names for a picker (no keys or URLs)</td><td>200 · 401 · 403</td></tr>
+    <tr><td>DELETE</td><td><code>/api/v1/assistant/conversations/{id}</code></td><td>Clear the caller's own conversation memory</td><td>204 · 401 · 403 · 404</td></tr>
+    <tr><td>MCP</td><td><code>/mcp</code></td><td>MCP server: <code>tools/list</code>, <code>tools/call</code></td><td>401 without JWT</td></tr>
+  </table></div>
+  <div class="grid2">
+    <div>
+      <h3>ChatRequest</h3>
+<pre class="code">record ChatRequest(
+  @NotBlank @Size(max = 2000) String message,
+  UUID conversationId,          // null → new conversation
+  @Pattern(regexp = "^[a-z0-9-]{1,32}$")
+  String model                  // null → default (groq)
+) {}</pre>
+    </div>
+    <div>
+      <h3>ChatResponse</h3>
+<pre class="code">record ChatResponse(
+  UUID conversationId,
+  String model,                 // name used, e.g. "groq"
+  String reply,
+  List&lt;String&gt; toolsUsed,       // e.g. ["track_parcel"]
+  List&lt;SourceRef&gt; sources       // help articles used by RAG
+) {}
+record SourceRef(String article, String section) {}</pre>
+    </div>
+  </div>
+<pre class="code">// POST /api/v1/assistant/chat
+{ "message": "Where is SD-7K3Q-9P2M?", "conversationId": null }
+
+// 200
+{ "conversationId": "0b6c…", "model": "groq",
+  "reply": "Parcel SD-7K3Q-9P2M is OUT_FOR_DELIVERY. It left the Kandy hub at 09:15.",
+  "toolsUsed": ["track_parcel"], "sources": [] }</pre>
+</section>
+
+<!-- 7 -->
+<section class="card" id="s7">
+  <h2><span class="num">7</span>Tools (live data)</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Tool</th><th>Arguments</th><th>Calls (through gateway)</th><th>Returns to the model</th></tr>
+    <tr><td><code>track_parcel</code></td><td><code>trackingNo</code> (pattern <code>SD-XXXX-XXXX</code>)</td><td><code>GET /api/v1/track/{trackingNo}</code> (public)</td><td>status, last update time, history (no names or addresses)</td></tr>
+    <tr><td><code>estimate_fee</code></td><td><code>fromZone</code>, <code>toZone</code>, <code>weightKg</code>, <code>size</code></td><td><code>GET /api/v1/pricing/estimate</code></td><td>amount, currency (LKR)</td></tr>
+    <tr><td><code>my_parcels</code></td><td><code>status</code> (optional), <code>limit</code> ≤ 10</td><td><code>GET /api/v1/parcels</code> with caller's JWT</td><td>tracking no, status, created date for each</td></tr>
+    <tr><td><code>search_help_articles</code> <em>(MCP only)</em></td><td><code>query</code></td><td>in-process vector store</td><td>top passages with article + section</td></tr>
+  </table></div>
+  <ul>
+    <li><strong>Read-only.</strong> No tool writes anything.</li>
+    <li><strong>Caller's token</strong> is passed to tools through Spring AI's <code>ToolContext</code>, not a thread-local, so it also works when streaming runs tools on another thread.</li>
+    <li><strong>Tool results are trimmed</strong> to what the model needs. Personal data from parcel responses (recipient name, phone, address) is dropped before it reaches the LLM.</li>
+    <li><strong>Errors become short messages</strong> the model can relay ("No parcel found with that tracking number"), never stack traces. 401/403 from downstream become "you don't have access to that".</li>
+    <li>At most <strong>5 tool calls per request</strong> to stop loops.</li>
+  </ul>
+</section>
+
+<!-- 8 -->
+<section class="card" id="s8">
+  <h2><span class="num">8</span>Knowledge base (RAG)</h2>
+  <div class="grid2">
+    <div>
+      <h3>Ingestion (at startup)</h3>
+      <ol>
+        <li>Read <code>src/main/resources/knowledge/*.md</code>.</li>
+        <li>Split by heading, then <code>TokenTextSplitter</code> (~400 tokens, small overlap).</li>
+        <li>Metadata on each chunk: <code>article</code>, <code>section</code>.</li>
+        <li>Embed with the local ONNX model (<code>spring-ai-transformers</code>, all-MiniLM-L6-v2).</li>
+        <li>Store in <code>SimpleVectorStore</code> (in memory).</li>
+      </ol>
+    </div>
+    <div>
+      <h3>Retrieval (each chat message)</h3>
+      <ol>
+        <li><code>RetrievalAugmentationAdvisor</code> embeds the question.</li>
+        <li>Top-k = 4 passages with similarity ≥ 0.4 (measured with the real model: relevant questions score 0.45–0.66, off-topic about 0.1).</li>
+        <li>Passages are added to the prompt as context.</li>
+        <li>System prompt: answer help questions <em>only</em> from context; if none, say so and suggest support.</li>
+        <li>Articles used are returned in <code>sources</code>.</li>
+      </ol>
+    </div>
+  </div>
+  <h3>Starting articles (written by us, no personal data)</h3>
+  <div class="table-scroll"><table>
+    <tr><th>File</th><th>Covers</th></tr>
+    <tr><td><code>shipping-rules.md</code></td><td>Size classes, weight limits, packaging</td></tr>
+    <tr><td><code>prohibited-items.md</code></td><td>What cannot be sent</td></tr>
+    <tr><td><code>delivery-times-and-zones.md</code></td><td>Zones, typical delivery times (zone list itself comes from pricing)</td></tr>
+    <tr><td><code>fees-explained.md</code></td><td>How the fee is calculated (weight, zone, express)</td></tr>
+    <tr><td><code>failed-delivery.md</code></td><td>What happens on FAILED, re-delivery</td></tr>
+    <tr><td><code>tracking-status-guide.md</code></td><td>Meaning of each status</td></tr>
+    <tr><td><code>merchant-api-faq.md</code></td><td>API keys, webhooks, signature check</td></tr>
+  </table></div>
+  <p class="note">Groq does not appear to host embedding models (checked Oct 2026), so embeddings are separate from the chat model. The local ONNX model needs no key and no new container; an OpenAI-compatible embedding endpoint can be configured instead.</p>
+</section>
+
+<!-- 9 -->
+<section class="card" id="s9">
+  <h2><span class="num">9</span>Model registry</h2>
+  <p>Spring AI 2.0.2 has no Groq starter, but Groq exposes an OpenAI-compatible API. The registry builds one OpenAI-compatible <code>ChatModel</code> (and a <code>ChatClient</code>) per enabled entry. The same mechanism covers OpenAI, OpenRouter and a local Ollama.</p>
+<pre class="code">swiftdrop:
+  ai:
+    default-model: ${AI_DEFAULT_MODEL:groq}
+    models:
+      groq:
+        enabled: true
+        base-url: ${AI_GROQ_BASE_URL:https://api.groq.com/openai/v1}
+        api-key: ${AI_GROQ_API_KEY}                # secret, no default
+        model: ${AI_GROQ_MODEL:openai/gpt-oss-120b}   # llama-3.3-70b-versatile was retired in Aug 2026
+        temperature: 0.2
+      openai:
+        enabled: ${AI_OPENAI_ENABLED:false}
+        base-url: ${AI_OPENAI_BASE_URL:https://api.openai.com}
+        api-key: ${AI_OPENAI_API_KEY:}
+        model: ${AI_OPENAI_MODEL:}
+      ollama:
+        enabled: ${AI_OLLAMA_ENABLED:false}
+        base-url: ${AI_OLLAMA_BASE_URL:http://localhost:11434}
+        model: ${AI_OLLAMA_MODEL:}</pre>
+  <ul>
+    <li>Startup fails fast if the default model is missing, disabled or has no key.</li>
+    <li>A request can name a model; only configured, enabled names are accepted (400 otherwise). Clients can never send a URL or raw model id.</li>
+    <li>Adding Anthropic or Bedrock later = one new provider type in the registry plus its starter; nothing else changes.</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section class="card" id="s10">
+  <h2><span class="num">10</span>Class structure</h2>
+<pre class="code">lk.swiftdrop.ai
+├── chat/
+│   ├── controller/AssistantController
+│   ├── dto/ChatRequest, ChatResponse, SourceRef, ModelSummary
+│   └── service/AssistantService, SystemPrompts
+├── model/
+│   ├── AiModelProperties          (@ConfigurationProperties, validated)
+│   ├── ChatModelRegistry
+│   └── UnknownModelException      (→ 400 via common ValidationException)
+├── memory/ConversationMemory      (key = userId:conversationId)
+├── tools/
+│   ├── SwiftDropTools             (@Tool track_parcel, estimate_fee, my_parcels)
+│   ├── HelpArticleTools           (@Tool search_help_articles, MCP only)
+│   ├── client/GatewayClient       (RestClient, forwards bearer token)
+│   └── dto/TrackingResult, FeeEstimate, ParcelSummary
+├── knowledge/
+│   ├── KnowledgeIngestor          (ApplicationReadyEvent)
+│   └── KnowledgeProperties
+└── config/
+    ├── ChatClientConfig, RagConfig, McpToolConfig, GatewayClientConfig</pre>
+  <div class="diagram"><pre class="mermaid">
+classDiagram
+  class AssistantController {
+    +chat(ChatRequest, Jwt) ChatResponse
+    +stream(ChatRequest, Jwt) Flux~ServerSentEvent~
+    +models() List~ModelSummary~
+    +clear(UUID, Jwt) void
+  }
+  class AssistantService {
+    -ChatModelRegistry registry
+    -ConversationMemory memory
+    -RetrievalAugmentationAdvisor ragAdvisor
+    -SwiftDropTools tools
+    +chat(ChatRequest, Jwt) ChatResponse
+    +stream(ChatRequest, Jwt) Flux~String~
+    +clear(UUID, String userId) void
+  }
+  class ChatModelRegistry {
+    -Map~String, ChatClient~ clients
+    -String defaultName
+    +resolve(String name) ChatClient
+    +enabledModels() List~ModelSummary~
+  }
+  class AiModelProperties {
+    +String defaultModel
+    +Map~String, ModelConfig~ models
+  }
+  class ConversationMemory {
+    -ChatMemory delegate
+    +key(String userId, UUID conversationId) String
+    +clear(String key) void
+  }
+  class SwiftDropTools {
+    -GatewayClient gateway
+    +trackParcel(String trackingNo, ToolContext) TrackingResult
+    +estimateFee(FeeQuery, ToolContext) FeeEstimate
+    +myParcels(String status, int limit, ToolContext) List~ParcelSummary~
+  }
+  class HelpArticleTools {
+    -VectorStore store
+    +searchHelpArticles(String query) List~SourcedPassage~
+  }
+  class GatewayClient {
+    -RestClient restClient
+    +track(String trackingNo) TrackingResult
+    +estimate(FeeQuery, String token) FeeEstimate
+    +myParcels(String token, String status, int limit) List~ParcelSummary~
+  }
+  class KnowledgeIngestor {
+    -VectorStore store
+    -KnowledgeProperties props
+    +onReady() void
+  }
+  class VectorStore {
+    &lt;&lt;interface&gt;&gt;
+  }
+  class SimpleVectorStore
+  class EmbeddingModel {
+    &lt;&lt;interface&gt;&gt;
+  }
+  class TransformersEmbeddingModel
+
+  AssistantController --> AssistantService
+  AssistantService --> ChatModelRegistry
+  AssistantService --> ConversationMemory
+  AssistantService --> SwiftDropTools
+  ChatModelRegistry --> AiModelProperties
+  SwiftDropTools --> GatewayClient
+  HelpArticleTools --> VectorStore
+  KnowledgeIngestor --> VectorStore
+  VectorStore <|.. SimpleVectorStore
+  SimpleVectorStore --> EmbeddingModel
+  EmbeddingModel <|.. TransformersEmbeddingModel
+  </pre></div>
+</section>
+
+<!-- 11 -->
+<section class="card" id="s11">
+  <h2><span class="num">11</span>Sequence diagrams</h2>
+
+  <h3>11.1 Chat question answered with a tool (track a parcel)</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant GW as api-gateway
+  participant AC as AssistantController
+  participant AS as AssistantService
+  participant REG as ChatModelRegistry
+  participant MEM as ConversationMemory
+  participant RAG as RAG advisor
+  participant LLM as Groq
+  participant T as SwiftDropTools
+  participant PS as parcel-service
+
+  User->>GW: POST /api/v1/assistant/chat + JWT
+  GW->>AC: forward (JWT verified)
+  AC->>AS: chat(request, jwt)
+  AS->>REG: resolve(model or default)
+  alt unknown or disabled model
+    REG-->>AC: UnknownModelException
+    AC-->>User: 400 ProblemDetail
+  else model found
+    AS->>MEM: load history (userId:conversationId)
+    AS->>RAG: retrieve passages for message
+    RAG-->>AS: 0 passages (below threshold)
+    AS->>LLM: system + history + message + tool definitions
+    LLM-->>AS: tool call track_parcel(SD-7K3Q-9P2M)
+    AS->>T: trackParcel(no, ToolContext with token)
+    T->>GW: GET /api/v1/track/SD-7K3Q-9P2M
+    GW->>PS: route
+    PS-->>T: status + history
+    T-->>AS: TrackingResult (no PII)
+    AS->>LLM: tool result
+    LLM-->>AS: final answer text
+    AS->>MEM: save user + assistant messages
+    AS-->>AC: ChatResponse(toolsUsed = track_parcel)
+    AC-->>User: 200
+  end
+  </pre></div>
+
+  <h3>11.2 Help question answered with RAG</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant AS as AssistantService
+  participant RAG as RetrievalAugmentationAdvisor
+  participant EMB as EmbeddingModel (ONNX)
+  participant VS as SimpleVectorStore
+  participant LLM as Groq
+
+  User->>AS: "Can I send perfume?"
+  AS->>RAG: before call
+  RAG->>EMB: embed(question)
+  EMB-->>RAG: vector
+  RAG->>VS: similaritySearch(topK 4, threshold 0.4)
+  alt passages found
+    VS-->>RAG: prohibited-items.md / Flammable liquids, ...
+    RAG->>LLM: prompt + context passages
+    LLM-->>AS: answer based on context
+    AS-->>User: reply + sources [prohibited-items.md]
+  else nothing relevant
+    VS-->>RAG: empty
+    RAG->>LLM: prompt with empty context
+    LLM-->>AS: "I don't have that information, please contact support"
+    AS-->>User: reply, sources []
+  end
+  </pre></div>
+
+  <h3>11.3 Knowledge ingestion at startup</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  participant APP as Spring Boot
+  participant ING as KnowledgeIngestor
+  participant FS as classpath knowledge/*.md
+  participant SPL as TokenTextSplitter
+  participant EMB as EmbeddingModel (ONNX)
+  participant VS as SimpleVectorStore
+
+  APP->>ING: ApplicationReadyEvent
+  ING->>FS: read all .md files
+  FS-->>ING: documents
+  ING->>SPL: split by heading and size
+  SPL-->>ING: chunks + metadata (article, section)
+  ING->>EMB: embed chunks (batched)
+  EMB-->>ING: vectors
+  ING->>VS: add(documents)
+  ING->>APP: log "Loaded N chunks from M articles"
+  Note over ING,VS: Health stays DOWN (readiness) until loading finishes
+  </pre></div>
+
+  <h3>11.4 External MCP client calls a tool</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor Dev as MCP client (Claude Desktop, Cursor)
+  participant GW as api-gateway
+  participant MCP as MCP server (/mcp)
+  participant T as SwiftDropTools
+  participant PR as pricing-service
+
+  Dev->>GW: initialize (Authorization: Bearer JWT)
+  GW->>MCP: forward
+  MCP-->>Dev: server info + capabilities
+  Dev->>MCP: tools/list
+  MCP-->>Dev: track_parcel, estimate_fee, my_parcels, search_help_articles
+  Dev->>MCP: tools/call estimate_fee(Colombo, Kandy, 2.0, SMALL)
+  MCP->>T: estimateFee(..., ToolContext with token)
+  T->>GW: GET /api/v1/pricing/estimate?...
+  GW->>PR: route
+  PR-->>T: 1250.00 LKR
+  T-->>MCP: FeeEstimate
+  MCP-->>Dev: tool result (the client's own LLM writes the answer)
+  </pre></div>
+
+  <h3>11.5 Streaming reply, and LLM failure</h3>
+  <div class="diagram"><pre class="mermaid">
+sequenceDiagram
+  actor User
+  participant AC as AssistantController
+  participant AS as AssistantService
+  participant LLM as Groq
+
+  User->>AC: POST /api/v1/assistant/chat/stream + JWT
+  AC->>AS: stream(request, jwt)
+  AS->>LLM: streaming completion
+  alt provider responds
+    loop each chunk
+      LLM-->>AS: token
+      AS-->>User: event: token
+    end
+    AS-->>User: event: done (conversationId, toolsUsed, sources)
+  else timeout or 5xx from provider
+    LLM--xAS: error
+    AS-->>User: event: error (ProblemDetail 503, generic message)
+  end
+  </pre></div>
+</section>
+
+<!-- 12 -->
+<section class="card" id="s12">
+  <h2><span class="num">12</span>Activity flow — one chat request</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart TD
+  A(["Chat request arrives"]) --> B{"Valid JWT and role?"}
+  B -- "No" --> B1(["401 / 403"])
+  B -- "Yes" --> C{"Body valid?"}
+  C -- "No" --> C1(["400 with field errors"])
+  C -- "Yes" --> D{"Model name known and enabled?"}
+  D -- "No" --> D1(["400 unknown model"])
+  D -- "Yes" --> E["Load memory for userId:conversationId"]
+  E --> F["Retrieve help passages (RAG)"]
+  F --> G["Call LLM with system prompt, history, context, tools"]
+  G --> H{"Model asks for a tool?"}
+  H -- "Yes" --> I{"Tool calls so far under 5?"}
+  I -- "No" --> I1["Stop tools, ask model to answer with what it has"]
+  I1 --> G
+  I -- "Yes" --> J["Run tool via gateway with caller's token"]
+  J --> K["Trim result, drop PII"]
+  K --> G
+  H -- "No" --> L["Save messages to memory"]
+  L --> M(["200 ChatResponse"])
+  G -. "timeout or provider error" .-> N(["503 ProblemDetail"])
+  </pre></div>
+</section>
+
+<!-- 13 -->
+<section class="card" id="s13">
+  <h2><span class="num">13</span>State machines</h2>
+  <div class="grid2">
+    <div>
+      <h3>Conversation</h3>
+      <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --> New : first message, no conversationId
+  New --> Active : reply saved
+  Active --> Active : next message
+  Active --> Trimmed : over 20 messages
+  Trimmed --> Active : oldest messages dropped
+  Active --> Cleared : DELETE conversation
+  Active --> Expired : idle 30 min or restart
+  Cleared --> [*]
+  Expired --> [*]
+      </pre></div>
+    </div>
+    <div>
+      <h3>Tool call (within one request)</h3>
+      <div class="diagram"><pre class="mermaid">
+stateDiagram-v2
+  [*] --> Requested : model emits tool call
+  Requested --> Rejected : limit reached or bad arguments
+  Requested --> Executing
+  Executing --> Succeeded : 2xx from gateway
+  Executing --> Failed : 4xx, 5xx or timeout
+  Succeeded --> ReturnedToModel
+  Failed --> ReturnedToModel : short error text
+  Rejected --> ReturnedToModel
+  ReturnedToModel --> [*]
+      </pre></div>
+    </div>
+  </div>
+</section>
+
+<!-- 14 -->
+<section class="card" id="s14">
+  <h2><span class="num">14</span>Security &amp; privacy</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Concern</th><th>Decision</th></tr>
+    <tr><td>Authentication</td><td>JWT verified by <code>common</code>'s auto-configuration (JWKS from auth-service). Applies to chat endpoints and <code>/mcp</code>.</td></tr>
+    <tr><td>Authorization</td><td><code>@PreAuthorize</code> requires a SwiftDrop role. Data access is enforced downstream because tools forward the caller's JWT; the assistant never uses a service token for user data.</td></tr>
+    <tr><td>Conversation isolation</td><td>Memory key is <code>userId:conversationId</code>; another user's conversationId simply finds nothing.</td></tr>
+    <tr><td>Prompt injection</td><td>Read-only tools, a narrow system prompt, tool arguments validated (tracking-number pattern, weight &gt; 0, limit ≤ 10), tool output treated as data.</td></tr>
+    <tr><td>PII to the LLM</td><td>Tool results drop recipient name, phone and address before reaching the provider. Help articles contain no personal data.</td></tr>
+    <tr><td>Logs</td><td>No prompts, replies or tool payloads in logs. Log model name, tools used, latency and token counts only. <code>PiiMasker</code> from <code>common</code> as a safety net.</td></tr>
+    <tr><td>Secrets</td><td>Provider keys from environment variables only; never returned by <code>/models</code>.</td></tr>
+    <tr><td>Abuse and cost</td><td>Message max 2000 chars, memory window 20, max 5 tool calls, provider timeout; per-user rate limit on <code>/api/v1/assistant/**</code> in the gateway (Role 1).</td></tr>
+  </table></div>
+</section>
+
+<!-- 15 -->
+<section class="card" id="s15">
+  <h2><span class="num">15</span>Deployment</h2>
+  <div class="diagram"><pre class="mermaid">
+flowchart LR
+  subgraph Compose["Docker Compose / Kubernetes namespace"]
+    GW["api-gateway :8080"]
+    AI["ai-assistant :8087 (knowledge + ONNX model in image)"]
+    AUTH["auth-service :8081"]
+    PS["parcel-service :8083"]
+    PR["pricing-service :8082"]
+    SEC[/"env / Secret: AI_GROQ_API_KEY"/]
+  end
+  NET[("Internet: api.groq.com")]
+  GW --> AI
+  AI -- "http://api-gateway:8080" --> GW
+  AI -- "JWKS" --> AUTH
+  GW --> PS
+  GW --> PR
+  SEC -.-> AI
+  AI -- "HTTPS" --> NET
+  </pre></div>
+  <ul>
+    <li>Compose already defines <code>ai-assistant</code> (depends on auth-service, health check on <code>/actuator/health</code>).</li>
+    <li>The ONNX embedding model is downloaded once at image build and baked in, so startup needs no extra download.</li>
+    <li>Readiness probe stays DOWN until the knowledge base is loaded.</li>
+    <li>Kubernetes: one Deployment + ClusterIP Service, key in a Secret, gateway route for <code>/api/v1/assistant/**</code> and <code>/mcp</code>; SSE needs <code>proxy-buffering: off</code> (already planned for tracking).</li>
+  </ul>
+</section>
+
+<!-- 16 -->
+<section class="card" id="s16">
+  <h2><span class="num">16</span>Configuration</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Env var</th><th>Default</th><th>Notes</th></tr>
+    <tr><td><code>GATEWAY_URL</code></td><td><code>http://localhost:8080</code></td><td><code>http://api-gateway:8080</code> in Docker</td></tr>
+    <tr><td><code>JWT_JWK_SET_URI</code></td><td><code>http://localhost:8081/.well-known/jwks.json</code></td><td>Already set</td></tr>
+    <tr><td><code>AI_DEFAULT_MODEL</code></td><td><code>groq</code></td><td>Name of a configured model</td></tr>
+    <tr><td><code>AI_GROQ_API_KEY</code></td><td><em>none (required)</em></td><td>Secret</td></tr>
+    <tr><td><code>AI_GROQ_BASE_URL</code></td><td><code>https://api.groq.com/openai/v1</code></td><td></td></tr>
+    <tr><td><code>AI_GROQ_MODEL</code></td><td><code>openai/gpt-oss-120b</code></td><td>Groq retired llama-3.3-70b-versatile in Aug 2026</td></tr>
+    <tr><td><code>AI_OPENAI_ENABLED</code> / <code>_API_KEY</code> / <code>_MODEL</code> / <code>_BASE_URL</code></td><td><code>false</code></td><td>Optional second model</td></tr>
+    <tr><td><code>AI_OLLAMA_ENABLED</code> / <code>_MODEL</code> / <code>_BASE_URL</code></td><td><code>false</code></td><td>Optional local model</td></tr>
+    <tr><td><code>AI_EMBEDDING_PROVIDER</code></td><td><code>local</code></td><td><code>local</code> (ONNX) or <code>openai</code></td></tr>
+    <tr><td><code>AI_RAG_TOP_K</code> / <code>AI_RAG_SIMILARITY_THRESHOLD</code></td><td><code>4</code> / <code>0.4</code></td><td></td></tr>
+    <tr><td><code>AI_MEMORY_MAX_MESSAGES</code></td><td><code>20</code></td><td></td></tr>
+    <tr><td><code>AI_CHAT_TIMEOUT</code></td><td><code>30s</code></td><td>Provider call timeout</td></tr>
+  </table></div>
+  <p class="note">Replaces the current placeholders <code>LLM_API_KEY</code> and <code>SPRING_AI_OPENAI_API_KEY</code> in <code>deploy/compose/.env.example</code>; Helm values updated in the same change.</p>
+</section>
+
+<!-- 17 -->
+<section class="card" id="s17">
+  <h2><span class="num">17</span>Testing strategy</h2>
+  <p>No real LLM in CI: the <code>ChatModel</code> is mocked and the gateway is WireMock. Coverage ≥ 70% (JaCoCo).</p>
+  <div class="table-scroll"><table>
+    <tr><th>Level</th><th>Class</th><th>What</th></tr>
+    <tr><td>Unit</td><td><code>SwiftDropToolsTest</code></td><td>Arguments validated, PII dropped, errors turned into short messages</td></tr>
+    <tr><td>Unit</td><td><code>ChatModelRegistryTest</code></td><td>Default resolved, unknown name rejected, startup fails without key</td></tr>
+    <tr><td>Unit</td><td><code>ConversationMemoryTest</code></td><td>Keys scoped per user, window trimmed</td></tr>
+    <tr><td>Web</td><td><code>AssistantControllerTest</code></td><td>200, 400 (blank message, bad model), 401, 403 (no SwiftDrop role)</td></tr>
+    <tr><td>Integration</td><td><code>GatewayClientIT</code></td><td>WireMock gateway: token forwarded, timeouts, 404/403 mapping</td></tr>
+    <tr><td>Integration</td><td><code>KnowledgeIngestionIT</code></td><td>Articles load, a known question retrieves the right article</td></tr>
+    <tr><td>Integration</td><td><code>McpServerIT</code></td><td><code>tools/list</code> returns 4 tools, <code>/mcp</code> rejects missing JWT</td></tr>
+    <tr><td>Integration</td><td><code>ChatToolCallingIT</code></td><td>Scripted mock model requests <code>track_parcel</code>; reply and <code>toolsUsed</code> correct</td></tr>
+    <tr><td>Manual eval</td><td><code>eval/questions.md</code></td><td>~20 questions with expected tool or article, run against real Groq before a demo</td></tr>
+  </table></div>
+  <p>Example names: <code>customerCannotReadAnotherUsersConversation()</code>, <code>unknownModelNameReturns400()</code>, <code>trackParcelDropsRecipientPhone()</code>, <code>helpQuestionCitesProhibitedItemsArticle()</code>.</p>
+</section>
+
+<!-- 18 -->
+<section class="card" id="s18">
+  <h2><span class="num">18</span>Design decisions</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Decision</th><th>Why</th><th>Alternative rejected</th></tr>
+    <tr><td>LLM + tools + RAG</td><td>Tools for live data, RAG for static knowledge; each grounds a different question type</td><td>Raw LLM (hallucinates); rule bot (rigid)</td></tr>
+    <tr><td>Tools call the gateway with the user's JWT</td><td>Reuses existing auth and ownership rules; no duplicated checks</td><td>Service token + own checks (duplicates rules, risk of leaks)</td></tr>
+    <tr><td>One tool class for chat and MCP</td><td>DRY; both contracts in <code>architecture.md</code> met</td><td>Separate MCP and chat implementations</td></tr>
+    <tr><td>Groq default via OpenAI-compatible client</td><td>Fast, low cost, OpenAI-compatible API; no extra dependency for other compatible providers</td><td>Single hard-coded provider; AWS Bedrock as default (AWS setup, demo risk)</td></tr>
+    <tr><td>RAG as advisor in chat, tool over MCP</td><td>Advisor always grounds chat answers; MCP clients choose for themselves</td><td>RAG only as a tool (small models may skip it)</td></tr>
+    <tr><td>Local ONNX embeddings</td><td>Groq has no embeddings; no key, no container, works offline</td><td>OpenAI embeddings (second paid key) — kept as an option</td></tr>
+    <tr><td>In-memory <code>SimpleVectorStore</code></td><td>Small knowledge base rebuilt in seconds; fits "no database" rule</td><td>pgvector (new DB for this service, needs an ADR)</td></tr>
+    <tr><td>In-memory chat memory</td><td>No database; conversations are short-lived</td><td>Redis/JDBC memory (more infrastructure)</td></tr>
+    <tr><td>SSE for streaming</td><td>Same technique already used for tracking; works through gateway and ingress</td><td>WebSockets (two-way not needed)</td></tr>
+  </table></div>
+  <p>These go into <code>docs/decisions.md</code> as ADR-012 (assistant approach, Groq default) when the first PR lands.</p>
+</section>
+
+<!-- 19 -->
+<section class="card" id="s19">
+  <h2><span class="num">19</span>Delivery plan</h2>
+  <div class="table-scroll"><table>
+    <tr><th>#</th><th>Slice</th><th>Contents</th></tr>
+    <tr><td>1</td><td><code>feat(ai): add gateway client and SwiftDrop tools</code></td><td>GatewayClient, DTOs, <code>SwiftDropTools</code>, WireMock tests</td></tr>
+    <tr><td>2</td><td><code>feat(ai): expose tools over MCP</code></td><td>MCP config, JWT on <code>/mcp</code>, <code>McpServerIT</code></td></tr>
+    <tr><td>3</td><td><code>feat(ai): add configurable chat model registry</code></td><td><code>AiModelProperties</code>, <code>ChatModelRegistry</code>, Groq default</td></tr>
+    <tr><td>4</td><td><code>feat(ai): add assistant chat and models endpoints</code></td><td>Controller, service, memory, system prompt, MockMvc tests</td></tr>
+    <tr><td>5</td><td><code>feat(ai): add help knowledge base with RAG</code></td><td>Articles, ingestor, ONNX embeddings, advisor, <code>search_help_articles</code></td></tr>
+    <tr><td>6</td><td><code>feat(ai): stream assistant replies over SSE</code></td><td>Stream endpoint, error events</td></tr>
+    <tr><td>7</td><td><code>docs(ai): document ai-assistant and add ADR-012</code></td><td><code>architecture.md</code> table, env and Helm values</td></tr>
+  </table></div>
+  <p><strong>Outside this module (flag in PRs):</strong> gateway routes and rate limit for <code>/api/v1/assistant/**</code> and <code>/mcp</code> (Role 1); <code>.env.example</code> and Helm values (Role 8). New dependencies to note: <code>spring-ai-starter-model-openai</code>, <code>spring-ai-rag</code>, <code>spring-ai-vector-store</code>, <code>spring-ai-transformers</code>, WireMock (test).</p>
+</section>
+
+<!-- 20 -->
+<section class="card" id="s20">
+  <h2><span class="num">20</span>Risks &amp; open questions</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Item</th><th>Impact</th><th>Mitigation / question</th></tr>
+    <tr><td>Downstream APIs not built yet</td><td>Tools can't be tested end to end</td><td>Build to the documented contract with WireMock; confirm response shapes with Roles 3 and 1</td></tr>
+    <tr><td>Groq free-tier rate limits and model changes</td><td>Demo failures</td><td>Model id in config; a second model enabled for the demo; clear 503 message</td></tr>
+    <tr><td>Small models choosing tools poorly</td><td>Wrong or missing tool calls</td><td>Clear tool descriptions, low temperature, eval questions before demo</td></tr>
+    <tr><td>ONNX runtime adds image size (~100 MB+)</td><td>Bigger image, slower build</td><td>Acceptable; alternative is an OpenAI-compatible embedding endpoint</td></tr>
+    <tr><td>Spring AI RAG module marked experimental</td><td>API may change between minors</td><td>Version pinned in root <code>pom.xml</code>; thin wrapper in <code>RagConfig</code></td></tr>
+    <tr><td>Passing the JWT to MCP tool calls</td><td>Tools need the caller's token over MCP too</td><td>Verify how Spring AI 2.0's MCP server exposes the request to <code>ToolContext</code> in slice 2</td></tr>
+    <tr><td>Open: chat on the public tracking page (no login)?</td><td>Wider reach, more abuse risk</td><td>Default: signed-in only. Could allow anonymous with <code>track_parcel</code> + help only, strict rate limit</td></tr>
+  </table></div>
+</section>
+
+<footer>Owner: Role 9 (Devmith). Related: <a href="architecture.md">architecture.md</a> · <a href="conventions.md">conventions.md</a> · <a href="decisions.md">decisions.md</a> · <a href="diagrams/architecture-overview.html">architecture-overview.html</a>. Diagrams are Mermaid source rendered in the browser; paste any block into mermaid.live to export PNG/SVG for the design PDF.</footer>
+
+</div>
+
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "strict",
+  fontFamily: "IBM Plex Sans, system-ui, sans-serif", flowchart: { htmlLabels: true, curve: "basis" } });
+</script>
+</body>
+</html>

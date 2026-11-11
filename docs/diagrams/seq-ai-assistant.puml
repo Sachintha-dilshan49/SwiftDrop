@@ -1,0 +1,172 @@
+@startuml seq-ai-assistant
+' SwiftDrop AI Assistant - UML Sequence Diagram (Role 9)
+' Three flows in one diagram:
+'   1. Chat question answered with a tool (track a parcel)
+'   2. Help question answered from the knowledge base (RAG)
+'   3. External MCP client uses SwiftDrop tools
+' Render: plantuml -tpng -tsvg seq-ai-assistant.puml
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam ArrowColor #3B4A5E
+skinparam sequence {
+  ParticipantBackgroundColor #EEF3FF
+  ParticipantBorderColor #2350C8
+  ParticipantFontStyle bold
+  ActorBorderColor #2350C8
+  ActorBackgroundColor #FFFFFF
+  LifeLineBorderColor #A9B3C1
+  LifeLineBackgroundColor #DCE5FA
+  BoxBorderColor #A9B3C1
+  BoxFontStyle bold
+  GroupBorderColor #B86E00
+  GroupHeaderFontColor #B86E00
+  DividerBackgroundColor #E6EEFB
+  DividerBorderColor #2350C8
+  DividerFontStyle bold
+  MessageAlign left
+}
+skinparam note {
+  BackgroundColor #FFF6E6
+  BorderColor #E0A447
+  FontSize 11
+}
+
+title SwiftDrop AI Assistant - Sequence Diagram
+
+box "Clients" #FAFBFC
+  actor "Customer" as U
+  actor "MCP Client" as M
+end box
+
+box "Edge" #F3F6FB
+  participant "api-gateway" as GW
+end box
+
+box "AI Assistant  (ai-assistant :8087)" #F5F8FF
+  participant "MCP Server\n(/mcp)" as MCP
+  participant "Assistant\nController" as AC
+  participant "Assistant\nService" as AS
+  participant "SwiftDrop\nTools" as T
+  participant "Embedding\nModel (ONNX)" as EM
+  participant "Chat Memory\n(in memory)" as MEM
+  participant "Vector Store\n(in memory)" as VS
+end box
+
+box "SwiftDrop Services" #F2F9F5
+  participant "parcel-service" as PS
+  participant "pricing-service" as PR
+end box
+
+box "External" #FFF8EC
+  participant "LLM Provider\n(Groq)" as LLM
+end box
+
+' ─────────────────────────────────────────────────────────────
+== Flow 1: Chat question answered with a tool (track a parcel) ==
+autonumber 1 "<b>'1.'0"
+
+U -> GW ++ : POST /api/v1/assistant/chat\n{ message: "Where is SD-7K3Q-9P2M?" } + JWT
+GW -> AC ++ : forward (JWT verified)
+AC -> AS ++ : chat(request, jwt)
+
+alt model unknown or disabled
+  AS --> AC : UnknownModelException
+  AC --> GW : 400 ProblemDetail
+  GW --> U : 400 Bad Request
+else model resolved (default: groq)
+  AS -> MEM : load last 20 messages (userId:conversationId)
+  MEM --> AS : history
+  AS -> EM : embed(question)
+  EM --> AS : vector[384]
+  AS -> VS : similarity search (top 4, >= 0.4)
+  VS --> AS : no relevant passages
+  AS -> LLM : prompt + history + tool definitions
+  LLM --> AS : tool call track_parcel("SD-7K3Q-9P2M")
+  AS -> T ++ : trackParcel(trackingNo, ToolContext[JWT])
+  T -> GW : GET /api/v1/track/SD-7K3Q-9P2M + JWT
+  GW -> PS ++ : route
+  PS --> GW -- : 200 { status, history }
+  GW --> T : 200
+  T --> AS -- : TrackingResult (personal data removed)
+  AS -> LLM : tool result
+  alt provider responds in time
+    LLM --> AS : final answer
+    AS -> MEM : save question + reply
+    AS --> AC : ChatResponse(toolsUsed = [track_parcel])
+    AC --> GW : 200 OK
+    GW --> U : 200 "Your parcel is OUT_FOR_DELIVERY..."
+  else timeout or provider error
+    LLM --> AS : error
+    AS --> AC : AssistantUnavailableException
+    AC --> GW : 503 ProblemDetail
+    GW --> U : 503 Service Unavailable
+  end
+end
+deactivate AS
+deactivate AC
+deactivate GW
+
+' ─────────────────────────────────────────────────────────────
+== Flow 2: Help question answered from the knowledge base (RAG) ==
+autonumber 1 "<b>'2.'0"
+
+U -> GW ++ : POST /api/v1/assistant/chat\n{ message: "Can I send perfume?" } + JWT
+GW -> AC ++ : forward (JWT verified)
+AC -> AS ++ : chat(request, jwt)
+AS -> MEM : load conversation history
+MEM --> AS : history
+AS -> EM : embed(question)
+EM --> AS : vector[384]
+AS -> VS : cosine similarity search (top 4, >= 0.4)
+
+alt relevant passages found
+  VS --> AS : passages from prohibited-items.md
+  AS -> LLM : prompt + passages as context
+  LLM --> AS : answer grounded in the passages
+  AS -> MEM : save question + reply
+  AS --> AC : ChatResponse(sources = [prohibited-items.md])
+else nothing relevant
+  VS --> AS : empty result
+  AS -> LLM : prompt with no context
+  LLM --> AS : "I don't have that information, please contact support"
+  AS -> MEM : save question + reply
+  AS --> AC : ChatResponse(sources = [])
+end
+deactivate AS
+AC --> GW -- : 200 OK
+GW --> U -- : 200 reply (+ sources)
+
+' ─────────────────────────────────────────────────────────────
+== Flow 3: External MCP client uses SwiftDrop tools ==
+autonumber 1 "<b>'3.'0"
+
+M -> GW ++ : POST /mcp  initialize + JWT
+GW -> MCP ++ : forward (JWT verified)
+MCP --> GW -- : server info + capabilities
+GW --> M -- : 200
+
+M -> GW ++ : tools/list
+GW -> MCP ++ : forward
+MCP --> GW -- : track_parcel, estimate_fee,\nmy_parcels, search_help_articles
+GW --> M -- : tool list
+
+M -> GW ++ : tools/call estimate_fee\n(Colombo, Kandy, 2.0 kg, SMALL)
+GW -> MCP ++ : forward
+MCP -> T ++ : estimateFee(query, ToolContext[JWT])
+T -> GW : GET /api/v1/pricing/estimate?... + JWT
+GW -> PR ++ : route
+PR --> GW -- : 200 { amount: 1250.00, currency: LKR }
+GW --> T : 200
+T --> MCP -- : FeeEstimate
+MCP --> GW -- : tool result
+GW --> M -- : tool result
+
+note over M
+  The MCP client's own LLM writes the final
+  answer. No LLM call on SwiftDrop's side.
+end note
+
+@enduml

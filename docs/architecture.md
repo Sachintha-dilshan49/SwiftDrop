@@ -154,7 +154,7 @@ All public routes are prefixed `/api/v1` and go through the gateway. The excepti
 | dispatch | `GET /dispatch/unassigned` · `POST /dispatch/assignments` · `GET /dispatch/workload` · `GET /reports/daily?from&to` · `GET /courier/deliveries/today` · `GET /courier/deliveries/{id}` (own only) · `POST /courier/deliveries/{id}/status` (multipart, optional photo) |
 | merchant | `POST /merchants/register` · `GET /merchants/me` · `GET /admin/merchants?status=PENDING` · `PATCH /admin/merchants/{id}/approve` · `PATCH /admin/merchants/{id}/reject` · `POST, GET /merchants/me/api-keys` · `DELETE /merchants/me/api-keys/{id}` · `GET, PUT /merchants/me/webhook` · `POST /merchant-api/orders` (X-API-Key, full path `/api/v1/merchant-api/orders`) · `GET /merchants/me/orders` · `GET /merchants/me/orders/{id}` · internal `GET /internal/merchants/{id}/webhook` |
 | notification | `GET /admin/webhook-deliveries` · `POST /admin/webhook-deliveries/{id}/replay` |
-| ai-assistant | `POST /assistant/chat` · MCP endpoint `/mcp` (tools: `track_parcel`, `estimate_fee`, `my_parcels`) |
+| ai-assistant | `POST /assistant/chat` · `POST /assistant/chat/stream` (SSE) · `GET /assistant/models` · `DELETE /assistant/conversations/{id}` · MCP endpoint `/mcp` (tools: `track_parcel`, `estimate_fee`, `my_parcels`, `search_help_articles`) |
 
 Each service publishes its OpenAPI spec at `/v3/api-docs`; the gateway aggregates them in Swagger UI.
 
