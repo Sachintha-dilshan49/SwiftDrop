@@ -105,3 +105,18 @@ Supersedes ADR-007 (the version line only; the rest of ADR-007 still applies).
 **Decision.** `auth_db` holds identity only (users, roles, user roles, refresh tokens, Google accounts, one-time login codes); merchant details live in `merchant_db`, courier details in `dispatch_db`, and the two profile tables are removed in a later auth migration. `GET /api/v1/pricing/estimate` is public for guests and the AI assistant, rate-limited per client at the gateway; booking still needs a login. The gateway forwards `/oauth2/**` and `/login/oauth2/**` to auth-service unchanged, so Spring's default redirect URI works. The merchant order path is `/api/v1/merchant-api/orders`.
 
 **Consequences.** Each fact has one owning service (ADR-008). Guests can price a delivery before signing up. The OAuth paths are the only public routes without the `/api/v1` prefix. Follow-up work: an auth migration to drop the profile tables, the gateway routes, and the merchant controller path.
+
+## ADR-012 · Frontend without extra libraries · Accepted · 2026-11-11
+
+**Context.** The docs planned Tailwind, React Router, TanStack Query, react-hook-form + zod and Recharts for the frontend. The screens built so far use none of them, and the deadline is 15 November. Adopting them now would mean learning them and migrating the existing screens in the last days of the project.
+
+**Decision.** The frontend uses React 18, Vite and TypeScript (strict) only.
+
+- Data fetching: `fetch` through the clients in `src/api/`, with `useState`/`useEffect` in the component or a shared hook.
+- Forms: controlled inputs and hand-written validation that mirrors the backend Bean Validation rules.
+- Styling: plain CSS files per feature, with the `:root` variables in `src/style.css` as design tokens.
+- Routing: one small in-house router in `src/routes/`, with role guards and 403 and 404 pages.
+- ESLint and Prettier are allowed as dev tools only.
+- Any new runtime dependency needs a new ADR.
+
+**Consequences.** Less to learn and nothing to migrate. More hand-written code for routing, caching and validation; it lives in shared modules (`src/routes/`, `src/api/`, `src/hooks/`, `src/lib/`) so each piece is written once.
