@@ -18,6 +18,7 @@ import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.StatObjectArgs;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
@@ -85,9 +86,20 @@ class CourierStatusUpdateIT {
         registry.add("swiftdrop.services.parcel-url", parcelService::baseUrl);
     }
 
+    // MinIO answers its health check a moment before it accepts S3 calls, so the first call may be dropped
     @BeforeAll
     static void createBucket() throws Exception {
-        storageClient().makeBucket(MakeBucketArgs.builder().bucket(BUCKET).build());
+        for (int attempt = 1; ; attempt++) {
+            try {
+                storageClient().makeBucket(MakeBucketArgs.builder().bucket(BUCKET).build());
+                return;
+            } catch (IOException e) {
+                if (attempt == 10) {
+                    throw e;
+                }
+                Thread.sleep(500);
+            }
+        }
     }
 
     @Autowired
@@ -113,7 +125,8 @@ class CourierStatusUpdateIT {
                         .param("status", "DELIVERED").param("recipientName", "Nimali")
                         .with(signedInAs(courier)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"));
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.parcelStatus").value("DELIVERED"));
 
         List<DeliveryProof> proofs = deliveryProofRepository.findByAssignmentId(assignment.getId());
         assertThat(proofs).hasSize(1);

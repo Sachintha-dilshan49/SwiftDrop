@@ -1,0 +1,230 @@
+/* Dispatcher screens, after the Figma Admin pages (Users, Platform overview).
+   Mobile first; colours from the :root variables in src/style.css. */
+
+.dispatch { display: grid; gap: 16px; }
+
+.dispatch-tabs {
+  display: inline-flex;
+  justify-self: start;
+  max-width: 100%;
+  gap: 2px;
+  padding: 4px;
+  overflow-x: auto;
+  background: #eef1f5;
+  border-radius: 12px;
+}
+
+.dispatch-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  color: #4d5a6e;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dispatch-tab[aria-selected="true"] {
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 1px 2px rgb(23 36 59 / 10%);
+}
+
+.dispatch-card {
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.dispatch-card-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dispatch-card-heading h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.dispatch-card-heading > span { color: var(--muted); font-size: 12px; }
+
+.dispatch-note { margin: 8px 0; color: var(--muted); font-size: 13px; }
+.dispatch .alert { font-size: 13px; }
+
+.dispatch-success {
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  color: #1f6b3a;
+  background: #e8f6ed;
+  border: 1px solid #c8ead3;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.dispatch-empty h2 { margin: 0 0 6px; font-size: 17px; }
+.dispatch-empty p { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* Table: stacked cards on phones, a real table from 760px. */
+.dispatch-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dispatch-table thead { display: none; }
+.dispatch-table tbody { display: grid; gap: 10px; }
+
+.dispatch-table tr {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.dispatch-table td { display: flex; justify-content: space-between; gap: 12px; padding: 0; }
+
+.dispatch-table td[data-label]::before {
+  content: attr(data-label);
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.dispatch-number { font-variant-numeric: tabular-nums; }
+
+.dispatch-tracking {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+
+.dispatch-route { display: grid; gap: 3px; text-align: right; overflow-wrap: anywhere; }
+.dispatch-route span { display: inline-flex; align-items: center; justify-content: flex-end; gap: 7px; }
+
+.dispatch-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; }
+.dispatch-dot-pickup { background: var(--orange); }
+.dispatch-dot-dropoff { background: var(--ink); }
+
+.dispatch-action { justify-content: flex-end; }
+
+.dispatch-courier { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; }
+
+.dispatch-avatar {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: #4d5a6e;
+  background: #eef1f5;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dispatch-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.dispatch-pill::before { content: ""; width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+.dispatch-pill-available { color: #1f6b3a; background: #e8f6ed; }
+.dispatch-pill-busy { color: #8a4b0f; background: #fff1df; }
+.dispatch-pill-offline { color: #5d6878; background: #eef1f5; }
+
+.dispatch-button,
+.dispatch-button-outline {
+  min-height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dispatch-button { color: white; background: var(--orange); border: 1px solid var(--orange); }
+.dispatch-button:hover:not(:disabled) { background: var(--orange-dark); }
+.dispatch-button-outline { color: var(--ink); background: white; border: 1px solid var(--line); }
+.dispatch-button-outline:hover:not(:disabled) { border-color: #cbd3df; }
+.dispatch-button:disabled,
+.dispatch-button-outline:disabled { opacity: .6; cursor: default; }
+
+/* Assign panel */
+.dispatch-assign {
+  margin-top: 14px;
+  padding: 16px;
+  background: #fbfbfd;
+  border: 1px solid var(--orange);
+  border-radius: 12px;
+}
+
+.dispatch-assign h3 { margin: 0; font-size: 15px; }
+
+.dispatch-couriers { display: grid; gap: 6px; margin: 12px 0 0; padding: 0; border: 0; }
+.dispatch-couriers legend { margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 650; }
+
+.dispatch-courier-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.dispatch-courier-option:has(input:checked) { border-color: var(--orange); background: #fff7f1; }
+.dispatch-courier-option input { accent-color: var(--orange); }
+.dispatch-courier-name { font-weight: 650; }
+.dispatch-courier-load { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+.dispatch-assign-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+.dispatch-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 760px) {
+  .dispatch-card { padding: 20px 22px; }
+
+  .dispatch-table thead { display: table-header-group; }
+  .dispatch-table tbody { display: table-row-group; }
+  .dispatch-table tr { display: table-row; padding: 0; border: 0; }
+  .dispatch-table td,
+  .dispatch-table th { display: table-cell; padding: 12px; border-top: 1px solid #edf0f4; vertical-align: middle; }
+  .dispatch-table td[data-label]::before { content: none; }
+
+  .dispatch-table th {
+    color: var(--muted);
+    background: #f7f8fa;
+    border-top: 0;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .06em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .dispatch-table th:first-child { border-radius: 9px 0 0 9px; }
+  .dispatch-table th:last-child { border-radius: 0 9px 9px 0; }
+  .dispatch-table .dispatch-number { text-align: right; }
+  .dispatch-route { text-align: left; }
+  .dispatch-route span { justify-content: flex-start; }
+  .dispatch-table .dispatch-action { text-align: right; }
+}

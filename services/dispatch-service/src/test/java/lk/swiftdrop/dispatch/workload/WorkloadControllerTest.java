@@ -35,11 +35,12 @@ class WorkloadControllerTest {
     void dispatcherSeesActiveDeliveriesPerCourier() throws Exception {
         UUID courierId = UUID.randomUUID();
         given(workloadService.getWorkload()).willReturn(List.of(
-                new CourierWorkloadResponse(courierId, UUID.randomUUID(), CourierStatus.AVAILABLE, 3)));
+                new CourierWorkloadResponse(courierId, UUID.randomUUID(), "Kasun", CourierStatus.AVAILABLE, 3)));
 
         mockMvc.perform(get("/api/v1/dispatch/workload").with(user("DISPATCHER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].courierId").value(courierId.toString()))
+                .andExpect(jsonPath("$[0].firstName").value("Kasun"))
                 .andExpect(jsonPath("$[0].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$[0].activeDeliveries").value(3));
     }
