@@ -266,6 +266,10 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+      parcel-service:
+        condition: service_healthy
+      merchant-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health || exit 1"]
       interval: 30s
