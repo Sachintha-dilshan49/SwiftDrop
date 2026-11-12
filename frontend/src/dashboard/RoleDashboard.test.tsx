@@ -24,4 +24,13 @@ describe("RoleDashboard", () => {
     expect(screen.queryByText("Dashboard preview · sample data")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Dashboard summary" })).not.toBeInTheDocument();
   });
+
+  it("uses the shared header and lists only the portals the user has", () => {
+    const staff = { ...user, fullName: "Demo Admin", roles: ["ADMIN", "DISPATCHER"] };
+    render(<RoleDashboard role="ADMIN" user={staff} onSignOut={vi.fn()} />);
+
+    expect(screen.getByRole("link", { name: "Platform overview" })).toHaveAttribute("aria-current", "page");
+    const options = screen.getAllByRole("option").map((option) => option.textContent);
+    expect(options).toEqual(["Dispatch portal", "Admin portal"]);
+  });
 });
