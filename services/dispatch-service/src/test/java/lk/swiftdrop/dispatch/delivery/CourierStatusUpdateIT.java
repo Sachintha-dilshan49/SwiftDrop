@@ -18,6 +18,7 @@ import io.minio.ListObjectsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.StatObjectArgs;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.StreamSupport;
@@ -55,6 +56,8 @@ class CourierStatusUpdateIT {
 
     private static final String BUCKET = "delivery-proofs";
     private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10};
+    private static final Duration PARCEL_VERIFY_TIMEOUT = Duration.ofSeconds(2);
+    private static final Duration PARCEL_VERIFY_RETRY_DELAY = Duration.ofMillis(100);
 
     @Container
     @ServiceConnection
@@ -121,8 +124,7 @@ class CourierStatusUpdateIT {
         assertThat(key).startsWith("assignments/" + assignment.getId() + "/").endsWith(".jpg");
         assertThat(storageClient().statObject(StatObjectArgs.builder().bucket(BUCKET).object(key).build())
                 .contentType()).isEqualTo("image/jpeg");
-        parcelService.verify(patchRequestedFor(urlMatching("/internal/parcels/" + assignment.getParcelId() + "/status"))
-                .withRequestBody(matchingJsonPath("$.proofReference", equalTo(key))));
+        assertParcelServiceStatusUpdate(assignment.getParcelId(), key);
         assertThat(assignmentRepository.findById(assignment.getId()).orElseThrow().getStatus())
                 .isEqualTo(AssignmentStatus.COMPLETED);
     }
@@ -147,6 +149,33 @@ class CourierStatusUpdateIT {
         return StreamSupport.stream(storageClient().listObjects(
                 ListObjectsArgs.builder().bucket(BUCKET).prefix(prefix).recursive(true).build()).spliterator(), false)
                 .count();
+    }
+
+    private static void assertParcelServiceStatusUpdate(UUID parcelId, String key) throws InterruptedException {
+        long deadline = System.nanoTime() + PARCEL_VERIFY_TIMEOUT.toNanos();
+        AssertionError lastAssertion = null;
+        RuntimeException lastRuntimeException = null;
+
+        while (System.nanoTime() < deadline) {
+            try {
+                parcelService.verify(patchRequestedFor(urlMatching("/internal/parcels/" + parcelId + "/status"))
+                        .withRequestBody(matchingJsonPath("$.proofReference", equalTo(key))));
+                return;
+            } catch (AssertionError assertionError) {
+                lastAssertion = assertionError;
+            } catch (RuntimeException runtimeException) {
+                lastRuntimeException = runtimeException;
+            }
+            Thread.sleep(PARCEL_VERIFY_RETRY_DELAY);
+        }
+
+        if (lastAssertion != null) {
+            throw lastAssertion;
+        }
+        if (lastRuntimeException != null) {
+            throw lastRuntimeException;
+        }
+        throw new AssertionError("Parcel status update was not observed in time.");
     }
 
     private static String minioUrl() {
