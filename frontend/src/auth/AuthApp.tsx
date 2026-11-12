@@ -213,7 +213,7 @@ export function AuthApp() {
             <ul className="benefit-list">
               <li><BoltIcon /> Couriers in every Colombo zone, 6 AM to 11 PM</li>
               <li><StoreIcon /> Merchants ship orders by dashboard or API</li>
-              <li><SparkIcon /> Customers book from one message with the AI assistant</li>
+              <li><SparkIcon /> Ask the AI assistant where your parcel is or what a delivery costs</li>
             </ul>
           </div>
           <p className="brand-footnote">SwiftDrop makes every delivery feel effortless.</p>
