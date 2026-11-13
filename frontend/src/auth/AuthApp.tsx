@@ -25,6 +25,7 @@ import { RoleDashboard } from "../dashboard/RoleDashboard";
 import { CustomerHome } from "../features/booking/CustomerHome";
 import { CourierHome } from "../features/courier/CourierHome";
 import { DispatchHome } from "../features/dispatch/DispatchHome";
+import { AssistantWidget } from "../features/assistant/AssistantWidget";
 
 type AuthMode = "login" | "signup";
 
@@ -173,9 +174,12 @@ export function AuthApp() {
     }
     if (dashboardRole) {
       return (
-        <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-          {roleScreen(dashboardRole, session.accessToken)}
-        </RoleDashboard>
+        <>
+          <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
+            {roleScreen(dashboardRole, session.accessToken)}
+          </RoleDashboard>
+          <AssistantWidget token={session.accessToken} />
+        </>
       );
     }
     return (
@@ -208,7 +212,7 @@ export function AuthApp() {
             <ul className="benefit-list">
               <li><BoltIcon /> Couriers in every Colombo zone, 6 AM to 11 PM</li>
               <li><StoreIcon /> Merchants ship orders by dashboard or API</li>
-              <li><SparkIcon /> Customers book from one message with the AI assistant</li>
+              <li><SparkIcon /> Track parcels and check fees by asking the AI assistant</li>
             </ul>
           </div>
           <p className="brand-footnote">SwiftDrop makes every delivery feel effortless.</p>
