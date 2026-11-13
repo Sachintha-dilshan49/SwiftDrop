@@ -41,6 +41,10 @@ import org.springframework.web.client.RestClient;
 class SwiftDropToolsTest {
 
     private static final String TOKEN = "user-jwt";
+    // Same fields as pricing-service's PricingQuoteResponse
+    private static final String QUOTE = """
+            {"routeType":"INTER_CITY","baseFee":650.00,"weightFee":40.00,"sizeFee":500.00,"expressFee":60.00,
+             "discount":0.00,"total":1250.00,"currency":"LKR"}""";
 
     private static WireMockServer gateway;
     private SwiftDropTools tools;
@@ -67,20 +71,34 @@ class SwiftDropToolsTest {
 
     @Test
     void trackParcelForwardsTokenAndDropsPersonalData() {
+        // Same fields as parcel-service's PublicTrackingResponse, plus personal data that must never pass through
         gateway.stubFor(get("/api/v1/track/SD-7K3Q-9P2M").willReturn(okJson("""
-                {"trackingNo":"SD-7K3Q-9P2M","status":"OUT_FOR_DELIVERY","lastUpdatedAt":"2026-11-01T09:15:00Z",
+                {"trackingNo":"SD-7K3Q-9P2M","status":"OUT_FOR_DELIVERY","size":"SMALL","weightKg":1.20,
+                 "createdAt":"2026-10-31T08:00:00Z",
                  "recipientName":"Nimal Perera","recipientPhone":"0771234567","dropoffAddress":"12 Galle Rd",
-                 "history":[{"status":"CREATED","at":"2026-10-31T08:00:00Z","note":"call 0771234567"},
-                            {"status":"OUT_FOR_DELIVERY","at":"2026-11-01T09:15:00Z"}]}""")));
+                 "history":[{"status":"CREATED","occurredAt":"2026-10-31T08:00:00Z","note":"call 0771234567"},
+                            {"status":"OUT_FOR_DELIVERY","occurredAt":"2026-11-01T09:15:00Z"}]}""")));
 
         TrackingResult result = tools.trackParcel(" sd-7k3q-9p2m ", chatContext(new ToolCallTracker()));
 
         assertThat(result.status()).isEqualTo("OUT_FOR_DELIVERY");
         assertThat(result.history()).extracting(TrackingResult.HistoryEntry::status)
                 .containsExactly("CREATED", "OUT_FOR_DELIVERY");
+        assertThat(result.history()).extracting(TrackingResult.HistoryEntry::at)
+                .containsExactly("2026-10-31T08:00:00Z", "2026-11-01T09:15:00Z");
+        assertThat(result.lastUpdatedAt()).isEqualTo("2026-11-01T09:15:00Z");
         assertThat(result.toString()).doesNotContain("Nimal", "0771234567", "Galle");
         gateway.verify(getRequestedFor(urlPathEqualTo("/api/v1/track/SD-7K3Q-9P2M"))
                 .withHeader("Authorization", equalTo("Bearer " + TOKEN)));
+    }
+
+    @Test
+    void trackParcelWithoutHistoryUsesCreationTime() {
+        gateway.stubFor(get("/api/v1/track/SD-AAAA-BBBB").willReturn(okJson("""
+                {"trackingNo":"SD-AAAA-BBBB","status":"CREATED","createdAt":"2026-11-01T08:00:00Z","history":[]}""")));
+
+        assertThat(tools.trackParcel("SD-AAAA-BBBB", chatContext(new ToolCallTracker())).lastUpdatedAt())
+                .isEqualTo("2026-11-01T08:00:00Z");
     }
 
     @Test
@@ -124,42 +142,98 @@ class SwiftDropToolsTest {
     }
 
     @Test
-    void estimateFeeSendsNormalizedQuery() {
+    void estimateFeeSendsZoneCodesAndReadsTotal() {
+        stubZones();
         gateway.stubFor(get(urlPathEqualTo("/api/v1/pricing/estimate"))
-                .withQueryParam("fromZone", equalTo("Colombo South"))
-                .withQueryParam("toZone", equalTo("Kandy"))
+                .withQueryParam("pickupZone", equalTo("COLOMBO_SOUTH"))
+                .withQueryParam("dropoffZone", equalTo("KANDY"))
                 .withQueryParam("weightKg", equalTo("2.0"))
                 .withQueryParam("size", equalTo("EXTRA_LARGE"))
-                .willReturn(okJson("{\"amount\":1250.00,\"currency\":\"LKR\"}")));
+                .withQueryParam("speed", equalTo("EXPRESS"))
+                .willReturn(okJson(QUOTE)));
 
-        FeeEstimate estimate = tools.estimateFee("Colombo South", "Kandy", new BigDecimal("2.0"), "extra large",
-                chatContext(new ToolCallTracker()));
+        FeeEstimate estimate = tools.estimateFee("Colombo South", "kandy", new BigDecimal("2.0"), "extra large",
+                "express", chatContext(new ToolCallTracker()));
 
         assertThat(estimate.amount()).isEqualByComparingTo("1250.00");
         assertThat(estimate.currency()).isEqualTo("LKR");
         assertThat(estimate.size()).isEqualTo("EXTRA_LARGE");
+        assertThat(estimate.speed()).isEqualTo("EXPRESS");
+        assertThat(estimate.pickupZone()).isEqualTo("Colombo South");
+        assertThat(estimate.dropoffZone()).isEqualTo("Kandy");
+    }
+
+    @Test
+    void estimateFeeDefaultsToStandardSpeed() {
+        stubZones();
+        gateway.stubFor(get(urlPathEqualTo("/api/v1/pricing/estimate"))
+                .withQueryParam("speed", equalTo("STANDARD"))
+                .willReturn(okJson(QUOTE)));
+
+        assertThat(tools.estimateFee("COLOMBO_SOUTH", "KANDY", BigDecimal.ONE, "SMALL", null,
+                chatContext(new ToolCallTracker())).speed()).isEqualTo("STANDARD");
+    }
+
+    @Test
+    void estimateFeeFindsZoneFromDistrictOrNameWithSymbol() {
+        stubZones();
+        gateway.stubFor(get(urlPathEqualTo("/api/v1/pricing/estimate"))
+                .withQueryParam("pickupZone", equalTo("NUGEGODA_MAHARAGAMA"))
+                .withQueryParam("dropoffZone", equalTo("COLOMBO_SOUTH"))
+                .willReturn(okJson(QUOTE)));
+
+        assertThat(tools.estimateFee("Maharagama", "Colombo 4", BigDecimal.ONE, "SMALL", null,
+                chatContext(new ToolCallTracker())).pickupZone()).isEqualTo("Nugegoda & Maharagama");
+        assertThat(tools.estimateFee("Nugegoda & Maharagama", "colombo 04", BigDecimal.ONE, "SMALL", null,
+                chatContext(new ToolCallTracker())).dropoffZone()).isEqualTo("Colombo South");
+    }
+
+    @Test
+    void estimateFeeUnknownZoneListsTheRealZones() {
+        stubZones();
+
+        assertThatThrownBy(() -> tools.estimateFee("Jaffna", "Kandy", BigDecimal.ONE, "SMALL", null,
+                chatContext(new ToolCallTracker())))
+                .isInstanceOf(ToolFailureException.class)
+                .hasMessageContaining("Jaffna")
+                .hasMessageContaining("Colombo South, Kandy");
+        gateway.verify(0, getRequestedFor(urlPathEqualTo("/api/v1/pricing/estimate")));
+    }
+
+    @Test
+    void estimateFeeRoundsWeightToTwoDecimals() {
+        stubZones();
+        gateway.stubFor(get(urlPathEqualTo("/api/v1/pricing/estimate"))
+                .withQueryParam("weightKg", equalTo("1.24"))
+                .willReturn(okJson(QUOTE)));
+
+        assertThat(tools.estimateFee("Kandy", "Kandy", new BigDecimal("1.2371"), "SMALL", null,
+                chatContext(new ToolCallTracker())).weightKg()).isEqualByComparingTo("1.24");
     }
 
     @Test
     void estimateFeeRejectsInvalidArguments() {
         ToolContext context = chatContext(new ToolCallTracker(10));
 
-        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", new BigDecimal("41"), "SMALL", context))
+        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", new BigDecimal("41"), "SMALL", null, context))
                 .hasMessageContaining("at most 40 kg");
-        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", BigDecimal.ZERO, "SMALL", context))
+        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", BigDecimal.ZERO, "SMALL", null, context))
                 .hasMessageContaining("more than 0 kg");
-        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", BigDecimal.ONE, "HUGE", context))
+        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", BigDecimal.ONE, "HUGE", null, context))
                 .hasMessageContaining("SMALL, MEDIUM");
-        assertThatThrownBy(() -> tools.estimateFee(" ", "Kandy", BigDecimal.ONE, "SMALL", context))
+        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", BigDecimal.ONE, "SMALL", "TOMORROW", context))
+                .hasMessageContaining("EXPRESS, STANDARD");
+        assertThatThrownBy(() -> tools.estimateFee(" ", "Kandy", BigDecimal.ONE, "SMALL", null, context))
                 .hasMessageContaining("pickup zone");
         assertThat(gateway.getAllServeEvents()).isEmpty();
     }
 
     @Test
     void estimateFeeRejectsUnexpectedResponse() {
+        stubZones();
         gateway.stubFor(get(urlPathEqualTo("/api/v1/pricing/estimate")).willReturn(okJson("{\"fee\":\"?\"}")));
 
-        assertThatThrownBy(() -> tools.estimateFee("Colombo", "Kandy", BigDecimal.ONE, "SMALL",
+        assertThatThrownBy(() -> tools.estimateFee("Kandy", "Kandy", BigDecimal.ONE, "SMALL", null,
                 chatContext(new ToolCallTracker())))
                 .hasMessage(SwiftDropTools.UNEXPECTED_RESPONSE);
     }
@@ -246,10 +320,19 @@ class SwiftDropToolsTest {
     @Test
     void toolDefinitionsDescribeArgumentsForTheModel() {
         assertThat(callback(SwiftDropTools.ESTIMATE_FEE).getToolDefinition().inputSchema())
-                .contains("fromZone", "toZone", "weightKg", "size")
+                .contains("pickupZone", "dropoffZone", "weightKg", "size", "speed")
                 .doesNotContain("toolContext");
         assertThat(callback(SwiftDropTools.MY_PARCELS).getToolDefinition().inputSchema())
                 .contains("OUT_FOR_DELIVERY");
+    }
+
+    private static void stubZones() {
+        gateway.stubFor(get("/api/v1/pricing/zones").willReturn(okJson("""
+                [{"code":"COLOMBO_SOUTH","name":"Colombo South","group":"COLOMBO",
+                  "districts":["Colombo 04","Colombo 05","Colombo 06"]},
+                 {"code":"KANDY","name":"Kandy","group":"INTER_CITY","districts":[]},
+                 {"code":"NUGEGODA_MAHARAGAMA","name":"Nugegoda & Maharagama","group":"SUBURBS",
+                  "districts":["Nugegoda","Maharagama"]}]""")));
     }
 
     private ToolCallback callback(String name) {

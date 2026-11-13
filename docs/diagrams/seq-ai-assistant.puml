@@ -158,7 +158,7 @@ GW -> MCP ++ : forward
 MCP -> T ++ : estimateFee(query, ToolContext[JWT])
 T -> GW : GET /api/v1/pricing/estimate?... + JWT
 GW -> PR ++ : route
-PR --> GW -- : 200 { amount: 1250.00, currency: LKR }
+PR --> GW -- : 200 { total: 1250.00, currency: LKR }
 GW --> T : 200
 T --> MCP -- : FeeEstimate
 MCP --> GW -- : tool result

@@ -84,8 +84,9 @@ class ChatToolCallingIT {
     @Test
     void modelCallsTrackParcelAndAnswersFromResult() throws Exception {
         gateway.stubFor(get("/api/v1/track/SD-7K3Q-9P2M").willReturn(okJson("""
-                {"trackingNo":"SD-7K3Q-9P2M","status":"OUT_FOR_DELIVERY","lastUpdatedAt":"2026-11-01T09:15:00Z",
-                 "recipientPhone":"0771234567","history":[{"status":"OUT_FOR_DELIVERY","at":"2026-11-01T09:15:00Z"}]}""")));
+                {"trackingNo":"SD-7K3Q-9P2M","status":"OUT_FOR_DELIVERY","size":"SMALL","weightKg":1.20,
+                 "createdAt":"2026-10-31T08:00:00Z","recipientPhone":"0771234567",
+                 "history":[{"status":"OUT_FOR_DELIVERY","occurredAt":"2026-11-01T09:15:00Z"}]}""")));
         // Second LLM call carries the tool result: answer. First call: ask for the tool.
         llm.stubFor(post("/v1/chat/completions").atPriority(1)
                 .withRequestBody(containing("tool_call_id"))

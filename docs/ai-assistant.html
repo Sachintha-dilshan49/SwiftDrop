@@ -305,7 +305,7 @@ record SourceRef(String article, String section) {}</pre>
   <div class="table-scroll"><table>
     <tr><th>Tool</th><th>Arguments</th><th>Calls (through gateway)</th><th>Returns to the model</th></tr>
     <tr><td><code>track_parcel</code></td><td><code>trackingNo</code> (pattern <code>SD-XXXX-XXXX</code>)</td><td><code>GET /api/v1/track/{trackingNo}</code> (public)</td><td>status, last update time, history (no names or addresses)</td></tr>
-    <tr><td><code>estimate_fee</code></td><td><code>fromZone</code>, <code>toZone</code>, <code>weightKg</code>, <code>size</code></td><td><code>GET /api/v1/pricing/estimate</code></td><td>amount, currency (LKR)</td></tr>
+    <tr><td><code>estimate_fee</code></td><td><code>pickupZone</code>, <code>dropoffZone</code>, <code>weightKg</code>, <code>size</code>, <code>speed</code> (optional)</td><td><code>GET /api/v1/pricing/estimate</code></td><td>amount, currency (LKR)</td></tr>
     <tr><td><code>my_parcels</code></td><td><code>status</code> (optional), <code>limit</code> ≤ 10</td><td><code>GET /api/v1/parcels</code> with caller's JWT</td><td>tracking no, status, created date for each</td></tr>
     <tr><td><code>search_help_articles</code> <em>(MCP only)</em></td><td><code>query</code></td><td>in-process vector store</td><td>top passages with article + section</td></tr>
   </table></div>

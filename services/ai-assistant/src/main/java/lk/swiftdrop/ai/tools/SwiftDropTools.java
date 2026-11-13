@@ -1,6 +1,7 @@
 package lk.swiftdrop.ai.tools;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -30,9 +31,11 @@ public class SwiftDropTools {
     public static final String ESTIMATE_FEE = "estimate_fee";
     public static final String MY_PARCELS = "my_parcels";
 
-    static final Pattern TRACKING_NO = Pattern.compile("^SD-[A-Z0-9]{4}-[A-Z0-9]{4}$");
-    static final Pattern ZONE = Pattern.compile("^[A-Za-z0-9 _-]{1,64}$");
+    static final Pattern TRACKING_NO = Pattern.compile("^SD-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$");
+    static final int MAX_ZONE_LENGTH = 64;
     static final List<String> SIZES = List.of("SMALL", "MEDIUM", "LARGE", "EXTRA_LARGE");
+    static final List<String> SPEEDS = List.of("EXPRESS", "STANDARD", "NEXT_DAY");
+    static final String DEFAULT_SPEED = "STANDARD";
     static final BigDecimal MAX_WEIGHT_KG = BigDecimal.valueOf(40);
     static final int MAX_PARCELS = 10;
     static final String UNEXPECTED_RESPONSE = "SwiftDrop returned an unexpected answer. Try again later.";
@@ -58,44 +61,59 @@ public class SwiftDropTools {
 
         List<TrackingResult.HistoryEntry> history = new ArrayList<>();
         for (JsonNode entry : body.path("history").values()) {
-            history.add(new TrackingResult.HistoryEntry(text(entry, "status"), text(entry, "at", "changedAt")));
+            history.add(new TrackingResult.HistoryEntry(text(entry, "status"), text(entry, "occurredAt")));
         }
-        return new TrackingResult(normalized, text(body, "status"), text(body, "lastUpdatedAt", "updatedAt"),
-                history);
+        // parcel-service returns history oldest first and has no separate last-updated field
+        String lastUpdatedAt = history.isEmpty() ? text(body, "createdAt") : history.getLast().at();
+        return new TrackingResult(normalized, text(body, "status"), lastUpdatedAt, history);
     }
 
     @Tool(name = ESTIMATE_FEE, description = """
             Estimate the delivery fee in LKR for a parcel between two SwiftDrop zones. \
-            Ask the user for any missing value instead of guessing. The booking step gives the final fee.""")
+            Ask the user for a missing zone, weight or size instead of guessing. \
+            The result shows the delivery speed used. The booking step gives the final fee.""")
     public FeeEstimate estimateFee(
-            @ToolParam(description = "Pickup zone, e.g. Colombo South") String fromZone,
-            @ToolParam(description = "Drop-off zone, e.g. Kandy") String toZone,
+            @ToolParam(description = "Pickup zone or area, e.g. Colombo South or Nugegoda") String pickupZone,
+            @ToolParam(description = "Drop-off zone or area, e.g. Kandy") String dropoffZone,
             @ToolParam(description = "Parcel weight in kilograms, greater than 0 and at most 40") BigDecimal weightKg,
             @ToolParam(description = "Parcel size: SMALL, MEDIUM, LARGE or EXTRA_LARGE") String size,
+            @ToolParam(required = false, description = "Delivery speed: EXPRESS, STANDARD or NEXT_DAY (default STANDARD)")
+            String speed,
             ToolContext toolContext) {
         String token = ToolCaller.begin(toolContext, ESTIMATE_FEE);
-        String from = zone(fromZone, "pickup");
-        String to = zone(toZone, "drop-off");
-        if (weightKg == null || weightKg.signum() <= 0 || weightKg.compareTo(MAX_WEIGHT_KG) > 0) {
+        String pickup = zoneInput(pickupZone, "pickup");
+        String dropoff = zoneInput(dropoffZone, "drop-off");
+        // pricing-service accepts at most 2 decimals
+        BigDecimal weight = weightKg == null || weightKg.scale() <= 2 ? weightKg : weightKg.setScale(2, RoundingMode.HALF_UP);
+        if (weight == null || weight.signum() <= 0 || weight.compareTo(MAX_WEIGHT_KG) > 0) {
             throw new ToolFailureException("The weight must be more than 0 kg and at most 40 kg.");
         }
-        String normalizedSize = size == null ? "" : size.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
+        String normalizedSize = enumInput(size);
         if (!SIZES.contains(normalizedSize)) {
             throw new ToolFailureException("The size must be SMALL, MEDIUM, LARGE or EXTRA_LARGE.");
         }
+        String normalizedSpeed = speed == null || speed.isBlank() ? DEFAULT_SPEED : enumInput(speed);
+        if (!SPEEDS.contains(normalizedSpeed)) {
+            throw new ToolFailureException("The delivery speed must be EXPRESS, STANDARD or NEXT_DAY.");
+        }
 
+        JsonNode zones = gateway.get(uri -> uri.path("/api/v1/pricing/zones").build(), token);
+        Zone from = findZone(zones, pickup);
+        Zone to = findZone(zones, dropoff);
         JsonNode body = gateway.get(uri -> uri.path("/api/v1/pricing/estimate")
-                .queryParam("fromZone", from)
-                .queryParam("toZone", to)
-                .queryParam("weightKg", weightKg.toPlainString())
+                .queryParam("pickupZone", from.code())
+                .queryParam("dropoffZone", to.code())
+                .queryParam("weightKg", weight.toPlainString())
                 .queryParam("size", normalizedSize)
+                .queryParam("speed", normalizedSpeed)
                 .build(), token);
-        JsonNode amount = body.path("amount").isMissingNode() ? body.path("total") : body.path("amount");
-        if (!amount.isNumber() && !amount.isString()) {
+        JsonNode total = body.path("total");
+        if (!total.isNumber()) {
             throw new ToolFailureException(UNEXPECTED_RESPONSE);
         }
         String currency = body.path("currency").asString("LKR");
-        return new FeeEstimate(from, to, weightKg, normalizedSize, amount.asDecimal(), currency);
+        return new FeeEstimate(from.name(), to.name(), weight, normalizedSize, normalizedSpeed, total.asDecimal(),
+                currency);
     }
 
     @Tool(name = MY_PARCELS, description = """
@@ -126,12 +144,46 @@ public class SwiftDropTools {
         return parcels;
     }
 
-    private static String zone(String value, String which) {
+    private static String zoneInput(String value, String which) {
         String trimmed = value == null ? "" : value.trim();
-        if (!ZONE.matcher(trimmed).matches()) {
+        if (trimmed.isEmpty() || trimmed.length() > MAX_ZONE_LENGTH) {
             throw new ToolFailureException("Ask the user for the " + which + " zone, e.g. Colombo South.");
         }
         return trimmed;
+    }
+
+    private static String enumInput(String value) {
+        return value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
+    }
+
+    /** Matches what the user said against zone codes and names first, then the districts inside each zone. */
+    private static Zone findZone(JsonNode zones, String input) {
+        String wanted = comparable(input);
+        List<String> names = new ArrayList<>();
+        for (JsonNode zone : zones.values()) {
+            names.add(zone.path("name").asString(""));
+            if (wanted.equals(comparable(zone.path("code").asString("")))
+                    || wanted.equals(comparable(zone.path("name").asString("")))) {
+                return new Zone(zone.path("code").asString(), zone.path("name").asString());
+            }
+        }
+        for (JsonNode zone : zones.values()) {
+            for (JsonNode district : zone.path("districts").values()) {
+                if (wanted.equals(comparable(district.asString("")))) {
+                    return new Zone(zone.path("code").asString(), zone.path("name").asString());
+                }
+            }
+        }
+        throw new ToolFailureException("SwiftDrop has no zone called " + input + ". The zones are: "
+                + String.join(", ", names) + ".");
+    }
+
+    /** Ignores case, punctuation and leading zeros, so "colombo 4" matches "Colombo 04". */
+    private static String comparable(String value) {
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\b0+(\\d)", "$1");
+    }
+
+    private record Zone(String code, String name) {
     }
 
     /** First non-empty text value among {@code names}, or {@code null}. */
