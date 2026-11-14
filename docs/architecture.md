@@ -92,16 +92,16 @@ flowchart TB
     EX{{parcel.events<br/>topic exchange}}
     Q1[notification.q]
     Q2[webhook.q]
-    Q3[dispatch.q]
     Q4[tracking.q]
+    Q5[merchant.orders.q]
   end
 
   PARCEL -. publish ParcelStatusChanged .-> EX
-  EX -.-> Q1 & Q2 & Q3 & Q4
+  EX -.-> Q1 & Q2 & Q4 & Q5
   Q1 -.-> NOTIF
   Q2 -.-> NOTIF
-  Q3 -.-> DISP
   Q4 -.-> PARCEL
+  Q5 -.-> MERCH
 
   AUTH --> G[(Google OAuth 2.0)]
   AI --> L[(LLM provider)]
@@ -180,8 +180,8 @@ The gateway does:
 - **JWT check** on every non-public route, using auth-service's JWKS (fetched on the first token and cached, refreshed on unknown key IDs; the gateway starts even when auth-service is down). The gateway only authenticates: no role or ownership checks, and the `Authorization` header is forwarded unchanged so each service verifies the token again. Missing, expired or invalid token → `401` ProblemDetail (`.../problems/unauthorized`) that does not say which.
 - **CORS** for the SPA origins (`GATEWAY_CORS_ALLOWED_ORIGINS`), applied inside Spring Security so preflight succeeds without a token. Credentials are allowed (the refresh token is an httpOnly cookie); `X-Request-Id` is exposed.
 - **`X-Request-Id`**: kept if the client sent a safe one, otherwise a new one replaces it; forwarded to the service, returned on every response (including the gateway's own 401/404), and logged. One access-log line per request: method, path, status, duration and request ID (no query strings, tokens, API keys or cookies).
-- **Rate limiting** with Redis (`RequestRateLimiter` + `RedisRateLimiter`): `/api/v1/merchant-api/**` per API key and the public `GET /api/v1/pricing/estimate` per client IP. Buckets are `merchant-api:<sha256(key)>` and `pricing-estimate:<sha256(ip)>`, so raw keys and IPs never reach Redis. The client IP is the last `X-Forwarded-For` entry (the one nginx appends; one trusted hop), or the remote address without the header. Over the limit → `429` ProblemDetail with the `X-RateLimit-*` headers. If Redis is unreachable the limiter **fails open** (requests pass) and the gateway stays healthy.
-- **SSE pass-through** for `GET /api/v1/track/{trackingNo}/stream`: its own route with no response timeout and no buffering, so events arrive as they are sent.
+- **Rate limiting** with Redis (`RequestRateLimiter` + `RedisRateLimiter`): `/api/v1/merchant-api/**` per API key, the public `GET /api/v1/pricing/estimate` per client IP, and the AI assistant's `POST /api/v1/assistant/chat` and `/chat/stream` per signed-in user (each message is an LLM call). Buckets are `merchant-api:<sha256(key)>`, `pricing-estimate:<sha256(ip)>` and `assistant-chat:<sha256(userId)>`, so raw keys, IPs and user IDs never reach Redis. The client IP is the last `X-Forwarded-For` entry (the one nginx appends; one trusted hop), or the remote address without the header. Over the limit → `429` ProblemDetail with the `X-RateLimit-*` headers. If Redis is unreachable the limiter **fails open** (requests pass) and the gateway stays healthy.
+- **SSE pass-through** for `GET /api/v1/track/{trackingNo}/stream`: its own route with no response timeout and no buffering, so events arrive as they are sent. The assistant's chat routes and `/mcp` have a 2-minute response timeout instead of the default, because replies that call tools or stream a long answer take longer.
 - **Public routes** (no JWT): `POST /api/v1/auth/signup`, `/login`, `/refresh`, `/logout` and `/token`; `GET /api/v1/pricing/estimate` (guests and the AI assistant, rate-limited; booking still needs a login); `GET /api/v1/pricing/zones` (not rate-limited); `/api/v1/track/**`; the Google OAuth paths `/oauth2/**` and `/login/oauth2/**`, forwarded unchanged without the `/api/v1` prefix so Spring Security's default redirect URI works (`/api/v1/oauth2/**` is routed and public too); CORS preflight; `/actuator/health/**`. The list is `swiftdrop.gateway.public-paths` in the gateway's `application.yml`. On public routes the gateway ignores any token it is sent and forwards it as is.
 - Merchant registration requires a logged-in user (decided 14 Nov).
 - **API-key route**: `/api/v1/merchant-api/**` carries `X-API-Key` instead of a JWT. The gateway rejects requests without a non-blank `X-API-Key` header (`401`, "Missing X-API-Key header") and rate-limits per key; merchant-service verifies the key itself.
@@ -198,7 +198,7 @@ The gateway does **not** contain business logic or ownership checks (those are i
 | `/api/v1/dispatch/**`, `/api/v1/courier/**`, `/api/v1/reports/**` | `dispatch-service:8084` |
 | `/api/v1/merchants/**`, `/api/v1/merchant-api/**`, `/api/v1/admin/merchants/**` | `merchant-service:8085` |
 | `/api/v1/admin/webhook-deliveries/**` | `notification-service:8086` |
-| `/api/v1/assistant/**` | `ai-assistant:8087` |
+| `/api/v1/assistant/**`, `/mcp` | `ai-assistant:8087` |
 | `/internal/**`, `/api/v1/internal/**` | not routed (`404`) |
 
 #### Gateway environment variables
@@ -210,9 +210,10 @@ The gateway does **not** contain business logic or ownership checks (those are i
 | `REDIS_HOST`, `REDIS_PORT` | `localhost`, `6379` | Rate-limiter store |
 | `GATEWAY_CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Allowed SPA origins, comma-separated |
 | `GATEWAY_HTTP_CONNECT_TIMEOUT_MS` | `2000` | Connect timeout to services |
-| `GATEWAY_HTTP_RESPONSE_TIMEOUT` | `10s` | Response timeout (not applied to the SSE route) |
+| `GATEWAY_HTTP_RESPONSE_TIMEOUT` | `10s` | Response timeout (not the tracking SSE route; 2 minutes on the assistant's chat and `/mcp` routes) |
 | `GATEWAY_MERCHANT_RATE_LIMIT_REPLENISH`, `GATEWAY_MERCHANT_RATE_LIMIT_BURST` | `10`, `20` | Merchant API: tokens per second and burst, per key |
 | `GATEWAY_ESTIMATE_RATE_LIMIT_REPLENISH`, `GATEWAY_ESTIMATE_RATE_LIMIT_BURST` | `5`, `20` | Fee estimate: tokens per second and burst, per client IP |
+| `GATEWAY_ASSISTANT_RATE_LIMIT_REPLENISH`, `GATEWAY_ASSISTANT_RATE_LIMIT_BURST`, `GATEWAY_ASSISTANT_RATE_LIMIT_TOKENS_PER_MESSAGE` | `1`, `30`, `6` | Assistant chat, per signed-in user: 5 messages at once, then one every 6 seconds |
 
 The gateway does not need `INTERNAL_API_TOKEN`: it never calls `/internal/**`, and `common`'s servlet auto-configuration does not run in the reactive gateway.
 
@@ -261,8 +262,8 @@ All of them require the header `X-Internal-Token` equal to the environment varia
 |---|---|---|---|
 | `notification.q` | `parcel.status.#` | notification-service | Email on every change; SMS on OUT_FOR_DELIVERY, DELIVERED, FAILED |
 | `webhook.q` | `parcel.status.#` | notification-service | POST to merchant webhook if `merchantId` is set |
-| `dispatch.q` | `parcel.status.#` | dispatch-service | Update daily counters for reports |
 | `tracking.q` | `parcel.status.#` | parcel-service | Push the change to open SSE connections |
+| `merchant.orders.q` | `parcel.status.#` | merchant-service | Copy the status onto the merchant's order (never moves an order back), so the dashboard and merchant API show it |
 
 ### Who is notified
 
@@ -462,12 +463,14 @@ Sequence diagrams for these are in [`diagrams/sequence/`](diagrams/sequence/) an
 2. Gateway applies the per-key rate limit; merchant-service verifies the key and that the merchant is APPROVED.
 3. merchant-service calls `POST /internal/parcels` with the merchantId; parcel-service gets the fee from `POST /internal/pricing/quote` as in 10.1.
 4. CREATED event → `webhook.q` → notification-service POSTs the signed webhook to the merchant.
+5. Every later status change also reaches `merchant.orders.q`, so the order's status in merchant-service follows the parcel.
 
 ### 10.3 Courier updates status (triggers notifications)
+0. A courier account (COURIER role in the JWT) gets its dispatch record the first time it opens the courier screens; from then on dispatchers see it in the workload and can assign to it.
 1. Courier → `POST /courier/deliveries/{id}/status` with note and optional photo.
 2. dispatch-service checks the assignment belongs to this courier (403 otherwise) and stores the photo in MinIO.
 3. dispatch calls `PATCH /internal/parcels/{id}/status`; parcel-service validates the transition and writes history + outbox.
-4. The event fans out: email/SMS, merchant webhook, report counters, and SSE push to open tracking pages.
+4. The event fans out: email/SMS, merchant webhook, the merchant's order status, and SSE push to open tracking pages.
 
 ### 10.4 Login with Google (OAuth 2.0)
 1. SPA redirects to `/oauth2/authorization/google`; the gateway forwards it to auth-service unchanged. Google login is offered only when `AUTH_GOOGLE_ENABLED=true`.

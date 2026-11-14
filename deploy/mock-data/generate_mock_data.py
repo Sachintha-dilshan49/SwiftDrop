@@ -521,7 +521,6 @@ def backdate(by_role, merchants, parcels):
     parcel_sql, dispatch_sql, merchant_sql, notif_sql = [], [], [], []
     for p in parcels:
         planned = dict(p["timeline"])
-        p["final_status"] = [s for s, _ in p["timeline"] if s != "ASSIGNED"][-1]
         actual = by_parcel.get(p["id"], {})
         last_delta = None
         for status, (event_id, created_epoch, payload) in actual.items():
@@ -604,11 +603,6 @@ def backdate(by_role, merchants, parcels):
                count(*) FILTER (WHERE status = 'COMPLETED'), count(*) FILTER (WHERE status = 'FAILED'),
                max(assigned_at), max(coalesce(updated_at, assigned_at))
         FROM assignments GROUP BY 1, 2;"""
-
-    # merchant-service does not update an order's status yet; copy the parcel's so the dashboard shows real states
-    for p in parcels:
-        if p["merchant"]:
-            merchant_sql.append(f"UPDATE merchant_orders SET status = {q(p['final_status'])} WHERE parcel_id = {q(p['id'])};")
 
     for db, stmts in (("parcel_db", parcel_sql), ("dispatch_db", dispatch_sql + courier_sql + [stats_sql]),
                       ("merchant_db", merchant_sql), ("notification_db", notif_sql), ("auth_db", auth_sql)):

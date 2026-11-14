@@ -78,10 +78,8 @@ deploy/mock-data/export_dumps.sh             # writes deploy/mock-data/dumps/*.s
 
 The generator works around gaps in the services. Each will be removed once the service handles it:
 
-- Staff roles and courier and merchant profiles are written to `auth_db` directly, because
-  `GET/PATCH /admin/users` does not exist yet.
-- Couriers are inserted into dispatch's `couriers` table, because dispatch has no courier registration yet.
-- Each merchant order's status is copied from its parcel, because merchant-service never updates it.
+- Staff roles and courier and merchant profiles are written to `auth_db` directly. The first admin cannot be
+  created through the API, and the profiles have no API yet.
+- Couriers are inserted into dispatch's `couriers` table. dispatch registers a courier when they first open the
+  courier screens, but the dispatcher needs them before that to assign parcels.
 
-merchant-service also needs `spring-boot-starter-flyway`, or its tables are never created on a fresh database.
-That fix is in its own pull request.
