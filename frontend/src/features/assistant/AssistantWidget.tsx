@@ -18,14 +18,12 @@ export function articleTitle(slug: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** Unique "Article · Section" labels, in order. */
-function sourceLabels(sources: SourceRef[]): string[] {
-  const labels = sources.map((source) =>
-    source.section && source.section !== articleTitle(source.article)
-      ? `${articleTitle(source.article)} · ${source.section}`
-      : articleTitle(source.article),
-  );
-  return [...new Set(labels)];
+/** How many source articles are listed under a reply. */
+const MAX_SOURCES = 3;
+
+/** Unique article titles, in order: sections of the same article are listed once. */
+export function sourceTitles(sources: SourceRef[]): string[] {
+  return [...new Set(sources.map((source) => articleTitle(source.article)))].slice(0, MAX_SOURCES);
 }
 
 /** Renders **bold** inside one line of plain text. */
@@ -35,18 +33,93 @@ function renderInline(line: string): ReactNode[] {
   );
 }
 
-/** Plain text with line breaks, "- " / "* " bullets and **bold**; no HTML from the model is rendered. */
-function ReplyText({ text }: { text: string }) {
+function tableCells(row: string): string[] {
+  return row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+}
+
+const TABLE_SEPARATOR = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/;
+
+type Block =
+  | { kind: "line"; text: string }
+  | { kind: "bullet"; text: string; marker?: string }
+  | { kind: "heading"; text: string }
+  | { kind: "table"; header: string[]; rows: string[][] };
+
+/** Splits a reply into lines, list items, headings and tables. */
+export function replyBlocks(text: string): Block[] {
   const lines = text.split("\n");
+  const blocks: Block[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim().startsWith("|")) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      i--;
+      const rows = tableLines.filter((row) => !TABLE_SEPARATOR.test(row.trim())).map(tableCells);
+      const hasHeader = tableLines.length > 1 && TABLE_SEPARATOR.test(tableLines[1].trim());
+      blocks.push({ kind: "table", header: hasHeader ? rows[0] : [], rows: hasHeader ? rows.slice(1) : rows });
+      continue;
+    }
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
+      continue; // horizontal rule
+    }
+    const heading = /^\s*#{1,6}\s+(.*)$/.exec(line);
+    if (heading) {
+      blocks.push({ kind: "heading", text: heading[1].replace(/\*\*/g, "") });
+      continue;
+    }
+    const bullet = /^\s*[-*•]\s+(.*)$/.exec(line);
+    if (bullet) {
+      blocks.push({ kind: "bullet", text: bullet[1] });
+      continue;
+    }
+    const numbered = /^\s*(\d+)[.)]\s+(.*)$/.exec(line);
+    if (numbered) {
+      blocks.push({ kind: "bullet", text: numbered[2], marker: `${numbered[1]}.` });
+      continue;
+    }
+    blocks.push({ kind: "line", text: line });
+  }
+  return blocks;
+}
+
+/** Plain text with lists, headings, tables and **bold**; no HTML from the model is rendered. */
+function ReplyText({ text }: { text: string }) {
   return (
     <>
-      {lines.map((line, index) => {
-        const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
-        return (
-          <span className={bullet ? "assistant-line assistant-bullet" : "assistant-line"} key={index}>
-            {renderInline(bullet ? bullet[1] : line)}
-          </span>
-        );
+      {replyBlocks(text).map((block, index) => {
+        switch (block.kind) {
+          case "table":
+            return (
+              <div className="assistant-table-wrap" key={index}>
+                <table className="assistant-table">
+                  {block.header.length > 0 && (
+                    <thead>
+                      <tr>{block.header.map((cell, c) => <th key={c}>{renderInline(cell)}</th>)}</tr>
+                    </thead>
+                  )}
+                  <tbody>
+                    {block.rows.map((row, r) => (
+                      <tr key={r}>{row.map((cell, c) => <td key={c}>{renderInline(cell)}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          case "heading":
+            return <strong className="assistant-line assistant-heading" key={index}>{block.text}</strong>;
+          case "bullet":
+            return (
+              <span className="assistant-line assistant-bullet" data-marker={block.marker ?? "•"} key={index}>
+                {renderInline(block.text)}
+              </span>
+            );
+          default:
+            return <span className="assistant-line" key={index}>{renderInline(block.text)}</span>;
+        }
       })}
     </>
   );
@@ -113,7 +186,10 @@ export function AssistantWidget({ token, initiallyOpen = false }: AssistantWidge
           onToken: (piece) => updateAssistant(replyId, (message) => ({ ...message, text: message.text + piece })),
           onDone: (done) => {
             conversationId.current = done.conversationId;
-            updateAssistant(replyId, (message) => ({ ...message, sources: done.sources, pending: false }));
+            // Help articles are looked up for every message; when a tool supplied the answer they are
+            // only loosely related, so they are not shown as its source
+            const sources = done.toolsUsed.length > 0 ? [] : done.sources;
+            updateAssistant(replyId, (message) => ({ ...message, sources, pending: false }));
           },
         },
         controller.signal,
@@ -199,7 +275,7 @@ export function AssistantWidget({ token, initiallyOpen = false }: AssistantWidge
               {message.pending && !message.text && <span className="assistant-typing" aria-label="Assistant is typing">•••</span>}
               {message.error && <p className="assistant-error" role="alert">{message.error}</p>}
               {message.sources.length > 0 && (
-                <p className="assistant-sources">Based on: {sourceLabels(message.sources).join(", ")}</p>
+                <p className="assistant-sources">Based on: {sourceTitles(message.sources).join(", ")}</p>
               )}
             </div>
           ),

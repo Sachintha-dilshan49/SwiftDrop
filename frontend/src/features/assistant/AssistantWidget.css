@@ -111,8 +111,14 @@
 }
 
 .assistant-line { display: block; min-height: 1em; }
-.assistant-bullet { position: relative; padding-left: 14px; }
-.assistant-bullet::before { content: "•"; position: absolute; left: 2px; color: var(--orange); }
+.assistant-bullet { position: relative; padding-left: 18px; }
+.assistant-bullet::before { content: attr(data-marker); position: absolute; left: 2px; color: var(--orange); font-weight: 700; }
+.assistant-heading { margin-top: 4px; }
+
+.assistant-table-wrap { margin: 6px 0; overflow-x: auto; }
+.assistant-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.assistant-table th, .assistant-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.assistant-table th { color: var(--muted); font-weight: 600; }
 
 .assistant-typing { color: var(--muted); letter-spacing: 2px; }
 
