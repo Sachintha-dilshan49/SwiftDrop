@@ -1,11 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ParcelResponse, parcelApi } from "../../api/parcelApi";
+import { pricingApi } from "../../api/pricingApi";
 import { CustomerHome } from "./CustomerHome";
 
 vi.mock("../../api/parcelApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/parcelApi")>();
   return { ...actual, parcelApi: { createParcel: vi.fn(), getMyParcels: vi.fn(), getReceipt: vi.fn() } };
+});
+
+vi.mock("../../api/pricingApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../api/pricingApi")>();
+  return { ...actual, pricingApi: { getEstimate: vi.fn() } };
 });
 
 const createParcel = vi.mocked(parcelApi.createParcel);
@@ -16,6 +22,8 @@ describe("CustomerHome", () => {
     createParcel.mockReset();
     getMyParcels.mockReset();
     getMyParcels.mockResolvedValue({ content: [], page: 0, size: 10, totalElements: 0 });
+    vi.mocked(pricingApi.getEstimate).mockResolvedValue({ routeType: "INTER_CITY", baseFee: 650, weightFee: 0,
+      sizeFee: 0, expressFee: 0, discount: 0, total: 650, currency: "LKR" });
   });
 
   it("opens and closes the booking form above the delivery list", async () => {
@@ -45,7 +53,8 @@ describe("CustomerHome", () => {
     type("Recipient phone", "0771234567");
     type("Size", "SMALL");
     type("Weight (kg)", "1");
-    fireEvent.click(screen.getByRole("button", { name: "Book delivery" }));
+    fireEvent.click(screen.getByRole("button", { name: "See the fare" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Confirm & book · LKR 650.00" }));
 
     expect(await screen.findByRole("heading", { name: "Delivery booked" })).toBeInTheDocument();
     await waitFor(() => expect(getMyParcels).toHaveBeenCalledTimes(2));

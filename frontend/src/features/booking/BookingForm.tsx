@@ -3,7 +3,7 @@ import { ParcelApiError, ParcelResponse, parcelApi } from "../../api/parcelApi";
 import { Button } from "../../components/Button";
 import { formatMoney } from "../../lib/parcelFormat";
 import { trackingPath } from "../tracking/trackingNumber";
-import { SIZE_OPTIONS, SPEED_OPTIONS, ZONES } from "./bookingOptions";
+import { SIZE_OPTIONS, ZONES } from "./bookingOptions";
 import {
   BookingErrors,
   BookingFormValues,
@@ -11,6 +11,7 @@ import {
   toCreateRequest,
   validateBooking,
 } from "./bookingValidation";
+import { FareStep } from "./FareStep";
 import "./BookingForm.css";
 
 const FIELDS = new Set<string>(Object.keys(EMPTY_BOOKING));
@@ -61,13 +62,17 @@ type BookingFormProps = {
   onClose: () => void;
 };
 
-/** Customer booking (diagram seq-create-delivery). The fee comes from pricing-service, never from this form. */
+/**
+ * Customer booking (diagram seq-create-delivery) in two steps, as in Figma: the details, then the fare per
+ * speed and Confirm & book. The fee comes from pricing-service, never from this form.
+ */
 export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
   const [values, setValues] = useState<BookingFormValues>(EMPTY_BOOKING);
   const [errors, setErrors] = useState<BookingErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState<ParcelResponse | null>(null);
+  const [step, setStep] = useState<"details" | "fare">("details");
 
   function update<K extends keyof BookingFormValues>(field: K, value: BookingFormValues[K]) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -81,7 +86,8 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
       : { "aria-invalid": false };
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  /** Step 1: check the details, then show the fare. */
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const found = validateBooking(values);
     setErrors(found);
@@ -90,7 +96,13 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
       setFormError("Please check the highlighted fields.");
       return;
     }
+    setStep("fare");
+  }
+
+  /** Step 2: book. A field the server rejects is shown next to that field in step 1. */
+  async function confirmBooking() {
     setSubmitting(true);
+    setFormError(null);
     try {
       const parcel = await parcelApi.createParcel(toCreateRequest(values), token);
       setBooked(parcel);
@@ -99,6 +111,9 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
       const failure = describeFailure(bookingError);
       setErrors(failure.fieldErrors);
       setFormError(failure.message);
+      if (Object.keys(failure.fieldErrors).length > 0) {
+        setStep("details");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -122,6 +137,7 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
               onClick={() => {
                 setValues(EMPTY_BOOKING);
                 setBooked(null);
+                setStep("details");
               }}
             >
               Book another
@@ -135,14 +151,37 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
     );
   }
 
+  const heading = (
+    <div className="booking-heading">
+      <h2 id="booking-title">{step === "fare" ? "Fare and confirmation" : "Book a delivery"}</h2>
+      <Button variant="secondary" onClick={onClose}>
+        Cancel
+      </Button>
+    </div>
+  );
+
+  if (step === "fare") {
+    return (
+      <section className="booking" aria-labelledby="booking-title">
+        {heading}
+        <FareStep
+          values={values}
+          submitting={submitting}
+          error={formError}
+          onSpeedChange={(speed) => update("speed", speed)}
+          onBack={() => {
+            setFormError(null);
+            setStep("details");
+          }}
+          onConfirm={() => void confirmBooking()}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className="booking" aria-labelledby="booking-title">
-      <div className="booking-heading">
-        <h2 id="booking-title">Book a delivery</h2>
-        <Button variant="secondary" onClick={onClose}>
-          Cancel
-        </Button>
-      </div>
+      {heading}
 
       <form onSubmit={handleSubmit} noValidate>
         <fieldset className="booking-group">
@@ -250,23 +289,6 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
           </Field>
         </fieldset>
 
-        <fieldset className="booking-group booking-speeds">
-          <legend>Speed</legend>
-          {SPEED_OPTIONS.map((option) => (
-            <label key={option.speed} className="booking-speed">
-              <input
-                type="radio"
-                name="speed"
-                value={option.speed}
-                checked={values.speed === option.speed}
-                onChange={() => update("speed", option.speed)}
-              />
-              <span>
-                <strong>{option.name}</strong> {option.promise}
-              </span>
-            </label>
-          ))}
-        </fieldset>
 
         <Field id="promoCode" label="Promo code (optional)" error={errors.promoCode}>
           <input
@@ -284,9 +306,9 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
           </p>
         )}
 
-        <p className="booking-hint">The fee is calculated when you book and shown on the next screen.</p>
-        <Button type="submit" className="booking-submit" disabled={submitting}>
-          {submitting ? "Booking…" : "Book delivery"}
+        <p className="booking-hint">Next you choose the delivery speed and see the fare.</p>
+        <Button type="submit" className="booking-submit">
+          See the fare
         </Button>
       </form>
     </section>

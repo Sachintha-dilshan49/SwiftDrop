@@ -99,21 +99,6 @@
   font-size: 12px;
 }
 
-.booking-speeds { gap: 8px; }
-
-.booking-speed {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.booking-speed:has(input:checked) { border-color: var(--orange); background: #fff8f2; }
-
 .booking .alert { font-size: 13px; }
 
 .booking-submit {
@@ -144,6 +129,5 @@
   .booking { padding: 18px 20px; }
   .booking-group { grid-template-columns: 2fr 1fr; align-items: start; }
   .booking-group legend { grid-column: 1 / -1; }
-  .booking-speeds { grid-template-columns: repeat(3, 1fr); }
   .booking-submit { width: auto; }
 }
