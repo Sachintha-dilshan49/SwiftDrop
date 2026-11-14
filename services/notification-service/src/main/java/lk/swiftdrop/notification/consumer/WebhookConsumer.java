@@ -99,9 +99,15 @@ public class WebhookConsumer {
             idempotencyService.markProcessed(event.eventId(), CONSUMER_NAME);
             log.info("Webhook delivered for event {}", event.eventId());
         } else {
-            webhookDeliveryService.recordFailure(event.eventId(), event.parcelId(), event.merchantId(),
-                    webhook.webhookUrl(), attemptNumber, requestBody,
-                    result.httpStatus(), result.responseBody(), result.failureReason());
+            boolean willPark = retryCount >= 3;
+            if (willPark) {
+                webhookDeliveryService.recordParked(event.eventId(), event.parcelId(), event.merchantId(),
+                        webhook.webhookUrl(), attemptNumber, requestBody, result.failureReason());
+            } else {
+                webhookDeliveryService.recordFailure(event.eventId(), event.parcelId(), event.merchantId(),
+                        webhook.webhookUrl(), attemptNumber, requestBody,
+                        result.httpStatus(), result.responseBody(), result.failureReason());
+            }
             routeToRetry(message, retryCount, event);
         }
     }
@@ -116,10 +122,15 @@ public class WebhookConsumer {
             default -> parkingQueue;
         };
 
+        // Copy all original headers (including __TypeId__ needed by Jackson2JsonMessageConverter)
+        // then override only the retry count so deserialization works on subsequent attempts.
+        MessageProperties retryProps = new MessageProperties();
+        originalMessage.getMessageProperties().getHeaders().forEach(retryProps::setHeader);
+        retryProps.setHeader(RETRY_COUNT_HEADER, nextRetryCount);
+        retryProps.setContentType(MessageProperties.CONTENT_TYPE_JSON);
         Message retryMessage = MessageBuilder
                 .withBody(originalMessage.getBody())
-                .setContentType(MessageProperties.CONTENT_TYPE_JSON)
-                .setHeader(RETRY_COUNT_HEADER, nextRetryCount)
+                .andProperties(retryProps)
                 .build();
 
         rabbitTemplate.send("", targetQueue, retryMessage);

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageResponse, ParcelApiError, ParcelStatus, ParcelSummary, parcelApi } from "../../api/parcelApi";
+import { Button } from "../../components/Button";
+import { StatusBadge } from "../../components/StatusBadge";
 import { STATUS_LABELS, formatDateTime, formatMoney } from "../../lib/parcelFormat";
 import { trackingPath } from "../tracking/trackingNumber";
 import { ParcelDetails } from "./ParcelDetails";
@@ -143,9 +145,7 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
                 <a className="deliveries-tracking" href={trackingPath(parcel.trackingNo)}>
                   {parcel.trackingNo}
                 </a>
-                <span className={`deliveries-status deliveries-status-${parcel.status.toLowerCase()}`}>
-                  {STATUS_LABELS[parcel.status]}
-                </span>
+                <StatusBadge status={parcel.status} />
               </div>
               <p className="deliveries-route">
                 {parcel.pickupAddress} → {parcel.dropoffAddress}
@@ -155,23 +155,23 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
                 {formatDateTime(parcel.createdAt)}
               </p>
               <div className="deliveries-actions">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   className="deliveries-receipt"
                   onClick={() => setDetailsId(parcel.id)}
                   aria-label={`Show the details of ${parcel.trackingNo}`}
                 >
                   Details
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="secondary"
                   className="deliveries-receipt"
                   onClick={() => void downloadReceipt(parcel)}
                   disabled={downloadingId === parcel.id}
                   aria-label={`Download the receipt for ${parcel.trackingNo}`}
                 >
                   {downloadingId === parcel.id ? "Downloading…" : "Receipt (PDF)"}
-                </button>
+                </Button>
               </div>
             </li>
           ))}
@@ -180,19 +180,23 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
 
       {result && result.totalElements > PAGE_SIZE && (
         <nav className="deliveries-pages" aria-label="Pages">
-          <button type="button" onClick={() => setPage((current) => current - 1)} disabled={loading || page === 0}>
+          <Button
+            variant="secondary"
+            onClick={() => setPage((current) => current - 1)}
+            disabled={loading || page === 0}
+          >
             Previous
-          </button>
+          </Button>
           <span>
             Page {page + 1} of {totalPages}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() => setPage((current) => current + 1)}
             disabled={loading || page + 1 >= totalPages}
           >
             Next
-          </button>
+          </Button>
         </nav>
       )}
     </section>

@@ -82,19 +82,6 @@
 
 .deliveries-tracking:hover { color: var(--orange-dark); text-decoration: underline; }
 
-.deliveries-status {
-  flex: 0 0 auto;
-  padding: 4px 9px;
-  color: #315a83;
-  background: #edf4fb;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.deliveries-status-delivered { color: #1f6b3a; background: #e8f6ed; }
-.deliveries-status-failed { color: #963727; background: #fff3ef; }
-
 .deliveries-route,
 .deliveries-meta {
   margin: 0;
@@ -104,19 +91,13 @@
 
 .deliveries-meta { color: var(--muted); font-size: 12px; }
 
-.deliveries-receipt {
-  justify-self: start;
+/* Compact size for the shared secondary Button in the list (src/components/Button.css has the colours). */
+.sd-button.deliveries-receipt,
+.deliveries-pages .sd-button {
   min-height: 34px;
   padding: 0 12px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 8px;
   font-size: 12px;
-  font-weight: 650;
 }
-
-.deliveries-receipt:hover:not(:disabled) { border-color: var(--orange); }
 
 .deliveries-actions {
   display: flex;
@@ -133,16 +114,6 @@
   border-top: 1px solid #edf0f4;
   color: var(--muted);
   font-size: 12px;
-}
-
-.deliveries-pages button {
-  min-height: 34px;
-  padding: 0 12px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-weight: 650;
 }
 
 @media (min-width: 640px) {
