@@ -6,7 +6,7 @@ timeline into the past so the data looks like a month of operation.
 Why through the APIs: parcels, status history, outbox events, notifications, webhook deliveries,
 dispatch assignments, proof photos and merchant orders are then written by the services' own code, so
 every row passes their rules and the rows in different databases point at each other correctly.
-SQL is only used where no API exists yet (staff roles, dispatch courier records) and for the time shift.
+SQL is only used where no API exists yet (the first staff roles, dispatch courier records) and for the time shift.
 
 Needs the Docker Compose stack running on fresh, migrated databases (see README.md). Standard library only.
 
@@ -173,11 +173,17 @@ def log(message):
 used_names, used_mobiles = set(), set()
 
 
-def person():
+def person(taken_first_names=None):
+    """A new full name; with taken_first_names, also a first name not in that set (which it then joins)."""
     while True:
-        name = f"{rnd.choice(FIRST)} {rnd.choice(LAST)}"
+        first = rnd.choice(FIRST)
+        if taken_first_names is not None and first in taken_first_names:
+            continue
+        name = f"{first} {rnd.choice(LAST)}"
         if name not in used_names:
             used_names.add(name)
+            if taken_first_names is not None:
+                taken_first_names.add(first)
             return name
 
 
@@ -218,8 +224,10 @@ def make_users():
     for i in range(3):
         n = person()
         users.append(User("DISPATCHER", n, f"dispatcher{i + 1}@swiftdrop.example.com", mobile()))
+    # Dispatch screens show couriers by first name, so no two couriers share one
+    courier_first_names = set()
     for i in range(10):
-        n = person()
+        n = person(courier_first_names)
         users.append(User("COURIER", n, f"courier{i + 1:02d}@swiftdrop.example.com", mobile()))
     for _ in MERCHANTS:
         n = person()
@@ -246,26 +254,6 @@ def setup_roles(users):
         stmts.append(f"INSERT INTO user_roles (user_id, role_id, assignment_status, reviewed_at, reviewed_by) "
                      f"SELECT {q(u.id)}, id, '{status}', now(), {q(admin.id) if u is not admin else 'NULL'} "
                      f"FROM roles WHERE name = '{u.role}';")
-    zones_for = [["COLOMBO_CENTRAL", "COLOMBO_SOUTH"], ["COLOMBO_NORTH", "COLOMBO_CENTRAL"],
-                 ["KOTTE_RAJAGIRIYA", "NUGEGODA_MAHARAGAMA"], ["DEHIWALA_MT_LAVINIA", "COLOMBO_SOUTH"],
-                 ["NUGEGODA_MAHARAGAMA", "DEHIWALA_MT_LAVINIA"], ["COLOMBO_NORTH", "NEGOMBO"], ["KANDY"], ["GALLE"],
-                 ["COLOMBO_SOUTH", "KOTTE_RAJAGIRIYA"], ["COLOMBO_CENTRAL", "COLOMBO_NORTH"]]
-    for i, c in enumerate(by_role["COURIER"]):
-        nic = f"{rnd.randint(1975, 2003)}{rnd.randint(10000000, 99999999)}"
-        dob = dt.date(int(nic[:4]), rnd.randint(1, 12), rnd.randint(1, 28))
-        vehicle = rnd.choice(["Motorbike", "Motorbike", "Motorbike", "Three-wheeler", "Van"])
-        stmts.append(f"INSERT INTO courier_profiles (user_id, nic_number, date_of_birth, delivery_zones, vehicle_type, "
-                     f"approval_status, reviewed_at, reviewed_by) VALUES ({q(c.id)}, {q(nic)}, {q(dob)}, "
-                     f"{q(','.join(zones_for[i]))}, {q(vehicle)}, 'APPROVED', now(), {q(admin.id)});")
-    for (business, category, zone, status), m in zip(MERCHANTS, by_role["MERCHANT"]):
-        street, district = STREETS[zone][0]
-        approval = {"APPROVED": "APPROVED", "PENDING": "PENDING", "REJECTED": "REJECTED"}[status]
-        reviewed = "now()" if status != "PENDING" else "NULL"
-        stmts.append(f"INSERT INTO merchant_profiles (user_id, business_name, business_registration_number, "
-                     f"business_category, pickup_location, contact_person, approval_status, reviewed_at, reviewed_by) "
-                     f"VALUES ({q(m.id)}, {q(business)}, {q('PV' + str(rnd.randint(100000, 999999)))}, {q(category)}, "
-                     f"{q(f'{rnd.randint(1, 250)} {street}, {district}')}, {q(m.name)}, '{approval}', {reviewed}, "
-                     f"{q(admin.id) if status != 'PENDING' else 'NULL'});")
     stmts.append("UPDATE users SET email_verified = true;")
     sql("auth_db", "BEGIN;\n" + "\n".join(stmts) + "\nCOMMIT;")
     # dispatch-service has no courier registration yet: its couriers table just links to auth users
@@ -578,10 +566,6 @@ def backdate(by_role, merchants, parcels):
         auth_sql.append(f"UPDATE user_roles SET assigned_at = {ts(when)}, reviewed_at = "
                         f"CASE WHEN reviewed_at IS NULL THEN NULL ELSE {ts(when + dt.timedelta(hours=rnd.randint(2, 30)))} END "
                         f"WHERE user_id = {q(u.id)};")
-        for table in ("courier_profiles", "merchant_profiles"):
-            auth_sql.append(f"UPDATE {table} SET created_at = {ts(when)}, reviewed_at = CASE WHEN reviewed_at IS NULL "
-                            f"THEN NULL ELSE {ts(when + dt.timedelta(hours=rnd.randint(2, 30)))} END "
-                            f"WHERE user_id = {q(u.id)};")
     auth_sql.append("DELETE FROM refresh_tokens;")  # sessions from the generator run; sign in again
     for m in merchants:
         when = m["user"].created + dt.timedelta(hours=rnd.randint(1, 6))

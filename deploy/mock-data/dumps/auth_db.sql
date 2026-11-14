@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JUWduxqYUp1doH9VRhayQnucKa3h1nghzNL2OWQfGCsNbgRFafN0vmHXmz6Z6BJ
+\restrict WcQfvp6YkBzsZg78fW2tx53DWdUJtt9gjInzGMgJoFFpoNC5k1GPdeAdY9toJoK
 
 -- Dumped from database version 16.16
 -- Dumped by pg_dump version 16.16
@@ -25,10 +25,6 @@ ALTER TABLE IF EXISTS ONLY public.refresh_tokens DROP CONSTRAINT IF EXISTS refre
 ALTER TABLE IF EXISTS ONLY public.refresh_tokens DROP CONSTRAINT IF EXISTS refresh_tokens_replaced_by_fkey;
 ALTER TABLE IF EXISTS ONLY public.oauth_login_codes DROP CONSTRAINT IF EXISTS oauth_login_codes_user_id_fkey;
 ALTER TABLE IF EXISTS ONLY public.oauth_accounts DROP CONSTRAINT IF EXISTS oauth_accounts_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.merchant_profiles DROP CONSTRAINT IF EXISTS merchant_profiles_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.merchant_profiles DROP CONSTRAINT IF EXISTS merchant_profiles_reviewed_by_fkey;
-ALTER TABLE IF EXISTS ONLY public.courier_profiles DROP CONSTRAINT IF EXISTS courier_profiles_user_id_fkey;
-ALTER TABLE IF EXISTS ONLY public.courier_profiles DROP CONSTRAINT IF EXISTS courier_profiles_reviewed_by_fkey;
 DROP INDEX IF EXISTS public.uq_users_mobile_number;
 DROP INDEX IF EXISTS public.uq_users_email_lower;
 DROP INDEX IF EXISTS public.idx_user_roles_role_id;
@@ -46,45 +42,17 @@ ALTER TABLE IF EXISTS ONLY public.refresh_tokens DROP CONSTRAINT IF EXISTS refre
 ALTER TABLE IF EXISTS ONLY public.oauth_login_codes DROP CONSTRAINT IF EXISTS oauth_login_codes_pkey;
 ALTER TABLE IF EXISTS ONLY public.oauth_login_codes DROP CONSTRAINT IF EXISTS oauth_login_codes_code_hash_key;
 ALTER TABLE IF EXISTS ONLY public.oauth_accounts DROP CONSTRAINT IF EXISTS oauth_accounts_pkey;
-ALTER TABLE IF EXISTS ONLY public.merchant_profiles DROP CONSTRAINT IF EXISTS merchant_profiles_pkey;
-ALTER TABLE IF EXISTS ONLY public.merchant_profiles DROP CONSTRAINT IF EXISTS merchant_profiles_business_registration_number_key;
 ALTER TABLE IF EXISTS ONLY public.flyway_schema_history DROP CONSTRAINT IF EXISTS flyway_schema_history_pk;
-ALTER TABLE IF EXISTS ONLY public.courier_profiles DROP CONSTRAINT IF EXISTS courier_profiles_pkey;
-ALTER TABLE IF EXISTS ONLY public.courier_profiles DROP CONSTRAINT IF EXISTS courier_profiles_nic_number_key;
 DROP TABLE IF EXISTS public.users;
 DROP TABLE IF EXISTS public.user_roles;
 DROP TABLE IF EXISTS public.roles;
 DROP TABLE IF EXISTS public.refresh_tokens;
 DROP TABLE IF EXISTS public.oauth_login_codes;
 DROP TABLE IF EXISTS public.oauth_accounts;
-DROP TABLE IF EXISTS public.merchant_profiles;
 DROP TABLE IF EXISTS public.flyway_schema_history;
-DROP TABLE IF EXISTS public.courier_profiles;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: courier_profiles; Type: TABLE; Schema: public; Owner: auth
---
-
-CREATE TABLE public.courier_profiles (
-    user_id uuid NOT NULL,
-    nic_number character varying(30) NOT NULL,
-    date_of_birth date NOT NULL,
-    delivery_zones text NOT NULL,
-    vehicle_type character varying(50) NOT NULL,
-    nic_document_path text,
-    licence_document_path text,
-    approval_status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
-    reviewed_at timestamp with time zone,
-    reviewed_by uuid,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT chk_courier_approval_status CHECK (((approval_status)::text = ANY ((ARRAY['PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))
-);
-
-
-ALTER TABLE public.courier_profiles OWNER TO auth;
 
 --
 -- Name: flyway_schema_history; Type: TABLE; Schema: public; Owner: auth
@@ -105,29 +73,6 @@ CREATE TABLE public.flyway_schema_history (
 
 
 ALTER TABLE public.flyway_schema_history OWNER TO auth;
-
---
--- Name: merchant_profiles; Type: TABLE; Schema: public; Owner: auth
---
-
-CREATE TABLE public.merchant_profiles (
-    user_id uuid NOT NULL,
-    business_name character varying(200) NOT NULL,
-    business_registration_number character varying(100) NOT NULL,
-    business_category character varying(100) NOT NULL,
-    pickup_location text NOT NULL,
-    contact_person character varying(150) NOT NULL,
-    br_certificate_path text,
-    owner_nic_path text,
-    approval_status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
-    reviewed_at timestamp with time zone,
-    reviewed_by uuid,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT chk_merchant_approval_status CHECK (((approval_status)::text = ANY ((ARRAY['PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))
-);
-
-
-ALTER TABLE public.merchant_profiles OWNER TO auth;
 
 --
 -- Name: oauth_accounts; Type: TABLE; Schema: public; Owner: auth
@@ -242,47 +187,14 @@ CREATE TABLE public.users (
 ALTER TABLE public.users OWNER TO auth;
 
 --
--- Data for Name: courier_profiles; Type: TABLE DATA; Schema: public; Owner: auth
---
-
-COPY public.courier_profiles (user_id, nic_number, date_of_birth, delivery_zones, vehicle_type, nic_document_path, licence_document_path, approval_status, reviewed_at, reviewed_by, created_at) FROM stdin;
-c5592d9f-a72a-4822-9080-fd0ccc511add	197684979167	1976-07-09	COLOMBO_CENTRAL,COLOMBO_SOUTH	Three-wheeler	\N	\N	APPROVED	2026-08-10 11:42:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-08-10 09:42:00+00
-a1452cf6-4d4b-4a28-860e-518d81821912	200293904619	2002-12-26	COLOMBO_NORTH,COLOMBO_CENTRAL	Van	\N	\N	APPROVED	2026-07-10 04:40:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-07-09 02:40:00+00
-42b44f66-66c4-44b8-af94-031065494ba7	200229364897	2002-10-09	KOTTE_RAJAGIRIYA,NUGEGODA_MAHARAGAMA	Motorbike	\N	\N	APPROVED	2026-08-08 01:35:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-08-07 12:35:00+00
-73623c45-6a11-4080-98da-1a004bacbf48	198670871702	1986-03-16	DEHIWALA_MT_LAVINIA,COLOMBO_SOUTH	Motorbike	\N	\N	APPROVED	2026-08-21 18:26:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-08-21 11:26:00+00
-28e8368b-8a0e-4fa6-8a8f-db7172b8c354	199365881301	1993-12-14	NUGEGODA_MAHARAGAMA,DEHIWALA_MT_LAVINIA	Motorbike	\N	\N	APPROVED	2026-09-02 04:54:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-01 05:54:00+00
-88670f51-c181-48ba-b6ff-1342422fa974	197578137055	1975-11-04	COLOMBO_NORTH,NEGOMBO	Motorbike	\N	\N	APPROVED	2026-08-18 11:35:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-08-18 03:35:00+00
-8a9f6979-f1cc-4539-a393-1baa9bb70bad	200094589930	2000-08-23	KANDY	Three-wheeler	\N	\N	APPROVED	2026-09-03 05:40:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-02 06:40:00+00
-2312f6f5-ecd5-4e40-8ed1-8bfbfe15c53a	199031822359	1990-11-06	GALLE	Motorbike	\N	\N	APPROVED	2026-07-16 12:43:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-07-16 05:43:00+00
-175873ad-65ef-45e0-91ea-d52af596bf9e	199126255693	1991-03-04	COLOMBO_SOUTH,KOTTE_RAJAGIRIYA	Motorbike	\N	\N	APPROVED	2026-07-23 20:27:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-07-23 04:27:00+00
-9875ccd7-f7f9-4a43-bbbd-c1fd75a9407e	200140861450	2001-07-27	COLOMBO_CENTRAL,COLOMBO_NORTH	Motorbike	\N	\N	APPROVED	2026-07-15 00:37:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-07-14 05:37:00+00
-\.
-
-
---
 -- Data for Name: flyway_schema_history; Type: TABLE DATA; Schema: public; Owner: auth
 --
 
 COPY public.flyway_schema_history (installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success) FROM stdin;
-1	1	create auth tables	SQL	V1__create_auth_tables.sql	427391598	auth	2026-11-14 10:16:56.023329	128	t
-2	2	create oauth login codes	SQL	V2__create_oauth_login_codes.sql	-2005132465	auth	2026-11-14 10:16:56.212664	8	t
-3	3	unique user mobile numbers	SQL	V3__unique_user_mobile_numbers.sql	1535160245	auth	2026-11-14 10:16:56.236336	6	t
-\.
-
-
---
--- Data for Name: merchant_profiles; Type: TABLE DATA; Schema: public; Owner: auth
---
-
-COPY public.merchant_profiles (user_id, business_name, business_registration_number, business_category, pickup_location, contact_person, br_certificate_path, owner_nic_path, approval_status, reviewed_at, reviewed_by, created_at) FROM stdin;
-5bbfdaf0-3d8d-4ceb-bd93-00c91573ac23	Kandy Spice House	PV467611	Food & groceries	220 Peradeniya Road, Kandy	Ruwan Fernando	\N	\N	APPROVED	2026-09-21 01:06:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-20 06:06:00+00
-30056f25-6559-438c-9980-4e2a84365b06	Colombo Threads	PV603196	Clothing	10 Flower Road, Colombo 07	Sajith Karunaratne	\N	\N	APPROVED	2026-09-01 17:06:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-01 10:06:00+00
-cc91bacd-b679-443d-8d92-da68e6bdc2be	TechLanka Gadgets	PV405641	Electronics	216 Galle Road, Colombo 03	Lahiru Senanayake	\N	\N	APPROVED	2026-09-19 09:49:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-18 03:49:00+00
-9e6c3a6a-7c87-4f1d-a0b1-6509fb5a96d3	Ceylon Tea Corner	PV924020	Food & groceries	21 Stanley Thilakaratne Mawatha, Nugegoda	Lahiru Wijesinghe	\N	\N	APPROVED	2026-09-18 04:19:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-17 06:19:00+00
-8131f094-5b5f-4331-8afd-7d7f917074e5	BookNook Lanka	PV542663	Books	144 Havelock Road, Colombo 05	Chathura Perera	\N	\N	APPROVED	2026-09-22 10:26:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-21 13:26:00+00
-7635a541-77c2-47a8-a362-e854d888fcfc	Galle Fort Crafts	PV500681	Handicrafts	79 Wakwella Road, Galle	Pradeep Wickramasinghe	\N	\N	APPROVED	2026-09-15 02:08:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-14 11:08:00+00
-b498d433-f9af-4096-a491-d8d4097b64ed	Negombo Fresh Fish	PV470497	Food & groceries	170 Lewis Place, Negombo	Pradeep Rajapaksa	\N	\N	PENDING	\N	\N	2026-09-06 03:27:00+00
-25d7fcf0-1032-4973-a56d-0a547777f402	QuickFix Mobile Parts	PV616649	Electronics	216 Parliament Road, Rajagiriya	Oshada Weerasinghe	\N	\N	REJECTED	2026-09-18 03:25:00+00	679fce35-4d90-404d-abdf-3208533d5c24	2026-09-17 11:25:00+00
+1	1	create auth tables	SQL	V1__create_auth_tables.sql	427391598	auth	2026-11-14 14:11:36.752002	64	t
+2	2	create oauth login codes	SQL	V2__create_oauth_login_codes.sql	-2005132465	auth	2026-11-14 14:11:36.873384	11	t
+3	3	unique user mobile numbers	SQL	V3__unique_user_mobile_numbers.sql	1535160245	auth	2026-11-14 14:11:36.897776	5	t
+4	4	drop profile tables	SQL	V4__drop_profile_tables.sql	934928446	auth	2026-11-14 14:11:36.910325	17	t
 \.
 
 
@@ -328,75 +240,75 @@ COPY public.roles (id, name) FROM stdin;
 --
 
 COPY public.user_roles (user_id, role_id, assignment_status, assigned_at, reviewed_at, reviewed_by) FROM stdin;
-679fce35-4d90-404d-abdf-3208533d5c24	5	ACTIVE	2026-06-17 02:33:00+00	2026-06-17 13:33:00+00	\N
-8b792576-f64c-48bc-9eaa-1865563cfdb5	5	ACTIVE	2026-06-11 04:27:00+00	2026-06-11 10:27:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-49c139c8-8007-4199-80b6-e68a928a59fb	4	ACTIVE	2026-07-30 12:47:00+00	2026-07-31 15:47:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-80d23eb8-1156-49dc-b5c3-42cdedfab75d	4	ACTIVE	2026-07-11 03:05:00+00	2026-07-12 02:05:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-7d19bfe5-daf8-4879-8f88-7fcc9bff34c5	4	ACTIVE	2026-07-21 10:35:00+00	2026-07-22 16:35:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-c5592d9f-a72a-4822-9080-fd0ccc511add	3	ACTIVE	2026-08-10 09:42:00+00	2026-08-11 04:42:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-a1452cf6-4d4b-4a28-860e-518d81821912	3	ACTIVE	2026-07-09 02:40:00+00	2026-07-10 07:40:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-42b44f66-66c4-44b8-af94-031065494ba7	3	ACTIVE	2026-08-07 12:35:00+00	2026-08-07 23:35:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-73623c45-6a11-4080-98da-1a004bacbf48	3	ACTIVE	2026-08-21 11:26:00+00	2026-08-21 19:26:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-28e8368b-8a0e-4fa6-8a8f-db7172b8c354	3	ACTIVE	2026-09-01 05:54:00+00	2026-09-02 00:54:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-88670f51-c181-48ba-b6ff-1342422fa974	3	ACTIVE	2026-08-18 03:35:00+00	2026-08-19 05:35:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-8a9f6979-f1cc-4539-a393-1baa9bb70bad	3	ACTIVE	2026-09-02 06:40:00+00	2026-09-02 13:40:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-2312f6f5-ecd5-4e40-8ed1-8bfbfe15c53a	3	ACTIVE	2026-07-16 05:43:00+00	2026-07-16 09:43:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-175873ad-65ef-45e0-91ea-d52af596bf9e	3	ACTIVE	2026-07-23 04:27:00+00	2026-07-23 14:27:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-9875ccd7-f7f9-4a43-bbbd-c1fd75a9407e	3	ACTIVE	2026-07-14 05:37:00+00	2026-07-15 05:37:00+00	679fce35-4d90-404d-abdf-3208533d5c24
-5bbfdaf0-3d8d-4ceb-bd93-00c91573ac23	1	ACTIVE	2026-09-20 06:06:00+00	\N	\N
-5bbfdaf0-3d8d-4ceb-bd93-00c91573ac23	2	ACTIVE	2026-09-20 06:06:00+00	\N	\N
-30056f25-6559-438c-9980-4e2a84365b06	1	ACTIVE	2026-09-01 10:06:00+00	\N	\N
-30056f25-6559-438c-9980-4e2a84365b06	2	ACTIVE	2026-09-01 10:06:00+00	\N	\N
-cc91bacd-b679-443d-8d92-da68e6bdc2be	1	ACTIVE	2026-09-18 03:49:00+00	\N	\N
-cc91bacd-b679-443d-8d92-da68e6bdc2be	2	ACTIVE	2026-09-18 03:49:00+00	\N	\N
-9e6c3a6a-7c87-4f1d-a0b1-6509fb5a96d3	1	ACTIVE	2026-09-17 06:19:00+00	\N	\N
-9e6c3a6a-7c87-4f1d-a0b1-6509fb5a96d3	2	ACTIVE	2026-09-17 06:19:00+00	\N	\N
-8131f094-5b5f-4331-8afd-7d7f917074e5	1	ACTIVE	2026-09-21 13:26:00+00	\N	\N
-8131f094-5b5f-4331-8afd-7d7f917074e5	2	ACTIVE	2026-09-21 13:26:00+00	\N	\N
-7635a541-77c2-47a8-a362-e854d888fcfc	1	ACTIVE	2026-09-14 11:08:00+00	\N	\N
-7635a541-77c2-47a8-a362-e854d888fcfc	2	ACTIVE	2026-09-14 11:08:00+00	\N	\N
-b498d433-f9af-4096-a491-d8d4097b64ed	1	ACTIVE	2026-09-06 03:27:00+00	\N	\N
-25d7fcf0-1032-4973-a56d-0a547777f402	1	ACTIVE	2026-09-17 11:25:00+00	\N	\N
-abb1016e-35d4-40b4-a1d9-e5a308e17a5d	1	ACTIVE	2026-08-03 12:05:00+00	\N	\N
-643fdc94-f3a5-4cbb-ab82-67cb56405d8e	1	ACTIVE	2026-09-11 05:53:00+00	\N	\N
-56bccd5c-356a-4e87-8932-16022d0f1c67	1	ACTIVE	2026-08-09 09:14:00+00	\N	\N
-35af507f-40f9-4179-aa18-ad67cc90e3c6	1	ACTIVE	2026-09-19 06:23:00+00	\N	\N
-4562ae10-2335-4237-8eb9-25880e883a30	1	ACTIVE	2026-08-25 10:33:00+00	\N	\N
-b91119eb-4767-4860-b6e1-b5ee93593957	1	ACTIVE	2026-09-23 06:24:00+00	\N	\N
-fd7c2e41-eded-41e7-b0d2-98353000fa90	1	ACTIVE	2026-08-06 10:59:00+00	\N	\N
-a69f40d7-9950-455b-b2db-9a1a35f6b4c2	1	ACTIVE	2026-09-08 12:01:00+00	\N	\N
-ba7a69cd-815c-448c-ada9-f7a49ac6bb50	1	ACTIVE	2026-10-02 03:57:00+00	\N	\N
-ba860191-4254-4f32-ab5d-03b2adbee345	1	ACTIVE	2026-09-22 05:01:00+00	\N	\N
-38a8b458-db4b-4a49-9866-91e79ed8cb4c	1	ACTIVE	2026-10-06 02:54:00+00	\N	\N
-9f76138f-3fc1-4b8f-bb9f-5df28b84cd2c	1	ACTIVE	2026-08-26 09:38:00+00	\N	\N
-18dbe225-6150-4e1b-b41c-e7109ccbd18e	1	ACTIVE	2026-08-15 06:47:00+00	\N	\N
-b4f1804b-2b88-4a98-b6ba-0913cd259045	1	ACTIVE	2026-09-08 08:09:00+00	\N	\N
-d643c832-0366-4e10-b444-63f2cc479424	1	ACTIVE	2026-09-05 10:15:00+00	\N	\N
-c7a61ae5-05fc-49d7-9bd1-f8093be4f0e3	1	ACTIVE	2026-08-15 10:22:00+00	\N	\N
-7cbce484-9762-48e8-8fda-891d5d088cee	1	ACTIVE	2026-08-15 10:44:00+00	\N	\N
-f1c98d80-55e5-4e75-8f22-56fc86bfc894	1	ACTIVE	2026-08-09 12:41:00+00	\N	\N
-bc89ad84-c579-4c07-9452-41aff3eade38	1	ACTIVE	2026-09-10 07:17:00+00	\N	\N
-ab8979a9-f86a-4114-a57a-05c1bbb047a0	1	ACTIVE	2026-08-27 04:36:00+00	\N	\N
-35e35258-a722-428c-bf10-8318c9542f33	1	ACTIVE	2026-09-20 12:39:00+00	\N	\N
-b01faa8b-97a4-4fec-b8e6-83570b20abe1	1	ACTIVE	2026-10-11 09:28:00+00	\N	\N
-7837a8c9-5849-4620-8032-4c6db4bd64b9	1	ACTIVE	2026-09-23 03:43:00+00	\N	\N
-894da928-9d42-4091-a210-f889650603cf	1	ACTIVE	2026-08-29 11:03:00+00	\N	\N
-ca560003-b29d-4548-8e8a-db0e365ffacb	1	ACTIVE	2026-08-02 07:06:00+00	\N	\N
-0e48a1cf-a0d4-46ab-9355-bff3bd5b058c	1	ACTIVE	2026-09-03 07:46:00+00	\N	\N
-cbf74fc9-af4a-4124-8fc3-8e6aa92a6b4f	1	ACTIVE	2026-10-13 03:36:00+00	\N	\N
-41e925fa-e3cf-4ad8-b97b-590dddb8eb7e	1	ACTIVE	2026-09-30 06:14:00+00	\N	\N
-da3a2f45-be06-4092-bcc9-dba48859fd08	1	ACTIVE	2026-10-09 05:52:00+00	\N	\N
-7854b03a-8c06-47a6-8c46-971d35592326	1	ACTIVE	2026-10-07 07:39:00+00	\N	\N
-4a070202-5651-4fc2-8a83-9453e5948ea0	1	ACTIVE	2026-08-10 08:48:00+00	\N	\N
-99e69915-044d-46d1-ac17-0dec6d89ef9e	1	ACTIVE	2026-08-02 12:00:00+00	\N	\N
-5e62844d-8f4d-489e-96d9-44e67ff6da2c	1	ACTIVE	2026-08-02 13:21:00+00	\N	\N
-47bc625f-72d4-4c14-b74e-ae6bb4ff01ff	1	ACTIVE	2026-10-12 09:27:00+00	\N	\N
-69efc098-9961-44e4-9608-e4401147d661	1	ACTIVE	2026-09-13 13:16:00+00	\N	\N
-d4db9fa2-3261-4580-820e-9174ddc27975	1	ACTIVE	2026-08-12 07:21:00+00	\N	\N
-893ba1fd-f5b8-406d-a7d8-846f7b7370eb	1	ACTIVE	2026-07-28 04:08:00+00	\N	\N
-926acd4b-b097-4ed8-b69e-f6ef48e5dec3	1	ACTIVE	2026-08-06 04:19:00+00	\N	\N
-403f89f3-daab-43e4-a095-8c5382a79c41	1	ACTIVE	2026-09-23 08:19:00+00	\N	\N
-faf30155-d50f-4fd5-a24a-c85f69826132	1	ACTIVE	2026-08-10 05:29:00+00	\N	\N
+eeab7ea5-20bc-4d80-b757-447ed3fa06f0	5	ACTIVE	2026-06-17 09:21:00+00	2026-06-17 15:21:00+00	\N
+2aea47d3-a06d-4dba-b302-a2a6c6c25e37	5	ACTIVE	2026-06-17 10:09:00+00	2026-06-18 03:09:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+cb4cd22c-d4cd-4f2f-ad43-c2e73f1b9cb5	4	ACTIVE	2026-08-21 04:02:00+00	2026-08-21 19:02:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+3900455f-0834-4d57-85c5-c3de92f5ecee	4	ACTIVE	2026-08-07 04:35:00+00	2026-08-08 08:35:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+7bf5a598-1908-4a34-9ac4-041d3ce99466	4	ACTIVE	2026-07-08 04:50:00+00	2026-07-08 22:50:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+9e3b8266-acf9-4126-91bb-369d59ad25a7	3	ACTIVE	2026-08-13 12:07:00+00	2026-08-14 12:07:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+69f3dbf3-6a51-4f41-8634-af3d608c2527	3	ACTIVE	2026-08-29 07:37:00+00	2026-08-29 09:37:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+2296db41-b3a5-4443-a906-df1b2a23b26c	3	ACTIVE	2026-08-02 10:06:00+00	2026-08-02 15:06:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+5b32b607-0ba6-4ff9-8b45-e7e15baf395b	3	ACTIVE	2026-08-30 13:19:00+00	2026-08-31 18:19:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+fd5016f3-f6ab-462f-a5ed-0a2fb7ee2491	3	ACTIVE	2026-07-31 06:02:00+00	2026-08-01 03:02:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+2064432d-0cca-4c76-ac2b-47cd07270ec7	3	ACTIVE	2026-07-14 11:52:00+00	2026-07-14 23:52:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+c4750ad6-4949-4e9e-b59c-1c8af8f71294	3	ACTIVE	2026-07-24 10:30:00+00	2026-07-24 15:30:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+d28074b5-475a-4e20-b5d3-63080c9f1b7f	3	ACTIVE	2026-08-12 07:32:00+00	2026-08-12 10:32:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+854d0d01-8a43-4f8c-b742-ee0202e4e1b8	3	ACTIVE	2026-08-18 13:04:00+00	2026-08-19 08:04:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+3be525c0-b776-4ec1-b343-38831e36255d	3	ACTIVE	2026-09-02 04:40:00+00	2026-09-02 19:40:00+00	eeab7ea5-20bc-4d80-b757-447ed3fa06f0
+c50a9935-b0a4-42a7-8b67-834c582c0b41	1	ACTIVE	2026-09-04 04:35:00+00	\N	\N
+c50a9935-b0a4-42a7-8b67-834c582c0b41	2	ACTIVE	2026-09-04 04:35:00+00	\N	\N
+71ac489c-40e8-4057-bd8d-22645457f877	1	ACTIVE	2026-09-19 11:13:00+00	\N	\N
+71ac489c-40e8-4057-bd8d-22645457f877	2	ACTIVE	2026-09-19 11:13:00+00	\N	\N
+ac219f99-85fb-43a8-90b2-786b06a4d80b	1	ACTIVE	2026-09-14 10:35:00+00	\N	\N
+ac219f99-85fb-43a8-90b2-786b06a4d80b	2	ACTIVE	2026-09-14 10:35:00+00	\N	\N
+c8b97194-64f2-4ced-bc12-b5c4b7d4d9ee	1	ACTIVE	2026-09-02 04:57:00+00	\N	\N
+c8b97194-64f2-4ced-bc12-b5c4b7d4d9ee	2	ACTIVE	2026-09-02 04:57:00+00	\N	\N
+9b13b98c-873f-4749-958b-2f913cc7e712	1	ACTIVE	2026-09-09 10:31:00+00	\N	\N
+9b13b98c-873f-4749-958b-2f913cc7e712	2	ACTIVE	2026-09-09 10:31:00+00	\N	\N
+fff7e75b-4ded-4f40-8614-627687e7ec32	1	ACTIVE	2026-09-19 05:24:00+00	\N	\N
+fff7e75b-4ded-4f40-8614-627687e7ec32	2	ACTIVE	2026-09-19 05:24:00+00	\N	\N
+533bff2a-8e8b-4b3e-91f3-9a06ff07c37a	1	ACTIVE	2026-08-29 10:12:00+00	\N	\N
+73e39455-d811-45cf-a238-602646b5422b	1	ACTIVE	2026-09-02 08:02:00+00	\N	\N
+b2691eac-bac7-474e-831a-394cf0a74ad4	1	ACTIVE	2026-08-10 05:40:00+00	\N	\N
+5ed4919f-41d3-4113-b146-c0e1fde1d5e1	1	ACTIVE	2026-10-05 05:54:00+00	\N	\N
+09113e73-190a-4d24-b29d-7e954c8046f3	1	ACTIVE	2026-08-16 07:20:00+00	\N	\N
+fb91c4b1-ee0b-420d-a871-afd90ef87175	1	ACTIVE	2026-10-04 05:56:00+00	\N	\N
+ef2804b1-d8ab-4ff3-adfa-286e6cabaa3c	1	ACTIVE	2026-09-12 04:40:00+00	\N	\N
+d6f7d004-a3f0-4c13-b832-9a5d2a190277	1	ACTIVE	2026-10-07 05:43:00+00	\N	\N
+3c71c5d3-fb79-4b87-9cc2-208259f8bd5c	1	ACTIVE	2026-09-23 08:15:00+00	\N	\N
+4a7ec423-fde4-463d-b720-dc701fa6cb67	1	ACTIVE	2026-09-11 10:21:00+00	\N	\N
+2d5e78c7-b018-44fa-919a-c88f6dec4d5a	1	ACTIVE	2026-09-14 04:14:00+00	\N	\N
+2a67b293-8450-4f8c-9974-de5f22cba511	1	ACTIVE	2026-10-05 02:45:00+00	\N	\N
+be990ef6-292c-4890-a29d-f87648582c13	1	ACTIVE	2026-09-10 10:50:00+00	\N	\N
+a658ff88-1274-44e4-810f-8c7075b7c364	1	ACTIVE	2026-08-03 12:36:00+00	\N	\N
+76176177-992e-488a-8a2c-932dcc5140f1	1	ACTIVE	2026-10-08 03:49:00+00	\N	\N
+1bee39c3-f064-4fa6-a337-4c2cc080e2e9	1	ACTIVE	2026-10-06 06:19:00+00	\N	\N
+bcb82745-4e74-4a93-b988-080e4ebe656e	1	ACTIVE	2026-10-15 13:26:00+00	\N	\N
+09d62189-9682-4b25-84ed-cc7ab1e87651	1	ACTIVE	2026-09-27 11:37:00+00	\N	\N
+9e7d6f92-a22a-4978-b95e-6a18c452a849	1	ACTIVE	2026-07-30 11:30:00+00	\N	\N
+d5677db6-7def-46a6-a51e-dad63366f591	1	ACTIVE	2026-09-14 03:27:00+00	\N	\N
+8884150d-9195-43bf-b123-69dc672f3488	1	ACTIVE	2026-08-19 10:34:00+00	\N	\N
+ef5bff6c-992b-4a08-811d-91be3cd0e645	1	ACTIVE	2026-08-08 08:51:00+00	\N	\N
+9c8c5f30-6fcd-4f27-a77b-2bb855526690	1	ACTIVE	2026-08-03 12:05:00+00	\N	\N
+0d266b85-d4b2-46b2-aafe-5f0ab0b02c0d	1	ACTIVE	2026-09-14 05:47:00+00	\N	\N
+e6a07fa6-7259-4d1b-ac3f-8a432f428b8d	1	ACTIVE	2026-08-29 10:55:00+00	\N	\N
+d1b1fc3f-f55d-4e46-99ea-704b2d1ef8ff	1	ACTIVE	2026-08-09 09:14:00+00	\N	\N
+356e5a5a-ba92-4d21-8017-b5649aa65425	1	ACTIVE	2026-08-16 09:43:00+00	\N	\N
+c1423ca5-efb7-4421-9901-4d70ae2163d0	1	ACTIVE	2026-10-09 11:55:00+00	\N	\N
+db3b1189-edff-403b-a1e7-09a061a2d405	1	ACTIVE	2026-08-09 02:32:00+00	\N	\N
+a5b66fa4-196a-41a2-a15b-dc7bbc57430f	1	ACTIVE	2026-08-24 05:18:00+00	\N	\N
+74d0028c-0695-44d9-b8e1-8a522a6e0e34	1	ACTIVE	2026-08-10 13:23:00+00	\N	\N
+500636b3-1973-4548-adf1-8666733731b8	1	ACTIVE	2026-08-05 10:07:00+00	\N	\N
+fdd7ae27-35e5-417e-b4cd-df85a5fe6cd1	1	ACTIVE	2026-09-08 12:01:00+00	\N	\N
+f8668c6d-3bc0-48b3-8ead-474d9523a7b7	1	ACTIVE	2026-09-25 03:34:00+00	\N	\N
+4b30e56a-3840-429c-b968-3e885023d0b2	1	ACTIVE	2026-09-12 10:10:00+00	\N	\N
+08ce854a-6db5-4855-a2b7-d68e5c8305cf	1	ACTIVE	2026-09-26 10:06:00+00	\N	\N
+af229567-0ca1-4397-bf5b-1d8f8b6ffe81	1	ACTIVE	2026-08-19 03:30:00+00	\N	\N
+4cecee6d-ec13-4ac2-803f-b9a696d6c972	1	ACTIVE	2026-08-10 12:55:00+00	\N	\N
+ceacbbdb-fde0-4a2c-95ed-e1d7ee74c98d	1	ACTIVE	2026-09-29 07:34:00+00	\N	\N
+b7e01598-766c-4b81-a1d2-55c4f2fbb709	1	ACTIVE	2026-08-15 06:47:00+00	\N	\N
+b02190b7-45c7-4967-baf0-5581d728dd35	1	ACTIVE	2026-07-30 07:15:00+00	\N	\N
+2da89375-52f5-47f7-859b-2ac948151468	1	ACTIVE	2026-07-28 04:11:00+00	\N	\N
 \.
 
 
@@ -405,69 +317,69 @@ faf30155-d50f-4fd5-a24a-c85f69826132	1	ACTIVE	2026-08-10 05:29:00+00	\N	\N
 --
 
 COPY public.users (id, full_name, email, mobile_number, password_hash, account_status, email_verified, created_at, updated_at) FROM stdin;
-7635a541-77c2-47a8-a362-e854d888fcfc	Pradeep Wickramasinghe	pradeep.wickramasinghe@merchant.example.com	0760290556	$2a$12$VU.TiXFiowKfs5mL7pG8C.w/sakPZ/MmlytJAykyvLFzlyMB14gMS	ACTIVE	t	2026-09-14 11:08:00+00	2026-09-14 11:08:00+00
-b498d433-f9af-4096-a491-d8d4097b64ed	Pradeep Rajapaksa	pradeep.rajapaksa@merchant.example.com	0726996524	$2a$12$mIa2LxluEV.Qceg3XNxx0ee.5dshqQZ1rd14pVCpPXsJfsi35tgiG	ACTIVE	t	2026-09-06 03:27:00+00	2026-09-06 03:27:00+00
-25d7fcf0-1032-4973-a56d-0a547777f402	Oshada Weerasinghe	oshada.weerasinghe@merchant.example.com	0787692766	$2a$12$FP1zL3NAXUY/9QlR2Uz9VuSuXK6QhJe1uky/cexJ4A0IyCs1aMmnO	ACTIVE	t	2026-09-17 11:25:00+00	2026-09-17 11:25:00+00
-643fdc94-f3a5-4cbb-ab82-67cb56405d8e	Anjali Fernando	anjali.fernando@example.com	0761737195	$2a$12$.CqNq6CaAPsYMfhMuwrCC.dfvWHrzhxc1pza/rFiTf92jt5iSxE0q	ACTIVE	t	2026-09-11 05:53:00+00	2026-09-11 05:53:00+00
-56bccd5c-356a-4e87-8932-16022d0f1c67	Thisaru Senanayake	thisaru.senanayake@example.com	0703171384	$2a$12$dYlFGCx1DnDhtjhP8ssXSuhVPzT8PF8dfvvFWTwycEIwba4c/ODWy	ACTIVE	t	2026-08-09 09:14:00+00	2026-08-09 09:14:00+00
-35af507f-40f9-4179-aa18-ad67cc90e3c6	Ishara Gunasekara	ishara.gunasekara@example.com	0774426117	$2a$12$19bZOUTu3INipkGKXC36jO7eSwNQ0aarbKDJlYoOVof.ZrPr8j//G	ACTIVE	t	2026-09-19 06:23:00+00	2026-09-19 06:23:00+00
-4562ae10-2335-4237-8eb9-25880e883a30	Tharushi de Silva	tharushi.de.silva@example.com	0706451756	$2a$12$DOcBwmzwdx4QXJKhc5Yptu55Qe2mZMBGnp2IV50D9OXhxhumB32QG	ACTIVE	t	2026-08-25 10:33:00+00	2026-08-25 10:33:00+00
-b91119eb-4767-4860-b6e1-b5ee93593957	Nipuni Liyanage	nipuni.liyanage@example.com	0767872240	$2a$12$ZRQpqWCQOJCBPlj5kf8BDuRtZom2h8LiIFie4GB911J9XWCn7Jzp6	ACTIVE	t	2026-09-23 06:24:00+00	2026-09-23 06:24:00+00
-fd7c2e41-eded-41e7-b0d2-98353000fa90	Malith de Silva	malith.de.silva@example.com	0701418621	$2a$12$7kcws3BsiDl5D.qUpNkzr.kl5YIt3UXiE1/QR3HdCboymQ5Tr5IWm	ACTIVE	t	2026-08-06 10:59:00+00	2026-08-06 10:59:00+00
-a69f40d7-9950-455b-b2db-9a1a35f6b4c2	Thisaru Wickramasinghe	thisaru.wickramasinghe@example.com	0721896886	$2a$12$r2YOVPZocEf/aLlR2lurreXiBMlq7K4y1bw.8X3H6mjP530uIJSuK	ACTIVE	t	2026-09-08 12:01:00+00	2026-09-08 12:01:00+00
-ba7a69cd-815c-448c-ada9-f7a49ac6bb50	Lahiru Nawaz	lahiru.nawaz@example.com	0700341717	$2a$12$94dlZr5AHqnSv/TRAVuDEOwnSWtfIn0cYBAFd77RWU5w0aQAoSsj2	ACTIVE	t	2026-10-02 03:57:00+00	2026-10-02 03:57:00+00
-ba860191-4254-4f32-ab5d-03b2adbee345	Tharindu Rahman	tharindu.rahman@example.com	0786177595	$2a$12$KXCPgGxUCuYIwWkGKSCgOO7srlMV4iu2Z3J9nBNEsq15JqkcwBHRu	ACTIVE	t	2026-09-22 05:01:00+00	2026-09-22 05:01:00+00
-38a8b458-db4b-4a49-9866-91e79ed8cb4c	Methmi Peiris	methmi.peiris@example.com	0717295928	$2a$12$DF8j7Ly5qVrN0Zv6ATMmHOYf/H/NjVXAbBTgKhUTaRFwy9Bka1cyW	ACTIVE	t	2026-10-06 02:54:00+00	2026-10-06 02:54:00+00
-9f76138f-3fc1-4b8f-bb9f-5df28b84cd2c	Hashini Weerasinghe	hashini.weerasinghe@example.com	0785757443	$2a$12$rSKZmz4zkGlquYFWQVs2Ge4LNkYUkZ4PRtiWc6mDzhmX9t6c0LrAG	ACTIVE	t	2026-08-26 09:38:00+00	2026-08-26 09:38:00+00
-18dbe225-6150-4e1b-b41c-e7109ccbd18e	Methmi Cooray	methmi.cooray@example.com	0765663118	$2a$12$uQiE2NpVMLOYWQ/1tTTFqu2NK7WoJXpIcf.gtHzWjHSyYN84eheK.	ACTIVE	t	2026-08-15 06:47:00+00	2026-08-15 06:47:00+00
-b4f1804b-2b88-4a98-b6ba-0913cd259045	Sanduni Silva	sanduni.silva@example.com	0727631910	$2a$12$J8t7G/i0piQV8NcF6qSn4emvRFr.UU1lyolrVuYkL3fAr2/LmThpu	ACTIVE	t	2026-09-08 08:09:00+00	2026-09-08 08:09:00+00
-d643c832-0366-4e10-b444-63f2cc479424	Amaya Senanayake	amaya.senanayake@example.com	0721398560	$2a$12$V.WdjR/io4jXbLymDRAf9uLxlETAHSMuHYSJwby.suAPy5PnRe3ji	ACTIVE	t	2026-09-05 10:15:00+00	2026-09-05 10:15:00+00
-c7a61ae5-05fc-49d7-9bd1-f8093be4f0e3	Sanduni Perera	sanduni.perera@example.com	0789265864	$2a$12$xJSDWf5cGrvraw/XLLMUVed64LHcS4Ip0GdU.HwgfNQqK4jodu1em	ACTIVE	t	2026-08-15 10:22:00+00	2026-08-15 10:22:00+00
-7cbce484-9762-48e8-8fda-891d5d088cee	Dulani Jayawardena	dulani.jayawardena@example.com	0767207213	$2a$12$jnCXV95j50JFUnMXewTlReAuiM1Q8sooNxs0F5rCNeKUW3Ed6kMgi	ACTIVE	t	2026-08-15 10:44:00+00	2026-08-15 10:44:00+00
-f1c98d80-55e5-4e75-8f22-56fc86bfc894	Dinuka Ratnayake	dinuka.ratnayake@example.com	0709621201	$2a$12$siC.Io9K3F9vYzw7pYy20ukNM84//C3M5jU3rCzfdjGUt476ugszu	ACTIVE	t	2026-08-09 12:41:00+00	2026-08-09 12:41:00+00
-bc89ad84-c579-4c07-9452-41aff3eade38	Rizwan Jayawardena	rizwan.jayawardena@example.com	0746337605	$2a$12$g4xbuw7sBd8iPxf9QacKIu5pb02Q38ZbDXavkS8BtLm6Yqlc3ZOUO	ACTIVE	t	2026-09-10 07:17:00+00	2026-09-10 07:17:00+00
-ab8979a9-f86a-4114-a57a-05c1bbb047a0	Senuri Gunasekara	senuri.gunasekara@example.com	0769629453	$2a$12$b9aVhdzoGih0gJVWMpxbUO66q7JV7MRVdZ2tOZo3IUSYUoHOsx9ve	ACTIVE	t	2026-08-27 04:36:00+00	2026-08-27 04:36:00+00
-35e35258-a722-428c-bf10-8318c9542f33	Yasiru Amarasekara	yasiru.amarasekara@example.com	0788162462	$2a$12$3GH0EtuEmmM0vL5lQnJBZObqM8smgjNkyOWYfcOMsaD0KtzKSfIbS	ACTIVE	t	2026-09-20 12:39:00+00	2026-09-20 12:39:00+00
-b01faa8b-97a4-4fec-b8e6-83570b20abe1	Senuri Karunaratne	senuri.karunaratne@example.com	0705100214	$2a$12$P0PlwjqqSQHDiFR9YpE3Gukzao18vBMeIsYitd2Vwc19v6eYBvg1q	ACTIVE	t	2026-10-11 09:28:00+00	2026-10-11 09:28:00+00
-7837a8c9-5849-4620-8032-4c6db4bd64b9	Ayesha Amarasekara	ayesha.amarasekara@example.com	0712374484	$2a$12$qDrs5zwbjmLVG9kwMPs8VeWhrbttjNZUdOX8BtygFarasWd1uZHbO	ACTIVE	t	2026-09-23 03:43:00+00	2026-09-23 03:43:00+00
-894da928-9d42-4091-a210-f889650603cf	Ishara Karunaratne	ishara.karunaratne@example.com	0761346321	$2a$12$9uq5SVeQtqXYC1.hW.ElUuWQ3UJ0L6VHhGh8anU4rR4xmHHgvN4my	ACTIVE	t	2026-08-29 11:03:00+00	2026-08-29 11:03:00+00
-ca560003-b29d-4548-8e8a-db0e365ffacb	Ayesha Herath	ayesha.herath@example.com	0770296518	$2a$12$FlyhTUJ3d3yCjMgVd3QufeiqLoWUZv2PIWfJFFK/HOroq4Dy/hmv6	ACTIVE	t	2026-08-02 07:06:00+00	2026-08-02 07:06:00+00
-0e48a1cf-a0d4-46ab-9355-bff3bd5b058c	Isuru Senanayake	isuru.senanayake@example.com	0769558037	$2a$12$Chr1ugme9RYU.OrfxSS0AOyuNABkf.oH.8ALw7K08/r8gDpQkap1m	ACTIVE	t	2026-09-03 07:46:00+00	2026-09-03 07:46:00+00
-cbf74fc9-af4a-4124-8fc3-8e6aa92a6b4f	Tharindu Silva	tharindu.silva@example.com	0788424029	$2a$12$6adYYlyY2r6OlCmjgeXJqO/rMHOglgzRuudNMvooboXGT1M8eOnNW	ACTIVE	t	2026-10-13 03:36:00+00	2026-10-13 03:36:00+00
-41e925fa-e3cf-4ad8-b97b-590dddb8eb7e	Kavindi Nawaz	kavindi.nawaz@example.com	0710147275	$2a$12$yvP1z5IRqYkAya0bcULYmutQSXvSbPG/rQIO8Q5aAyeWZkabDix4S	ACTIVE	t	2026-09-30 06:14:00+00	2026-09-30 06:14:00+00
-da3a2f45-be06-4092-bcc9-dba48859fd08	Hashini Wijesinghe	hashini.wijesinghe@example.com	0727662295	$2a$12$pGI7inO1VoI.T9heEmTqeOyijBtxxWnok0cqLxioo.4GoV4yuJJa.	ACTIVE	t	2026-10-09 05:52:00+00	2026-10-09 05:52:00+00
-7854b03a-8c06-47a6-8c46-971d35592326	Pradeep Nawaz	pradeep.nawaz@example.com	0704877974	$2a$12$oXpgLHCMXuj636L5YYd3j.ZEQO8HOLA0jOCP4r81jGCEahvf1r6tm	ACTIVE	t	2026-10-07 07:39:00+00	2026-10-07 07:39:00+00
-4a070202-5651-4fc2-8a83-9453e5948ea0	Nipuni Karunaratne	nipuni.karunaratne@example.com	0760873486	$2a$12$4ZxENLQ1CEhQZ9xwGnYuOO/R5xF9P.5c2ZmITC86ZpVm53vBV6osi	ACTIVE	t	2026-08-10 08:48:00+00	2026-08-10 08:48:00+00
-99e69915-044d-46d1-ac17-0dec6d89ef9e	Tharushi Sivakumar	tharushi.sivakumar@example.com	0764929388	$2a$12$luLiw5LNdIyxDBAk9XD0c.TMi/hGUKld4FD82unlTP0dpZN7eZORe	ACTIVE	t	2026-08-02 12:00:00+00	2026-08-02 12:00:00+00
-5e62844d-8f4d-489e-96d9-44e67ff6da2c	Isuru Perera	isuru.perera@example.com	0707429766	$2a$12$zjVqhIouUjOILzpVSMj3WeWC72mJx0XRgP2s9UKZgociO9SzlLpVq	ACTIVE	t	2026-08-02 13:21:00+00	2026-08-02 13:21:00+00
-47bc625f-72d4-4c14-b74e-ae6bb4ff01ff	Ishara de Silva	ishara.de.silva@example.com	0768566616	$2a$12$LHwVg3AJhTsWE0yoXPF.Q.Qfu3LB1JldLbySbIDjzXXDsOBslgu4i	ACTIVE	t	2026-10-12 09:27:00+00	2026-10-12 09:27:00+00
-69efc098-9961-44e4-9608-e4401147d661	Kamal Wickramasinghe	kamal.wickramasinghe@example.com	0721585856	$2a$12$e19DZZ3o.q2e4mzDeuYiCedXmyDcT.UjS7N03knghFkxPNkcQW0aK	ACTIVE	t	2026-09-13 13:16:00+00	2026-09-13 13:16:00+00
-d4db9fa2-3261-4580-820e-9174ddc27975	Chamari Perera	chamari.perera@example.com	0706725897	$2a$12$aW//vS04eU0GCMT6cOZy/OV8/Z1ait7LNG6C6qW1af8LLDN3QPKNa	ACTIVE	t	2026-08-12 07:21:00+00	2026-08-12 07:21:00+00
-893ba1fd-f5b8-406d-a7d8-846f7b7370eb	Senuri Jayasinghe	senuri.jayasinghe@example.com	0743647515	$2a$12$.ZEPTQeK9yGFKzsq/SWEV.d9lcT6VQ53DS0I0KXdKl66SzeTGWW9e	ACTIVE	t	2026-07-28 04:08:00+00	2026-07-28 04:08:00+00
-926acd4b-b097-4ed8-b69e-f6ef48e5dec3	Yasiru Dissanayake	yasiru.dissanayake@example.com	0760580653	$2a$12$7E8FJcuIXNtVu/uVmc4rUeZzCV9y8XV7cLsPWfsU90p3q9mZQxK/C	ACTIVE	t	2026-08-06 04:19:00+00	2026-08-06 04:19:00+00
-403f89f3-daab-43e4-a095-8c5382a79c41	Supuni Abeysekera	supuni.abeysekera@example.com	0744471904	$2a$12$fz1zMN7DhSU3AB4rGnayQ.PesvtNqU.yG44YKByrPpgcosJLLwcYy	ACTIVE	t	2026-09-23 08:19:00+00	2026-09-23 08:19:00+00
-faf30155-d50f-4fd5-a24a-c85f69826132	Dinuka Rajapaksa	dinuka.rajapaksa@example.com	0745802325	$2a$12$dw/OYCf2e8cLfII0MXX1v.3N1bq2FzehNzg6pnKG.kbWeQfeD/3UW	ACTIVE	t	2026-08-10 05:29:00+00	2026-08-10 05:29:00+00
-679fce35-4d90-404d-abdf-3208533d5c24	Sachintha Dilshan	admin@swiftdrop.example.com	0703897827	$2a$12$pgiisgnUZDVbsAWl/gmcoOsWSKJprZ6V/EKvULxWOq4cVHJN.zngq	ACTIVE	t	2026-06-17 02:33:00+00	2026-06-17 02:33:00+00
-8b792576-f64c-48bc-9eaa-1865563cfdb5	Ops Admin	ops.admin@swiftdrop.example.com	0707362069	$2a$12$iNL6Dtwh5rephdsZrXlvg.DHJyQZGBcW194e5IVzNkeuD3Ne64Uwi	ACTIVE	t	2026-06-11 04:27:00+00	2026-06-11 04:27:00+00
-49c139c8-8007-4199-80b6-e68a928a59fb	Hiruni Nawaz	dispatcher1@swiftdrop.example.com	0766643372	$2a$12$W7cWqHjBsd9yfGqWvOzhae3DatdSuSczqOcQlRaiPG6ezXukYoheq	ACTIVE	t	2026-07-30 12:47:00+00	2026-07-30 12:47:00+00
-80d23eb8-1156-49dc-b5c3-42cdedfab75d	Hiruni Weerasinghe	dispatcher2@swiftdrop.example.com	0763536741	$2a$12$BW8SmN5AsRXQvy.uezf01.IIM3E6j4j0e6T1ny3qICzQFsU1v620q	ACTIVE	t	2026-07-11 03:05:00+00	2026-07-11 03:05:00+00
-7d19bfe5-daf8-4879-8f88-7fcc9bff34c5	Sajith Wijesinghe	dispatcher3@swiftdrop.example.com	0765276291	$2a$12$K6rerjFDW./u1rItF9gWjeXp3tfnuNg0T.YAlIYv0EETV38lx6j2S	ACTIVE	t	2026-07-21 10:35:00+00	2026-07-21 10:35:00+00
-c5592d9f-a72a-4822-9080-fd0ccc511add	Malith Wijesinghe	courier01@swiftdrop.example.com	0705825274	$2a$12$p97VWRrnXIcUUEf99Nml4Okz1LwHCMbg8GiPYz4yAShMJBHRcWuMW	ACTIVE	t	2026-08-10 09:42:00+00	2026-08-10 09:42:00+00
-a1452cf6-4d4b-4a28-860e-518d81821912	Supuni Jayasinghe	courier02@swiftdrop.example.com	0744232026	$2a$12$16.HD2RHMUJlF1SIQb5z7utQIAXIw0M133Flzn0sgsBp7LjJuMwGq	ACTIVE	t	2026-07-09 02:40:00+00	2026-07-09 02:40:00+00
-42b44f66-66c4-44b8-af94-031065494ba7	Mohamed Weerasinghe	courier03@swiftdrop.example.com	0745692595	$2a$12$lmB76lgoYr4ZsAJ4497o/.Drl/ku4Slo4pZoDpHZGY6cTlu3lX8eC	ACTIVE	t	2026-08-07 12:35:00+00	2026-08-07 12:35:00+00
-73623c45-6a11-4080-98da-1a004bacbf48	Dimuth Nawaz	courier04@swiftdrop.example.com	0728377257	$2a$12$1HdMrNVYBWLgHAPmbDWRB.4B3/fjQCB41I9bo2HcTouUFT1Ci4sw.	ACTIVE	t	2026-08-21 11:26:00+00	2026-08-21 11:26:00+00
-28e8368b-8a0e-4fa6-8a8f-db7172b8c354	Ishara Rahman	courier05@swiftdrop.example.com	0778737854	$2a$12$bhpbGU0svMNu1htHPwsXaeYJY5N09jBzNqlxYvvp3PeoG6Y1wIPvC	ACTIVE	t	2026-09-01 05:54:00+00	2026-09-01 05:54:00+00
-88670f51-c181-48ba-b6ff-1342422fa974	Sachini Fonseka	courier06@swiftdrop.example.com	0767793065	$2a$12$C0fRXDC3j6YIC4kC8rdEquUTJ8BDUddyJYseisXNGRXjnppt8iALK	ACTIVE	t	2026-08-18 03:35:00+00	2026-08-18 03:35:00+00
-8a9f6979-f1cc-4539-a393-1baa9bb70bad	Thisaru Liyanage	courier07@swiftdrop.example.com	0746284855	$2a$12$.e2R1NImIrgZp0gHori5geqLsF1cZeQbjmpy.2TAT3wQMkQIRv2Fm	ACTIVE	t	2026-09-02 06:40:00+00	2026-09-02 06:40:00+00
-2312f6f5-ecd5-4e40-8ed1-8bfbfe15c53a	Supuni Nawaz	courier08@swiftdrop.example.com	0701627611	$2a$12$.vJxDBTjLC06LQCWc91gQuU5Eljo1M0JA2S1YPP45LHu4drnXAyiy	ACTIVE	t	2026-07-16 05:43:00+00	2026-07-16 05:43:00+00
-175873ad-65ef-45e0-91ea-d52af596bf9e	Hashini Ratnayake	courier09@swiftdrop.example.com	0782832894	$2a$12$mWLKuLtVYnO0KZXuewkEneVavVqUH4iD75eFVykJydlC0qdfefaya	ACTIVE	t	2026-07-23 04:27:00+00	2026-07-23 04:27:00+00
-9875ccd7-f7f9-4a43-bbbd-c1fd75a9407e	Pradeep Ratnayake	courier10@swiftdrop.example.com	0700045175	$2a$12$oX/eBuXbkU1qkEyOJedqCO.BgqJprg1Fy.W2LHeBfq6OPkcIZ0cfm	ACTIVE	t	2026-07-14 05:37:00+00	2026-07-14 05:37:00+00
-5bbfdaf0-3d8d-4ceb-bd93-00c91573ac23	Ruwan Fernando	ruwan.fernando@merchant.example.com	0772401774	$2a$12$blJtB7eO22Sz7V9r.3vk5.C1YkyhiLKsL.OSSkkOYAYThh22/RE4G	ACTIVE	t	2026-09-20 06:06:00+00	2026-09-20 06:06:00+00
-30056f25-6559-438c-9980-4e2a84365b06	Sajith Karunaratne	sajith.karunaratne@merchant.example.com	0774891635	$2a$12$ZlYp4ibByg12/27us6Hx7O9DJIcubcBYA5LcIp66e4RHXAWzGg2Be	ACTIVE	t	2026-09-01 10:06:00+00	2026-09-01 10:06:00+00
-cc91bacd-b679-443d-8d92-da68e6bdc2be	Lahiru Senanayake	lahiru.senanayake@merchant.example.com	0770480984	$2a$12$Ycw4NK4wS6kcwiDUEynxEezELC.9kzMGSBI9YDhXso3nrLP29MrzS	ACTIVE	t	2026-09-18 03:49:00+00	2026-09-18 03:49:00+00
-9e6c3a6a-7c87-4f1d-a0b1-6509fb5a96d3	Lahiru Wijesinghe	lahiru.wijesinghe@merchant.example.com	0782262943	$2a$12$nQfzpW4yKiyyb8DwBgsz9.KyYFYQH/50lsaNcDBb8IVXZw2ArixBW	ACTIVE	t	2026-09-17 06:19:00+00	2026-09-17 06:19:00+00
-8131f094-5b5f-4331-8afd-7d7f917074e5	Chathura Perera	chathura.perera@merchant.example.com	0770943404	$2a$12$hb41xG2YlF1TtK/EG9TvuO1/Bw8jeqK0It.ibNvL5XfFRQudDlv7i	ACTIVE	t	2026-09-21 13:26:00+00	2026-09-21 13:26:00+00
-abb1016e-35d4-40b4-a1d9-e5a308e17a5d	Demo Customer	customer@example.com	0702392760	$2a$12$KVnyn7t8gHLyIUEllPJgYez6.lOgY0dz2wNLghu43cCxaP115I1xm	ACTIVE	t	2026-08-03 12:05:00+00	2026-08-03 12:05:00+00
+fff7e75b-4ded-4f40-8614-627687e7ec32	Pradeep Wickramasinghe	pradeep.wickramasinghe@merchant.example.com	0760290556	$2a$12$Bfp1q5XV6S5wjCzwO2/qGeQSR7wHuWh0xMWFvaQS5WqH4jLqaBgP6	ACTIVE	t	2026-09-19 05:24:00+00	2026-09-19 05:24:00+00
+533bff2a-8e8b-4b3e-91f3-9a06ff07c37a	Pradeep Rajapaksa	pradeep.rajapaksa@merchant.example.com	0726996524	$2a$12$7/3MyQ25DGJPdhsVivimFuB8UE1NhoZk/DTjYaHGFmd5pg663x2BG	ACTIVE	t	2026-08-29 10:12:00+00	2026-08-29 10:12:00+00
+73e39455-d811-45cf-a238-602646b5422b	Oshada Weerasinghe	oshada.weerasinghe@merchant.example.com	0787692766	$2a$12$HVki7RhTfJNQoVFE/fakM.UqvPWLuO9ZT.EGOhwHxtznMZL2ytYc.	ACTIVE	t	2026-09-02 08:02:00+00	2026-09-02 08:02:00+00
+5ed4919f-41d3-4113-b146-c0e1fde1d5e1	Anjali Fernando	anjali.fernando@example.com	0761737195	$2a$12$7mHD2bk/PityTMexdebRbOGPqNGbkwKcoS8Gsds0zIErhz8WCQwV6	ACTIVE	t	2026-10-05 05:54:00+00	2026-10-05 05:54:00+00
+09113e73-190a-4d24-b29d-7e954c8046f3	Thisaru Senanayake	thisaru.senanayake@example.com	0703171384	$2a$12$Zlxyam5IIyxHFWFvESjKVOieGgt1jAsXZz7Wn6R454z75CuiLygv2	ACTIVE	t	2026-08-16 07:20:00+00	2026-08-16 07:20:00+00
+fb91c4b1-ee0b-420d-a871-afd90ef87175	Ishara Gunasekara	ishara.gunasekara@example.com	0774426117	$2a$12$9m91r27e4OvS.hQObu0uCOZZkkzMHKDvtOUF4ZeibYGjiNTXyGA4e	ACTIVE	t	2026-10-04 05:56:00+00	2026-10-04 05:56:00+00
+ef2804b1-d8ab-4ff3-adfa-286e6cabaa3c	Tharushi de Silva	tharushi.de.silva@example.com	0706451756	$2a$12$g/9r2kJrTy/.bNv2A2mqjeWYHyowFplt2tyRWMv0.mleicfm6CcWu	ACTIVE	t	2026-09-12 04:40:00+00	2026-09-12 04:40:00+00
+d6f7d004-a3f0-4c13-b832-9a5d2a190277	Nipuni Liyanage	nipuni.liyanage@example.com	0767872240	$2a$12$RfdsljPiulLQ2XyTe0ADt.psHY98ThWUmCAqBGa84HI403NVfSiti	ACTIVE	t	2026-10-07 05:43:00+00	2026-10-07 05:43:00+00
+3c71c5d3-fb79-4b87-9cc2-208259f8bd5c	Malith de Silva	malith.de.silva@example.com	0701418621	$2a$12$u6y/NrGrxfrPfHyZ48pgZOJ2yVG9.Vn.xCkmKlpLirBv0FjTf.wSe	ACTIVE	t	2026-09-23 08:15:00+00	2026-09-23 08:15:00+00
+4a7ec423-fde4-463d-b720-dc701fa6cb67	Thisaru Wickramasinghe	thisaru.wickramasinghe@example.com	0721896886	$2a$12$Sf2U6VrFfTTDiB4L6k/KHOV9mdWOMjjd5V33g74XDrRiTY6Xq3pGa	ACTIVE	t	2026-09-11 10:21:00+00	2026-09-11 10:21:00+00
+2d5e78c7-b018-44fa-919a-c88f6dec4d5a	Lahiru Nawaz	lahiru.nawaz@example.com	0700341717	$2a$12$Yv/1sEm.oIcQQTu8tn8SjuENRfBKRe3Bs7eNFnI/nhuPsSJ.YyCqu	ACTIVE	t	2026-09-14 04:14:00+00	2026-09-14 04:14:00+00
+2a67b293-8450-4f8c-9974-de5f22cba511	Tharindu Rahman	tharindu.rahman@example.com	0786177595	$2a$12$ZGWQvWoU8CYfeo/vszEVtuRF3GFOdHT40hYL2a7WqFa5jEakeT.HS	ACTIVE	t	2026-10-05 02:45:00+00	2026-10-05 02:45:00+00
+be990ef6-292c-4890-a29d-f87648582c13	Methmi Peiris	methmi.peiris@example.com	0717295928	$2a$12$uJauHfp0frfhtFLn7DeJN.vPDuaCqAeOllr3An3M2ShWNkyJI0NWu	ACTIVE	t	2026-09-10 10:50:00+00	2026-09-10 10:50:00+00
+a658ff88-1274-44e4-810f-8c7075b7c364	Hashini Weerasinghe	hashini.weerasinghe@example.com	0785757443	$2a$12$CGzvAndeJVxrUMRAjVqyEeAqdZWBH7v8s/E74.VH0DtTBgK9YrsTO	ACTIVE	t	2026-08-03 12:36:00+00	2026-08-03 12:36:00+00
+76176177-992e-488a-8a2c-932dcc5140f1	Methmi Cooray	methmi.cooray@example.com	0765663118	$2a$12$/ySxONXa7RA2qWlNqgWjoeucmi4ciTuKt4dK7bOtrherKrvEYIKf.	ACTIVE	t	2026-10-08 03:49:00+00	2026-10-08 03:49:00+00
+1bee39c3-f064-4fa6-a337-4c2cc080e2e9	Sanduni Silva	sanduni.silva@example.com	0727631910	$2a$12$vICoTHg4cFG2CiIfNhmrCeh.Qu5mpIHwyDRIFRUJIpwmeh7s2dR1O	ACTIVE	t	2026-10-06 06:19:00+00	2026-10-06 06:19:00+00
+bcb82745-4e74-4a93-b988-080e4ebe656e	Amaya Senanayake	amaya.senanayake@example.com	0721398560	$2a$12$mOptKsHbP0Z/6/l3SGUhuuGQVImz2k975XTzW1mBfdE1aANQn2HGu	ACTIVE	t	2026-10-15 13:26:00+00	2026-10-15 13:26:00+00
+09d62189-9682-4b25-84ed-cc7ab1e87651	Sanduni Perera	sanduni.perera@example.com	0789265864	$2a$12$ZC48CQogWtd53ZbbgJbs4..jlebd/5OI9U7.ehdYsoCwML.qUAOla	ACTIVE	t	2026-09-27 11:37:00+00	2026-09-27 11:37:00+00
+9e7d6f92-a22a-4978-b95e-6a18c452a849	Dulani Jayawardena	dulani.jayawardena@example.com	0767207213	$2a$12$hJ3WaLoBAZL8mVsN3B0/1eOzN1n1FgiFmy7ayW2wV90QJ9I7RX91i	ACTIVE	t	2026-07-30 11:30:00+00	2026-07-30 11:30:00+00
+d5677db6-7def-46a6-a51e-dad63366f591	Dinuka Ratnayake	dinuka.ratnayake@example.com	0709621201	$2a$12$DReW43u6wIYC9lBAltTa8.hBIvtzwcKkM79KMVLv1i3caLJqIuy9u	ACTIVE	t	2026-09-14 03:27:00+00	2026-09-14 03:27:00+00
+8884150d-9195-43bf-b123-69dc672f3488	Rizwan Jayawardena	rizwan.jayawardena@example.com	0746337605	$2a$12$Mi10wD5sh4damPSCIe4iHurdQ7xYXwrEevL/xD3vQLMvD/mL54dxm	ACTIVE	t	2026-08-19 10:34:00+00	2026-08-19 10:34:00+00
+ef5bff6c-992b-4a08-811d-91be3cd0e645	Senuri Gunasekara	senuri.gunasekara@example.com	0769629453	$2a$12$j6QxXJKqOovpFREVM6l1CuoV00OApew01Q7aMXLF/VdCVxMF3BLGS	ACTIVE	t	2026-08-08 08:51:00+00	2026-08-08 08:51:00+00
+9c8c5f30-6fcd-4f27-a77b-2bb855526690	Yasiru Amarasekara	yasiru.amarasekara@example.com	0788162462	$2a$12$HwxXpcOTNWzb5hVumGI7lO8vn/kxKNqBK0Z9uP7hxgGM/aLtJcPmq	ACTIVE	t	2026-08-03 12:05:00+00	2026-08-03 12:05:00+00
+0d266b85-d4b2-46b2-aafe-5f0ab0b02c0d	Senuri Karunaratne	senuri.karunaratne@example.com	0705100214	$2a$12$rB1GPZrcqwXDn2VIf0nhie6qHuSji9ozwCYgo.cNynB2fD9i6I5V6	ACTIVE	t	2026-09-14 05:47:00+00	2026-09-14 05:47:00+00
+e6a07fa6-7259-4d1b-ac3f-8a432f428b8d	Ayesha Amarasekara	ayesha.amarasekara@example.com	0712374484	$2a$12$YJQO/maIaJP/lIHbc8.LwOFxbD73om60O86VNMYL6xWtucBluM1b6	ACTIVE	t	2026-08-29 10:55:00+00	2026-08-29 10:55:00+00
+d1b1fc3f-f55d-4e46-99ea-704b2d1ef8ff	Ishara Karunaratne	ishara.karunaratne@example.com	0761346321	$2a$12$92ZG0635F34w1Bbimn2AjeeuoFvlrY7DDby11yQZR8LKINZw8vd.O	ACTIVE	t	2026-08-09 09:14:00+00	2026-08-09 09:14:00+00
+356e5a5a-ba92-4d21-8017-b5649aa65425	Ayesha Herath	ayesha.herath@example.com	0770296518	$2a$12$9D7P8gswy88SLHi3wizpGuUDMloxYwRwkhIeODA5InVCfEdwGbWPS	ACTIVE	t	2026-08-16 09:43:00+00	2026-08-16 09:43:00+00
+c1423ca5-efb7-4421-9901-4d70ae2163d0	Isuru Senanayake	isuru.senanayake@example.com	0769558037	$2a$12$/VxeGhOIDV5BEz8AKEBqx.9GxDIFghV/cVxs2B7BjZgJU0Q3ysg/e	ACTIVE	t	2026-10-09 11:55:00+00	2026-10-09 11:55:00+00
+db3b1189-edff-403b-a1e7-09a061a2d405	Tharindu Silva	tharindu.silva@example.com	0788424029	$2a$12$ZI.t50V83Sw9VtVKMpWJP.I8UBKy3oLgbSSpXoxvCAEbRgUaakVwa	ACTIVE	t	2026-08-09 02:32:00+00	2026-08-09 02:32:00+00
+a5b66fa4-196a-41a2-a15b-dc7bbc57430f	Kavindi Nawaz	kavindi.nawaz@example.com	0710147275	$2a$12$78AcleZCDZb.FYNM6kzLpegQNmfJkmU2/NcQif5n1QLzEQxB1l.B.	ACTIVE	t	2026-08-24 05:18:00+00	2026-08-24 05:18:00+00
+74d0028c-0695-44d9-b8e1-8a522a6e0e34	Hashini Wijesinghe	hashini.wijesinghe@example.com	0727662295	$2a$12$9zaxfapQR1PZi0WXhPHsD.pda3xth6dkp/cFlBSQrVdivFEvhgw.u	ACTIVE	t	2026-08-10 13:23:00+00	2026-08-10 13:23:00+00
+500636b3-1973-4548-adf1-8666733731b8	Pradeep Nawaz	pradeep.nawaz@example.com	0704877974	$2a$12$2FomsyvreTbqBrSbNZ51je8.NNDb4fDXwtOi19T6EPLp38.Y2.Nn6	ACTIVE	t	2026-08-05 10:07:00+00	2026-08-05 10:07:00+00
+fdd7ae27-35e5-417e-b4cd-df85a5fe6cd1	Nipuni Karunaratne	nipuni.karunaratne@example.com	0760873486	$2a$12$fYl9hwmkur7QyiOAIler/ek3cqasKK6TE4wHWFLS00HsDy.3fWYCC	ACTIVE	t	2026-09-08 12:01:00+00	2026-09-08 12:01:00+00
+f8668c6d-3bc0-48b3-8ead-474d9523a7b7	Tharushi Sivakumar	tharushi.sivakumar@example.com	0764929388	$2a$12$nQKMD2z7kTJk7JNDWompF.IKq.hFZfKJAWKHmJW9bjzMy97mMeNW2	ACTIVE	t	2026-09-25 03:34:00+00	2026-09-25 03:34:00+00
+4b30e56a-3840-429c-b968-3e885023d0b2	Isuru Perera	isuru.perera@example.com	0707429766	$2a$12$KreZDojeQhi5rw97WihGnubHUeqdSr3X0FweEHMOV9cgxbNpGJBwy	ACTIVE	t	2026-09-12 10:10:00+00	2026-09-12 10:10:00+00
+08ce854a-6db5-4855-a2b7-d68e5c8305cf	Ishara de Silva	ishara.de.silva@example.com	0768566616	$2a$12$EkWEu.G/rv0EWlyCNIosIueFE./hjMdSkYOrvLOAB6CV4sN9HsG/C	ACTIVE	t	2026-09-26 10:06:00+00	2026-09-26 10:06:00+00
+af229567-0ca1-4397-bf5b-1d8f8b6ffe81	Pradeep Ratnayake	pradeep.ratnayake@example.com	0706415858	$2a$12$r6z3S3pI7gKb8x30PB3ltuijZ6tQmCick6Efjozv9uC5/PXeAVb7O	ACTIVE	t	2026-08-19 03:30:00+00	2026-08-19 03:30:00+00
+4cecee6d-ec13-4ac2-803f-b9a696d6c972	Ravindu Rathnayake	ravindu.rathnayake@example.com	0740016725	$2a$12$/MhWd5Tnjf0qxP65/ANbVeLG8TJloO87JUw4RSuZnn6PoXP5T0.Ja	ACTIVE	t	2026-08-10 12:55:00+00	2026-08-10 12:55:00+00
+ceacbbdb-fde0-4a2c-95ed-e1d7ee74c98d	Ayesha Mendis	ayesha.mendis@example.com	0747126364	$2a$12$1CalwAnS2s50L//RKhEn4elIWhPDZayg1SN.H5quiz1sEH.AKLw.i	ACTIVE	t	2026-09-29 07:34:00+00	2026-09-29 07:34:00+00
+b7e01598-766c-4b81-a1d2-55c4f2fbb709	Fathima Dissanayake	fathima.dissanayake@example.com	0705590580	$2a$12$WcnQdXFO3sj7IGavDPwXCu9I.Vt.bx.GOIa2X6FQJ47Zojuo2SQh2	ACTIVE	t	2026-08-15 06:47:00+00	2026-08-15 06:47:00+00
+b02190b7-45c7-4967-baf0-5581d728dd35	Hiruni Senanayake	hiruni.senanayake@example.com	0712744719	$2a$12$O9hBJqjVyzqedh3Nfs455.cjhHFhQo/sFXciE/OfTEG0KBtOGeWiW	ACTIVE	t	2026-07-30 07:15:00+00	2026-07-30 07:15:00+00
+2da89375-52f5-47f7-859b-2ac948151468	Chamari Samarasinghe	chamari.samarasinghe@example.com	0784546580	$2a$12$ulu.xZV.HzjBvzGO180CF.gDBN9A65sDfnBMY/FTx4LgWirxdx9W2	ACTIVE	t	2026-07-28 04:11:00+00	2026-07-28 04:11:00+00
+eeab7ea5-20bc-4d80-b757-447ed3fa06f0	Sachintha Dilshan	admin@swiftdrop.example.com	0703897827	$2a$12$Nh97tsfjmXtKdfLUzyLJV.Ow/Ls3HLQbsY4AW.6yLldonyiUwIi4i	ACTIVE	t	2026-06-17 09:21:00+00	2026-06-17 09:21:00+00
+2aea47d3-a06d-4dba-b302-a2a6c6c25e37	Ops Admin	ops.admin@swiftdrop.example.com	0707362069	$2a$12$9ztBdCv8khNfXxyO6unxoORKaaEHFmEg3FeeSNcpXEQIXtcL4cmLm	ACTIVE	t	2026-06-17 10:09:00+00	2026-06-17 10:09:00+00
+cb4cd22c-d4cd-4f2f-ad43-c2e73f1b9cb5	Hiruni Nawaz	dispatcher1@swiftdrop.example.com	0766643372	$2a$12$wETxdeKFMf92cLNXVJPDeeFuc61t6/jhkkKE/.T4wIC7T7kKain3.	ACTIVE	t	2026-08-21 04:02:00+00	2026-08-21 04:02:00+00
+3900455f-0834-4d57-85c5-c3de92f5ecee	Hiruni Weerasinghe	dispatcher2@swiftdrop.example.com	0763536741	$2a$12$gSgMfOZTtZGgdJc/5OVeBe2xIPR2VQGuk17YVGx8TQDqQgvDRa97u	ACTIVE	t	2026-08-07 04:35:00+00	2026-08-07 04:35:00+00
+7bf5a598-1908-4a34-9ac4-041d3ce99466	Sajith Wijesinghe	dispatcher3@swiftdrop.example.com	0765276291	$2a$12$S7E6lBCmfenHxEZHJQ2iGeVuP65eddVzTXUyN64JbqJ.Z4Kao0MBC	ACTIVE	t	2026-07-08 04:50:00+00	2026-07-08 04:50:00+00
+9e3b8266-acf9-4126-91bb-369d59ad25a7	Malith Wijesinghe	courier01@swiftdrop.example.com	0705825274	$2a$12$chgzBjzIXi0YuVrqDPHxcu8.I8TUEHb9O99hdWOXqy11vRa9Jti1e	ACTIVE	t	2026-08-13 12:07:00+00	2026-08-13 12:07:00+00
+69f3dbf3-6a51-4f41-8634-af3d608c2527	Supuni Jayasinghe	courier02@swiftdrop.example.com	0744232026	$2a$12$6hbLQeJZiDIBY6QBocfj0eO1Z3CcVpMXIGTe4Npw9GjXc1s9xzMf6	ACTIVE	t	2026-08-29 07:37:00+00	2026-08-29 07:37:00+00
+2296db41-b3a5-4443-a906-df1b2a23b26c	Mohamed Weerasinghe	courier03@swiftdrop.example.com	0745692595	$2a$12$W1PiUoPAlBuQ3mLkXYxi8uPfZkf7qKNnHPrF6GdmMcYthnspLkzhu	ACTIVE	t	2026-08-02 10:06:00+00	2026-08-02 10:06:00+00
+5b32b607-0ba6-4ff9-8b45-e7e15baf395b	Dimuth Nawaz	courier04@swiftdrop.example.com	0728377257	$2a$12$wFNEscmWmxVAx.IPBQlR.eohWZkdpYCSd0UHAGHSQfUqTB7W2HvTK	ACTIVE	t	2026-08-30 13:19:00+00	2026-08-30 13:19:00+00
+fd5016f3-f6ab-462f-a5ed-0a2fb7ee2491	Ishara Rahman	courier05@swiftdrop.example.com	0778737854	$2a$12$9INcPOZLQBJ3GBAwQZ3oCuhGT07CfUFOmfkidEyJv4ZJX/oHDiidu	ACTIVE	t	2026-07-31 06:02:00+00	2026-07-31 06:02:00+00
+2064432d-0cca-4c76-ac2b-47cd07270ec7	Sachini Fonseka	courier06@swiftdrop.example.com	0767793065	$2a$12$fPLxg7/kmH/Q7vX5Qk.mdOTtqD.vE884hPIz03QpzR3fVE92zqYMS	ACTIVE	t	2026-07-14 11:52:00+00	2026-07-14 11:52:00+00
+c4750ad6-4949-4e9e-b59c-1c8af8f71294	Thisaru Liyanage	courier07@swiftdrop.example.com	0746284855	$2a$12$nwTp2F0z8/0lqu8RSmZ2pOdn2byRo3rpFB3p3t.wP212mXW76KWdK	ACTIVE	t	2026-07-24 10:30:00+00	2026-07-24 10:30:00+00
+d28074b5-475a-4e20-b5d3-63080c9f1b7f	Nimal de Silva	courier08@swiftdrop.example.com	0742761137	$2a$12$Mp42MmCDoySfYw4ueZCGyuIv0WUGbXeEdtyKWdnJd9fPn../xZtsi	ACTIVE	t	2026-08-12 07:32:00+00	2026-08-12 07:32:00+00
+854d0d01-8a43-4f8c-b742-ee0202e4e1b8	Ruwan Weerasinghe	courier09@swiftdrop.example.com	0712894471	$2a$12$9IKM2T0NyGwqyrbq7/7T4ufZWpdwc5OVVCIhvLpFjHWOxb0RrJ9gO	ACTIVE	t	2026-08-18 13:04:00+00	2026-08-18 13:04:00+00
+3be525c0-b776-4ec1-b343-38831e36255d	Hiruni Liyanage	courier10@swiftdrop.example.com	0700451752	$2a$12$tri2F7UsLbKByWlfuN2Z2e88tBO68ExMg4GBCU6TiXv63QWPPf4h.	ACTIVE	t	2026-09-02 04:40:00+00	2026-09-02 04:40:00+00
+c50a9935-b0a4-42a7-8b67-834c582c0b41	Chamari Peiris	chamari.peiris@merchant.example.com	0782401774	$2a$12$.7PfHINiFNUv1Y92goMd4uPbFTJ6tCy4jvkGasUqPTBkEJqpG8MqG	ACTIVE	t	2026-09-04 04:35:00+00	2026-09-04 04:35:00+00
+71ac489c-40e8-4057-bd8d-22645457f877	Sajith Karunaratne	sajith.karunaratne@merchant.example.com	0774891635	$2a$12$ApuhMMlCm7mWEYz8clbnLOS7lk236TPqle38kPH0zNkdAUcih2iVe	ACTIVE	t	2026-09-19 11:13:00+00	2026-09-19 11:13:00+00
+ac219f99-85fb-43a8-90b2-786b06a4d80b	Lahiru Senanayake	lahiru.senanayake@merchant.example.com	0770480984	$2a$12$w/T1oRUofX1P8uRbn7YyrescAbrLdBcCgwWrQXL2PSL8ww1QE4bWC	ACTIVE	t	2026-09-14 10:35:00+00	2026-09-14 10:35:00+00
+c8b97194-64f2-4ced-bc12-b5c4b7d4d9ee	Lahiru Wijesinghe	lahiru.wijesinghe@merchant.example.com	0782262943	$2a$12$OLJ43i10Tt3dALFln2ylqe7nFEGMKA7OveYuwS33EhV9OPtsF212W	ACTIVE	t	2026-09-02 04:57:00+00	2026-09-02 04:57:00+00
+9b13b98c-873f-4749-958b-2f913cc7e712	Chathura Perera	chathura.perera@merchant.example.com	0770943404	$2a$12$TzbYeh6lJYG.Jxo/69LTOeTzJZg4jQB6o9FHwid2aIzOHJnnIxAge	ACTIVE	t	2026-09-09 10:31:00+00	2026-09-09 10:31:00+00
+b2691eac-bac7-474e-831a-394cf0a74ad4	Demo Customer	customer@example.com	0702392760	$2a$12$etAKRSodCio3q.l66qShzewZxNJYwsK9vX6jjIVUBoxaYTAEHSHMu	ACTIVE	t	2026-08-10 05:40:00+00	2026-08-10 05:40:00+00
 \.
 
 
@@ -479,43 +391,11 @@ SELECT pg_catalog.setval('public.roles_id_seq', 5, true);
 
 
 --
--- Name: courier_profiles courier_profiles_nic_number_key; Type: CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.courier_profiles
-    ADD CONSTRAINT courier_profiles_nic_number_key UNIQUE (nic_number);
-
-
---
--- Name: courier_profiles courier_profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.courier_profiles
-    ADD CONSTRAINT courier_profiles_pkey PRIMARY KEY (user_id);
-
-
---
 -- Name: flyway_schema_history flyway_schema_history_pk; Type: CONSTRAINT; Schema: public; Owner: auth
 --
 
 ALTER TABLE ONLY public.flyway_schema_history
     ADD CONSTRAINT flyway_schema_history_pk PRIMARY KEY (installed_rank);
-
-
---
--- Name: merchant_profiles merchant_profiles_business_registration_number_key; Type: CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.merchant_profiles
-    ADD CONSTRAINT merchant_profiles_business_registration_number_key UNIQUE (business_registration_number);
-
-
---
--- Name: merchant_profiles merchant_profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.merchant_profiles
-    ADD CONSTRAINT merchant_profiles_pkey PRIMARY KEY (user_id);
 
 
 --
@@ -648,38 +528,6 @@ CREATE UNIQUE INDEX uq_users_mobile_number ON public.users USING btree (mobile_n
 
 
 --
--- Name: courier_profiles courier_profiles_reviewed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.courier_profiles
-    ADD CONSTRAINT courier_profiles_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id);
-
-
---
--- Name: courier_profiles courier_profiles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.courier_profiles
-    ADD CONSTRAINT courier_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
--- Name: merchant_profiles merchant_profiles_reviewed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.merchant_profiles
-    ADD CONSTRAINT merchant_profiles_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id);
-
-
---
--- Name: merchant_profiles merchant_profiles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: auth
---
-
-ALTER TABLE ONLY public.merchant_profiles
-    ADD CONSTRAINT merchant_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
-
---
 -- Name: oauth_accounts oauth_accounts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: auth
 --
 
@@ -739,5 +587,5 @@ ALTER TABLE ONLY public.user_roles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JUWduxqYUp1doH9VRhayQnucKa3h1nghzNL2OWQfGCsNbgRFafN0vmHXmz6Z6BJ
+\unrestrict WcQfvp6YkBzsZg78fW2tx53DWdUJtt9gjInzGMgJoFFpoNC5k1GPdeAdY9toJoK
 
