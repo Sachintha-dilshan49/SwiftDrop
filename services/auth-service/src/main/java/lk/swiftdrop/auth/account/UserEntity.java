@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -90,5 +91,14 @@ public class UserEntity {
 
     public void disable() {
         accountStatus = AccountStatus.DISABLED;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
+    }
+
+    public void replaceRoles(Collection<RoleEntity> roles) {
+        this.roles.clear();
+        this.roles.addAll(roles);
     }
 }

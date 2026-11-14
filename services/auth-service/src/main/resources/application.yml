@@ -44,6 +44,12 @@ swiftdrop:
     client-id: ${AUTH_GOOGLE_CLIENT_ID:}
     client-secret: ${AUTH_GOOGLE_CLIENT_SECRET:}
     frontend-success-uri: ${AUTH_OAUTH_SUCCESS_REDIRECT_URI:http://localhost:3000/auth/callback}
+  identity-storage:
+    enabled: ${AUTH_IDENTITY_STORAGE_ENABLED:false}
+    endpoint: ${AUTH_IDENTITY_STORAGE_ENDPOINT:}
+    access-key: ${AUTH_IDENTITY_STORAGE_ACCESS_KEY:}
+    secret-key: ${AUTH_IDENTITY_STORAGE_SECRET_KEY:}
+    bucket: ${AUTH_IDENTITY_STORAGE_BUCKET:}
 
 management:
   endpoints:
