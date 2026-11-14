@@ -53,18 +53,6 @@
   letter-spacing: .04em;
 }
 
-.tracking-button {
-  min-height: 44px;
-  padding: 0 18px;
-  color: var(--ink);
-  background: var(--orange);
-  border: 0;
-  border-radius: 8px;
-  font-weight: 700;
-}
-
-.tracking-button:hover:not(:disabled) { background: #ff7b2c; }
-
 .tracking-main .alert { font-size: 13px; }
 
 .tracking-card {
@@ -95,18 +83,6 @@
   letter-spacing: .04em;
 }
 
-.tracking-status {
-  flex: 0 0 auto;
-  padding: 5px 10px;
-  color: #315a83;
-  background: #edf4fb;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.tracking-status-delivered { color: #1f6b3a; background: #e8f6ed; }
-.tracking-status-failed { color: #963727; background: #fff3ef; }
 
 .tracking-live {
   margin: 10px 0 0;

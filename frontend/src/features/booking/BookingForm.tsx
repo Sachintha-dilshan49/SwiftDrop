@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useState } from "react";
 import { ParcelApiError, ParcelResponse, parcelApi } from "../../api/parcelApi";
+import { Button } from "../../components/Button";
 import { formatMoney } from "../../lib/parcelFormat";
 import { trackingPath } from "../tracking/trackingNumber";
 import { SIZE_OPTIONS, SPEED_OPTIONS, ZONES } from "./bookingOptions";
@@ -116,19 +117,18 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
             <a className="booking-primary" href={trackingPath(booked.trackingNo)}>
               Track this parcel
             </a>
-            <button
-              type="button"
-              className="booking-secondary"
+            <Button
+              variant="secondary"
               onClick={() => {
                 setValues(EMPTY_BOOKING);
                 setBooked(null);
               }}
             >
               Book another
-            </button>
-            <button type="button" className="booking-secondary" onClick={onClose}>
+            </Button>
+            <Button variant="secondary" onClick={onClose}>
               Close
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -139,9 +139,9 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
     <section className="booking" aria-labelledby="booking-title">
       <div className="booking-heading">
         <h2 id="booking-title">Book a delivery</h2>
-        <button type="button" className="booking-secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           Cancel
-        </button>
+        </Button>
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
@@ -285,9 +285,9 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
         )}
 
         <p className="booking-hint">The fee is calculated when you book and shown on the next screen.</p>
-        <button type="submit" className="booking-primary booking-submit" disabled={submitting}>
+        <Button type="submit" className="booking-submit" disabled={submitting}>
           {submitting ? "Booking…" : "Book delivery"}
-        </button>
+        </Button>
       </form>
     </section>
   );

@@ -24,4 +24,10 @@ describe("StatusBadge", () => {
 
     expect(screen.getByText(STATUS_LABELS.DELIVERED)).toHaveClass("sd-status-badge", "tracking-badge");
   });
+
+  it("passes other attributes through, e.g. role=status for live pages", () => {
+    render(<StatusBadge status="IN_TRANSIT" role="status" />);
+
+    expect(screen.getByRole("status")).toHaveTextContent(STATUS_LABELS.IN_TRANSIT);
+  });
 });

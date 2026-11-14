@@ -5,7 +5,7 @@
   gap: 16px;
 }
 
-.customer-book-button,
+/* The "Track this parcel" link looks like the shared primary Button; real buttons use <Button>. */
 .booking-primary {
   min-height: 44px;
   display: inline-flex;
@@ -15,25 +15,15 @@
   color: var(--ink);
   background: var(--orange);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--sd-radius-button);
+  font-family: var(--sd-font-heading);
   font-weight: 700;
   text-decoration: none;
 }
 
 .customer-book-button { justify-self: start; }
 
-.customer-book-button:hover,
-.booking-primary:hover:not(:disabled) { background: #ff7b2c; }
-
-.booking-secondary {
-  min-height: 38px;
-  padding: 0 14px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-weight: 650;
-}
+.booking-primary:hover { background: var(--orange-dark); }
 
 .booking {
   padding: 16px;

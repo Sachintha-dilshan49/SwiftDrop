@@ -7,6 +7,8 @@ import {
   TERMINAL_STATUSES,
   parcelApi,
 } from "../../api/parcelApi";
+import { Button } from "../../components/Button";
+import { StatusBadge } from "../../components/StatusBadge";
 import { SIZE_LABELS, STATUS_LABELS, formatDateTime } from "../../lib/parcelFormat";
 import { isValidTrackingNo, normalizeTrackingNo, trackingPath } from "./trackingNumber";
 import "./PublicTrackingPage.css";
@@ -133,9 +135,9 @@ export function PublicTrackingPage({ initialTrackingNo = "" }: PublicTrackingPag
               autoComplete="off"
               spellCheck={false}
             />
-            <button type="submit" className="tracking-button" disabled={loading}>
+            <Button type="submit" disabled={loading}>
               {loading ? "Searching…" : "Track"}
-            </button>
+            </Button>
           </div>
         </form>
 
@@ -154,9 +156,7 @@ export function PublicTrackingPage({ initialTrackingNo = "" }: PublicTrackingPag
                   {tracking.trackingNo}
                 </h2>
               </div>
-              <span className={`tracking-status tracking-status-${tracking.status.toLowerCase()}`} role="status">
-                {STATUS_LABELS[tracking.status]}
-              </span>
+              <StatusBadge status={tracking.status} role="status" />
             </div>
 
             {!finished && (

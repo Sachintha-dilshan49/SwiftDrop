@@ -2,16 +2,12 @@
 
 .parcel-details { display: grid; gap: 12px; }
 
-.parcel-details-back {
+/* Compact size for the shared secondary Button */
+.sd-button.parcel-details-back {
   justify-self: start;
   min-height: 34px;
   padding: 0 12px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 8px;
   font-size: 12px;
-  font-weight: 650;
 }
 
 .parcel-details-top {

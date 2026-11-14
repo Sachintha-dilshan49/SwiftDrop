@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "../../components/Button";
 import { MyDeliveriesPage } from "../deliveries/MyDeliveriesPage";
 import { BookingForm } from "./BookingForm";
 import "./BookingForm.css";
@@ -21,9 +22,9 @@ export function CustomerHome({ token }: CustomerHomeProps) {
           onClose={() => setBooking(false)}
         />
       ) : (
-        <button type="button" className="customer-book-button" onClick={() => setBooking(true)}>
+        <Button className="customer-book-button" onClick={() => setBooking(true)}>
           Book a delivery
-        </button>
+        </Button>
       )}
       <MyDeliveriesPage token={token} refreshKey={refreshKey} />
     </div>

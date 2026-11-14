@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { ParcelApiError, ParcelResponse, parcelApi } from "../../api/parcelApi";
+import { Button } from "../../components/Button";
+import { StatusBadge } from "../../components/StatusBadge";
 import { SIZE_LABELS, STATUS_LABELS, formatDateTime, formatMoney } from "../../lib/parcelFormat";
 import { trackingPath } from "../tracking/trackingNumber";
 import "./ParcelDetails.css";
@@ -57,9 +59,9 @@ export function ParcelDetails({ parcelId, token, onBack }: ParcelDetailsProps) {
 
   return (
     <div className="parcel-details">
-      <button type="button" className="parcel-details-back" onClick={onBack}>
+      <Button variant="secondary" className="parcel-details-back" onClick={onBack}>
         ← Back to my deliveries
-      </button>
+      </Button>
 
       {error && (
         <p className="alert" role="alert">
@@ -75,9 +77,7 @@ export function ParcelDetails({ parcelId, token, onBack }: ParcelDetailsProps) {
               <p className="parcel-details-label">Tracking number</p>
               <h3 className="parcel-details-number">{parcel.trackingNo}</h3>
             </div>
-            <span className={`deliveries-status deliveries-status-${parcel.status.toLowerCase()}`}>
-              {STATUS_LABELS[parcel.status]}
-            </span>
+            <StatusBadge status={parcel.status} />
           </div>
 
           {parcel.status === "FAILED" && parcel.failureReason && (
