@@ -34,6 +34,7 @@ import { MerchantDashboardPage } from "../features/merchant/MerchantDashboardPag
 import { AdminMerchantsPage } from "../features/merchant/AdminMerchantsPage";
 import { MerchantRegisterPage } from "../features/merchant/MerchantRegisterPage";
 import { PendingApprovalPage } from "../features/merchant/PendingApprovalPage";
+import { ForgotPasswordPage, ResetPasswordPage } from "./PasswordResetPages";
 
 type AuthMode = "login" | "signup";
 
@@ -107,6 +108,7 @@ export function AuthApp() {
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    setMessageType("error");
     const form = new FormData(event.currentTarget);
     try {
       const tokens =
@@ -159,10 +161,6 @@ export function AuthApp() {
     navigate("/", { replace: true });
   }
 
-  function showRecoveryNotice() {
-    setMessage("Password recovery is not available yet. Please contact SwiftDrop support.");
-    setMessageType("info");
-  }
 
   if (busy && isCallback) {
     return (
@@ -171,6 +169,21 @@ export function AuthApp() {
         <p>Finishing Google sign in…</p>
         <span className="loading-indicator" aria-hidden="true" />
       </main>
+    );
+  }
+
+  if (route.kind === "reset-password") {
+    return (
+      <ResetPasswordPage
+        onDone={(notice) => {
+          // The reset revoked every refresh token, so this browser signs in again too
+          clearSession();
+          setSession(null);
+          setMode("login");
+          setMessage(notice);
+          setMessageType("info");
+        }}
+      />
     );
   }
 
@@ -238,6 +251,9 @@ export function AuthApp() {
 
   if (route.kind === "notFound") {
     return <NotFoundPage homePath="/" />;
+  }
+  if (route.kind === "forgot-password") {
+    return <ForgotPasswordPage />;
   }
 
   return (
@@ -401,7 +417,7 @@ export function AuthApp() {
                   </label>
                 </>
               ) : (
-                <button className="forgot-link" type="button" onClick={showRecoveryNotice}>
+                <button className="forgot-link" type="button" onClick={() => navigate("/forgot-password")}>
                   Forgot password?
                 </button>
               )}

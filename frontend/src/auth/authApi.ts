@@ -37,7 +37,7 @@ async function post<TRequest, TResponse>(
       | null;
     throw new Error(body?.detail ?? body?.title ?? "Unable to complete sign in.");
   }
-  if (response.status === 204) {
+  if (response.status === 202 || response.status === 204) {
     return undefined as TResponse;
   }
   return (await response.json()) as TResponse;
@@ -66,6 +66,16 @@ export function exchangeGoogleCode(code: string): Promise<TokenResponse> {
 /** New tokens for the same account, carrying its current roles (e.g. MERCHANT right after approval). */
 export function refresh(refreshToken: string): Promise<TokenResponse> {
   return post("/refresh", { refreshToken });
+}
+
+/** Emails a reset link when the account exists; the answer is the same either way. */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await post("/password/forgot", { email });
+}
+
+/** Sets a new password with the token from the emailed link. */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await post("/password/reset", { token, newPassword });
 }
 
 export async function logout(refreshToken: string): Promise<void> {
