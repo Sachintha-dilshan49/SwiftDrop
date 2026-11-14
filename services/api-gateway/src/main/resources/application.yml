@@ -70,6 +70,32 @@ spring:
                     redis-rate-limiter.burst-capacity: ${GATEWAY_ESTIMATE_RATE_LIMIT_BURST:20}
                     redis-rate-limiter.requested-tokens: 1
                     throw-on-limit: true
+            - id: assistant-chat
+              # Each message costs an LLM call: limited per signed-in user. Replies that call tools or stream a long
+              # answer can take longer than the default response timeout, so this route has its own.
+              uri: ${AI_ASSISTANT_URL:http://localhost:8087}
+              order: -5
+              predicates:
+                - Path=/api/v1/assistant/chat,/api/v1/assistant/chat/stream
+                - Method=POST
+              metadata:
+                response-timeout: 120000  # ms; a plain number, as Spring Cloud Gateway expects
+              filters:
+                - name: RequestRateLimiter
+                  args:
+                    key-resolver: "#{@signedInUserKeyResolver}"
+                    redis-rate-limiter.replenish-rate: ${GATEWAY_ASSISTANT_RATE_LIMIT_REPLENISH:1}
+                    redis-rate-limiter.burst-capacity: ${GATEWAY_ASSISTANT_RATE_LIMIT_BURST:30}
+                    redis-rate-limiter.requested-tokens: ${GATEWAY_ASSISTANT_RATE_LIMIT_TOKENS_PER_MESSAGE:6}
+                    throw-on-limit: true
+            - id: assistant-mcp
+              # MCP clients (ai-assistant's tools over the Model Context Protocol); needs a JWT like any API path
+              uri: ${AI_ASSISTANT_URL:http://localhost:8087}
+              order: -5
+              predicates:
+                - Path=/mcp,/mcp/**
+              metadata:
+                response-timeout: 120000  # ms; a plain number, as Spring Cloud Gateway expects
             - id: auth-admin
               uri: ${AUTH_SERVICE_URL:http://localhost:8081}
               order: -5
@@ -100,6 +126,10 @@ spring:
               uri: ${AUTH_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/oauth2/**,/login/oauth2/**
+              filters:
+                # Keep the browser's host (e.g. localhost:3000) so auth-service builds Google's callback address
+                # on the public origin, not on auth-service:8081
+                - PreserveHostHeader
             - id: pricing-service
               uri: ${PRICING_SERVICE_URL:http://localhost:8082}
               predicates:

@@ -931,3 +931,61 @@
   }
 }
 
+
+/* ─── Merchant portal (embedded in the role dashboard) and admin merchant screen ─── */
+.merchant-portal { display: grid; gap: 18px; }
+.merchant-business { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+.merchant-business strong { font-size: 15px; }
+.merchant-business span { color: var(--muted); font-size: 12px; text-transform: capitalize; }
+.merchant-tabs { display: inline-flex; gap: 4px; width: fit-content; padding: 4px; background: var(--sd-subtle); border-radius: 12px; }
+.merchant-tab { padding: 7px 14px; color: var(--muted); font-size: 13px; font-weight: 650; background: transparent; border: 0; border-radius: 9px; }
+.merchant-tab[aria-selected="true"] { color: var(--ink); background: white; box-shadow: 0 1px 3px rgba(15, 26, 46, .12); }
+.merchant-list-title { margin: 0; font-size: 15px; }
+.merchant-filters-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.merchant-orders-search { max-width: 420px; margin-bottom: 14px; }
+.merchant-muted { color: var(--muted); font-size: 12px; }
+.merchant-tracking { color: var(--sd-orange-text); font-weight: 700; }
+.merchant-developer { display: grid; gap: 18px; }
+.merchant-code { overflow-x: auto; margin: 12px 0 0; padding: 14px; color: #e2e8f0; font-size: 12px; line-height: 1.5; background: var(--sd-navy); border-radius: 10px; }
+
+.alert.merchant-notice { margin-bottom: 16px; color: #167a49; background: #e6f6ee; border-color: #a7dfb8; }
+.merchant-admin-section { margin-bottom: 32px; }
+.merchant-admin-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.merchant-admin-heading h2 { margin: 0; font-size: 16px; font-weight: 800; }
+.merchant-admin-heading-split { justify-content: space-between; flex-wrap: wrap; }
+.merchant-admin-heading-split .merchant-search-wrapper { width: 260px; }
+.merchant-count-tag { color: var(--sd-orange-text); background: var(--sd-orange-soft); font-weight: 800; }
+.merchant-empty { padding: 28px; color: var(--muted); text-align: center; }
+.merchant-queue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.merchant-queue-card { display: flex; flex-direction: column; justify-content: space-between; }
+.merchant-queue-title { display: flex; align-items: center; gap: 12px; }
+.merchant-queue-title strong { display: block; font-size: 14px; }
+.merchant-queue-title span { color: var(--muted); font-size: 11px; }
+.merchant-queue-details { display: grid; gap: 5px; margin: 14px 0; font-size: 12px; }
+.merchant-queue-details div { display: grid; grid-template-columns: 64px 1fr; gap: 8px; }
+.merchant-queue-details dt { color: var(--muted); }
+.merchant-queue-details dd { margin: 0; overflow-wrap: anywhere; }
+.merchant-queue-actions { display: flex; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.merchant-queue-actions .button { flex: 1; min-height: 36px; margin-top: 0; font-size: 12px; }
+.merchant-reject-form { display: grid; gap: 8px; font-size: 12px; }
+.merchant-reject-form textarea { padding: 8px 10px; font: inherit; border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+.merchant-danger { color: white; background: var(--sd-danger); }
+.merchant-danger:hover:not(:disabled) { background: #b42318; }
+
+/* ─── Merchant application status ─── */
+.pending-title { margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: -.03em; }
+.pending-lead { margin: 0 0 22px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.pending-icon-circle.is-approved { color: #167a49; background: #e6f6ee; }
+.pending-icon-circle.is-rejected { color: #b32a2a; background: #fdeeee; }
+.pending-icon-circle.is-pending { color: var(--orange); background: #fff4ec; }
+ol.pending-timeline { padding: 0; list-style: none; }
+.pending-step-item strong { display: block; color: var(--ink); font-size: 13px; }
+.pending-step-item span { color: var(--muted); font-size: 11px; }
+.pending-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 20px; padding: 16px 20px; text-align: left; font-size: 12px; background: #fafbfc; border: 1px solid var(--line); border-radius: 10px; }
+.pending-details dt { color: var(--muted); font-size: 10px; }
+.pending-details dd { margin: 0; color: var(--ink); font-weight: 650; overflow-wrap: anywhere; }
+.pending-action { width: auto; padding: 0 22px; }
+
+.api-key-confirm { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.api-key-action { padding: 0; color: var(--ink); font-size: 11px; font-weight: 650; background: none; border: 0; cursor: pointer; }
+.api-key-danger { color: #b32a2a; }

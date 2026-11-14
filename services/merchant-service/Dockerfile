@@ -24,7 +24,9 @@ COPY common/ common/
 COPY services/merchant-service/ services/merchant-service/
 
 # Build only this module and its deps (common), skip tests
-RUN chmod +x mvnw && ./mvnw -pl services/merchant-service -am package -DskipTests -q
+# Maven downloads are cached across builds and shared by every service image; "locked" makes
+# parallel builds take turns, so a first build does not flood the network
+RUN --mount=type=cache,target=/root/.m2,sharing=locked chmod +x mvnw && ./mvnw -pl services/merchant-service -am package -DskipTests -q
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine AS runtime

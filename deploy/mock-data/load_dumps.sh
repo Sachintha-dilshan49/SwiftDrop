@@ -6,7 +6,8 @@ set -euo pipefail
 
 CONTAINER=${POSTGRES_CONTAINER:-swiftdrop-postgres}
 DUMPS=deploy/mock-data/dumps
-DATABASES="auth_db pricing_db parcel_db dispatch_db merchant_db notification_db"
+# database:owner, as created by deploy/compose/postgres-init/init.sql
+DATABASES="auth_db:auth pricing_db:pricing parcel_db:parcel dispatch_db:dispatch merchant_db:merchant notification_db:notif"
 SERVICES="auth-service pricing-service parcel-service dispatch-service merchant-service notification-service"
 
 running=()
@@ -18,7 +19,12 @@ if [ ${#running[@]} -gt 0 ]; then
   docker stop "${running[@]}" > /dev/null
 fi
 
-for db in $DATABASES; do
+for pair in $DATABASES; do
+  db=${pair%%:*}; owner=${pair##*:}
+  # Start from an empty database: a newer version of a service may have added tables the dump does not know about,
+  # and Flyway would then fail re-running that migration on top of them
+  docker exec "$CONTAINER" psql -U postgres -q -v ON_ERROR_STOP=1 \
+    -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" -c "CREATE DATABASE $db OWNER $owner"
   docker exec -i "$CONTAINER" psql -U postgres -d "$db" -q -v ON_ERROR_STOP=1 < "$DUMPS/$db.sql" > /dev/null
   echo "Loaded $db"
 done

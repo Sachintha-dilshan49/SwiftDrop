@@ -10,6 +10,9 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": "http://localhost:8080",
+      // Google sign-in through the gateway; keep the browser's host so the callback comes back here
+      "/oauth2": { target: "http://localhost:8080", xfwd: true },
+      "/login/oauth2": { target: "http://localhost:8080", xfwd: true },
     },
   },
 });

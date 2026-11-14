@@ -9,6 +9,8 @@ import {
   readSession,
   saveSession,
   signup,
+  refresh,
+  startGoogleLogin,
 } from "./authApi";
 import {
   AuthPortalId,
@@ -36,16 +38,16 @@ import { PendingApprovalPage } from "../features/merchant/PendingApprovalPage";
 type AuthMode = "login" | "signup";
 
 /** The role's real screen inside its dashboard; null keeps the dashboard's sample preview. */
-function roleScreen(role: DashboardRole, token: string) {
+function roleScreen(role: DashboardRole, token: string, roles: string[]) {
   switch (role) {
     case "CUSTOMER":
-      return <CustomerHome token={token} />;
+      return <CustomerHome token={token} isMerchant={roles.includes("MERCHANT")} />;
     case "COURIER":
       return <CourierHome token={token} />;
     case "DISPATCHER":
       return <DispatchHome token={token} />;
     case "MERCHANT":
-      return <MerchantDashboardPage token={token} embedded={true} />;
+      return <MerchantDashboardPage token={token} />;
     case "ADMIN":
       return <AdminMerchantsPage adminToken={token} />;
     default:
@@ -196,7 +198,12 @@ export function AuthApp() {
         <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
           <PendingApprovalPage
             token={session.accessToken}
-            onNavigateToDashboard={() => navigate("/merchant")}
+            onOpenPortal={async () => {
+              // The current token was issued before approval; a fresh one carries the MERCHANT role
+              setSession(saveSession(await refresh(session.refreshToken)));
+              navigate("/merchant");
+            }}
+            onRegister={() => navigate("/merchant/register")}
           />
         </RoleDashboard>
       );
@@ -206,7 +213,7 @@ export function AuthApp() {
       return (
         <>
           <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-            {roleScreen(dashboardRole, session.accessToken)}
+            {roleScreen(dashboardRole, session.accessToken, session.user.roles)}
           </RoleDashboard>
           <AssistantWidget token={session.accessToken} />
         </>
@@ -292,9 +299,7 @@ export function AuthApp() {
               type="button"
               onClick={() => {
                 if (googleLoginEnabled) {
-                  window.location.assign(
-                    `${import.meta.env.VITE_AUTH_BASE_URL ?? "http://localhost:8081"}/oauth2/authorization/google`,
-                  );
+                  startGoogleLogin();
                 }
               }}
               disabled={!googleLoginEnabled || busy}

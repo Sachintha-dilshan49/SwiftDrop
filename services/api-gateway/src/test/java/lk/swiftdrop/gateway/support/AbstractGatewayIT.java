@@ -81,6 +81,9 @@ public abstract class AbstractGatewayIT {
         registry.add("GATEWAY_MERCHANT_RATE_LIMIT_BURST", () -> RATE_LIMIT_BURST);
         registry.add("GATEWAY_ESTIMATE_RATE_LIMIT_REPLENISH", () -> 1);
         registry.add("GATEWAY_ESTIMATE_RATE_LIMIT_BURST", () -> RATE_LIMIT_BURST);
+        registry.add("GATEWAY_ASSISTANT_RATE_LIMIT_REPLENISH", () -> 1);
+        registry.add("GATEWAY_ASSISTANT_RATE_LIMIT_BURST", () -> RATE_LIMIT_BURST);
+        registry.add("GATEWAY_ASSISTANT_RATE_LIMIT_TOKENS_PER_MESSAGE", () -> 1);
     }
 
     @BeforeEach

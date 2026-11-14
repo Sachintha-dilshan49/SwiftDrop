@@ -13,6 +13,7 @@ export const ApiKeysPage: React.FC<Props> = ({ token }) => {
   const [newKeyData, setNewKeyData] = useState<ApiKeyCreatedResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [confirmingRevoke, setConfirmingRevoke] = useState<string | null>(null);
 
   const fetchKeys = async () => {
     try {
@@ -50,11 +51,9 @@ export const ApiKeysPage: React.FC<Props> = ({ token }) => {
     }
   };
 
+  /** Asked inline (no browser dialog): a revoked key stops working at once and cannot be restored. */
   const handleRevoke = async (id: string) => {
-    if (!window.confirm('Are you sure you want to revoke this API key? This action is permanent and cannot be undone.')) {
-      return;
-    }
-
+    setConfirmingRevoke(null);
     try {
       await merchantApi.revokeApiKey(token, id);
       fetchKeys();
@@ -176,7 +175,7 @@ export const ApiKeysPage: React.FC<Props> = ({ token }) => {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {loading && keys.length === 0 ? (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: '24px' }}>Loading API keys…</td>
               </tr>
@@ -200,15 +199,21 @@ export const ApiKeysPage: React.FC<Props> = ({ token }) => {
                     )}
                   </td>
                   <td>
-                    {!k.revoked && (
-                      <button
-                        type="button"
-                        onClick={() => handleRevoke(k.id)}
-                        style={{ background: 'none', border: 'none', color: '#b32a2a', fontWeight: 600, fontSize: '11px', cursor: 'pointer' }}
-                      >
-                        Revoke
-                      </button>
-                    )}
+                    {!k.revoked && (confirmingRevoke === k.id ? (
+                        <span className="api-key-confirm">
+                          <span>Revoke for good?</span>
+                          <button type="button" className="api-key-action api-key-danger" onClick={() => void handleRevoke(k.id)}>
+                            Revoke
+                          </button>
+                          <button type="button" className="api-key-action" onClick={() => setConfirmingRevoke(null)}>
+                            Cancel
+                          </button>
+                        </span>
+                      ) : (
+                        <button type="button" className="api-key-action api-key-danger" onClick={() => setConfirmingRevoke(k.id)}>
+                          Revoke
+                        </button>
+                      ))}
                   </td>
                 </tr>
               ))

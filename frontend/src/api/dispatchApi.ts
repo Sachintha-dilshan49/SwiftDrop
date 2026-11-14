@@ -27,6 +27,32 @@ export interface CourierWorkload {
   activeDeliveries: number;
 }
 
+/** Counts for one Sri Lanka day: assigned that day, delivered or failed that day. */
+export interface ReportDay {
+  date: string;
+  assigned: number;
+  delivered: number;
+  failed: number;
+}
+
+/** One courier's counts over the report's range. firstName is null if auth-service had none. */
+export interface ReportCourier {
+  courierId: string;
+  firstName: string | null;
+  assigned: number;
+  delivered: number;
+  failed: number;
+}
+
+/** GET /api/v1/reports/daily: every day in the range (oldest first), totals and couriers (most deliveries first). */
+export interface DailyReport {
+  from: string;
+  to: string;
+  days: ReportDay[];
+  totals: { assigned: number; delivered: number; failed: number };
+  couriers: ReportCourier[];
+}
+
 /** Reply of POST /api/v1/dispatch/assignments. */
 export interface Assignment {
   id: string;
@@ -108,6 +134,15 @@ export const dispatchApi = {
   /** Every courier with their active deliveries, least busy first. */
   getWorkload(token: string): Promise<CourierWorkload[]> {
     return getJson("/dispatch/workload", token, "Could not load the courier workload.");
+  },
+
+  /** Deliveries per day between two Sri Lanka dates (YYYY-MM-DD, both included); without dates, the last 7 days. */
+  getDailyReport(token: string, range: { from?: string; to?: string } = {}): Promise<DailyReport> {
+    const query = new URLSearchParams();
+    if (range.from) query.set("from", range.from);
+    if (range.to) query.set("to", range.to);
+    const suffix = query.toString() ? `?${query}` : "";
+    return getJson(`/reports/daily${suffix}`, token, "Could not load the delivery report.");
   },
 
   /** Gives the parcel to the courier; 409 if it is already assigned, the courier is offline or the parcel moved on. */

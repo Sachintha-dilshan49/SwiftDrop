@@ -4,7 +4,7 @@
 #   1. Copy deploy/compose/.env.example to deploy/compose/.env
 #   2. Run: docker compose -f deploy/compose/docker-compose.yml up --build
 #   To run infrastructure only:
-#      docker compose -f deploy/compose/docker-compose.yml up -d postgres rabbitmq redis minio minio-init mailpit
+#      docker compose -f deploy/compose/docker-compose.yml up -d postgres rabbitmq redis minio mailpit
 
 services:
 
@@ -61,39 +61,26 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:latest
+    # minio/minio and minio/mc are no longer published on Docker Hub or quay.io. bitnamilegacy/minio is the last
+    # published build; it creates the delivery-proofs bucket itself (MINIO_DEFAULT_BUCKETS, public download).
+    image: bitnamilegacy/minio:2025.7.23
     container_name: swiftdrop-minio
-    command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_DEFAULT_BUCKETS: delivery-proofs:download
     ports:
       - "9000:9000"     # S3 API
       - "9001:9001"     # MinIO Console
     volumes:
-      - minio_data:/data
+      - minio_data:/bitnami/minio/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
-
-  minio-init:
-    image: minio/mc:latest
-    container_name: swiftdrop-minio-init
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set local http://minio:9000 minioadmin minioadmin;
-        mc mb --ignore-existing local/delivery-proofs;
-        mc anonymous set download local/delivery-proofs;
-        echo 'MinIO bucket delivery-proofs initialized.';
-        exit 0"
-    restart: "no"
 
   mailpit:
     image: axllent/mailpit:latest
@@ -208,8 +195,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health || exit 1"]
       interval: 30s
@@ -236,6 +221,8 @@ services:
       auth-service:
         condition: service_healthy
       parcel-service:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health || exit 1"]
@@ -290,6 +277,9 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: docker
+    volumes:
+      # Embedding model and native libraries, downloaded on the first start only
+      - ai_model_cache:/app/onnx-cache
     depends_on:
       auth-service:
         condition: service_healthy
@@ -298,7 +288,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      # The first start downloads the embedding model (~90 MB) before it reports ready
+      start_period: 300s
     restart: unless-stopped
 
   api-gateway:
@@ -329,7 +320,8 @@ services:
       notification-service:
         condition: service_healthy
       ai-assistant:
-        condition: service_healthy
+        # Started, not healthy: a slow or broken assistant must not keep the rest of SwiftDrop offline
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
@@ -343,8 +335,9 @@ services:
       context: ../../frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
-        VITE_AUTH_BASE_URL: ${VITE_AUTH_BASE_URL:-http://localhost:8081}
+        # Always /api in this image: nginx proxies it to the gateway. Not read from .env, because .env files copied
+        # before 31 Oct have http://localhost:8080, which skips the /api prefix and breaks every request.
+        VITE_API_BASE_URL: /api
         VITE_GOOGLE_LOGIN_ENABLED: ${VITE_GOOGLE_LOGIN_ENABLED:-false}
     container_name: swiftdrop-frontend
     ports:
@@ -356,7 +349,8 @@ services:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ || exit 1"]
+      # 127.0.0.1, not localhost: on Alpine localhost resolves to ::1 first and nginx listens on IPv4 only
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -370,8 +364,11 @@ volumes:
     name: swiftdrop_pgdata
   rabbitmq_data:
     name: swiftdrop_rabbitmq_data
+  ai_model_cache:
+    name: swiftdrop_ai_model_cache
   minio_data:
-    name: swiftdrop_minio_data
+    # New name for the Bitnami image, which runs as a non-root user: a volume made by the old image is owned by root
+    name: swiftdrop_minio_bitnami_data
 
 # ─── Networks ────────────────────────────────────────────────────────────────
 

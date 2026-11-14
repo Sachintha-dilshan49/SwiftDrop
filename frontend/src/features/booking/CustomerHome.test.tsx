@@ -26,6 +26,16 @@ describe("CustomerHome", () => {
       sizeFee: 0, expressFee: 0, discount: 0, total: 650, currency: "LKR" });
   });
 
+  it("offers merchant registration to a customer and the portal to a merchant", () => {
+    const { unmount } = render(<CustomerHome token="token-1" />);
+    expect(screen.getByRole("button", { name: "Register as a merchant" })).toBeInTheDocument();
+    unmount();
+
+    render(<CustomerHome token="token-1" isMerchant />);
+    expect(screen.getByRole("button", { name: "Open merchant portal" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Register as a merchant" })).not.toBeInTheDocument();
+  });
+
   it("opens and closes the booking form above the delivery list", async () => {
     render(<CustomerHome token="token-1" />);
     expect(await screen.findByText("You have no deliveries yet.")).toBeInTheDocument();

@@ -54,7 +54,7 @@ describe("AuthApp", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign in to Customer portal" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: "Good morning, Demo" })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: /^Good (morning|afternoon|evening), Demo$/ })).toBeInTheDocument(),
     );
     expect(window.location.pathname).toBe("/customer");
     expect(loginMock).toHaveBeenCalledWith({ emailOrMobile: "demo@example.test", password: "a-very-long-password" });
@@ -118,7 +118,7 @@ describe("AuthApp", () => {
     fireEvent.click(screen.getByLabelText("I agree to the terms and the privacy policy"));
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(await screen.findByRole("heading", { name: "Good morning, Demo" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening), Demo$/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/customer");
   });
 
@@ -131,7 +131,7 @@ describe("AuthApp", () => {
     window.history.replaceState({}, "", "/auth/callback?code=oauth-code");
     render(<AuthApp />);
 
-    expect(await screen.findByRole("heading", { name: "Good morning, Demo" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^Good (morning|afternoon|evening), Demo$/ })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/customer");
     expect(exchangeGoogleCodeMock).toHaveBeenCalledWith("oauth-code");
   });

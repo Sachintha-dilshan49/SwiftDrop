@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { CourierWorkloadTab } from "./CourierWorkloadTab";
+import { ReportsTab } from "./ReportsTab";
 import { UnassignedParcelsTab } from "./UnassignedParcelsTab";
 import "./Dispatch.css";
 
@@ -42,12 +43,7 @@ export function DispatchHome({ token }: DispatchHomeProps) {
       <div role="tabpanel" id={`dispatch-panel-${tab}`} aria-labelledby={`dispatch-tab-${tab}`}>
         {tab === "unassigned" && <UnassignedParcelsTab token={token} />}
         {tab === "workload" && <CourierWorkloadTab token={token} />}
-        {tab === "reports" && (
-          <section className="dispatch-card dispatch-empty">
-            <h2>Reports</h2>
-            <p>Daily delivery reports are coming soon.</p>
-          </section>
-        )}
+        {tab === "reports" && <ReportsTab token={token} />}
       </div>
     </div>
   );

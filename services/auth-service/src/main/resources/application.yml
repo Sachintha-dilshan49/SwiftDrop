@@ -26,6 +26,8 @@ spring:
 
 server:
   port: 8081
+  # Behind nginx and the gateway: build Google's callback address from X-Forwarded-Host/Proto
+  forward-headers-strategy: framework
 
 swiftdrop:
   internal.token: ${INTERNAL_API_TOKEN:}   # shared /internal/** token, ADR-010; startup fails if unset
@@ -44,6 +46,9 @@ swiftdrop:
     client-id: ${AUTH_GOOGLE_CLIENT_ID:}
     client-secret: ${AUTH_GOOGLE_CLIENT_SECRET:}
     frontend-success-uri: ${AUTH_OAUTH_SUCCESS_REDIRECT_URI:http://localhost:3000/auth/callback}
+  # Demo staff accounts (admin, dispatcher, courier); off unless a password is set. Local and demo use only.
+  demo-accounts:
+    password: ${AUTH_DEMO_ACCOUNTS_PASSWORD:}
   identity-storage:
     enabled: ${AUTH_IDENTITY_STORAGE_ENABLED:false}
     endpoint: ${AUTH_IDENTITY_STORAGE_ENDPOINT:}

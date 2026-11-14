@@ -1,3 +1,4 @@
+import { greeting } from "../lib/greeting";
 import type { ReactNode } from "react";
 import { AuthUser } from "../auth/authApi";
 import { DashboardRole, dashboardPathForRoles } from "../auth/authPortals";
@@ -133,7 +134,7 @@ export function RoleDashboard({ role, user, onSignOut, children }: RoleDashboard
         <div className="dashboard-heading">
           <div>
             <p className="dashboard-eyebrow">{content.label}</p>
-            <h1>Good morning, {user.fullName.split(/\s+/)[0]}</h1>
+            <h1>{greeting()}, {user.fullName.split(/\s+/)[0]}</h1>
             <p>{content.description}</p>
           </div>
           {!children && <span className="dashboard-data-note">Dashboard preview · sample data</span>}

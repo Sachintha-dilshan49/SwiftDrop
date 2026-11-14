@@ -14,18 +14,18 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-/** The demo courier from V4 exists, so the demo COURIER account can open the courier screens. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class DemoCourierSeedIT {
+class CourierRegistrationIT {
 
-    /** Must match the demo COURIER user seeded in auth-service. */
-    private static final UUID DEMO_COURIER_USER_ID = UUID.fromString("00000000-0000-4000-8000-00000000c001");
+    /** The courier V4 seeded for a user no auth-service account has; V5 removes it. */
+    private static final UUID ORPHAN_DEMO_COURIER = UUID.fromString("00000000-0000-4000-8000-00000000d001");
 
     @Container
     @ServiceConnection
@@ -38,17 +38,27 @@ class DemoCourierSeedIT {
     private CourierRepository courierRepository;
 
     @Test
-    void demoCourierIsSeededAvailable() {
-        assertThat(courierRepository.findByUserId(DEMO_COURIER_USER_ID))
+    void newCourierAccountCanOpenTodaysDeliveriesAndIsRegisteredOnce() throws Exception {
+        UUID userId = UUID.randomUUID();
+
+        for (int visit = 0; visit < 2; visit++) {
+            mockMvc.perform(get("/api/v1/courier/deliveries/today").with(courier(userId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$").isEmpty());
+        }
+
+        assertThat(courierRepository.findByUserId(userId))
                 .hasValueSatisfying(courier -> assertThat(courier.getStatus()).isEqualTo(CourierStatus.AVAILABLE));
+        assertThat(courierRepository.findAll()).filteredOn(courier -> courier.getUserId().equals(userId)).hasSize(1);
     }
 
     @Test
-    void demoCourierCanOpenTodaysDeliveries() throws Exception {
-        mockMvc.perform(get("/api/v1/courier/deliveries/today")
-                        .with(jwt().jwt(token -> token.subject(DEMO_COURIER_USER_ID.toString()))
-                                .authorities(new SimpleGrantedAuthority("ROLE_COURIER"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray());
+    void orphanDemoCourierIsRemoved() {
+        assertThat(courierRepository.findById(ORPHAN_DEMO_COURIER)).isEmpty();
+    }
+
+    private static RequestPostProcessor courier(UUID userId) {
+        return jwt().jwt(token -> token.subject(userId.toString()))
+                .authorities(new SimpleGrantedAuthority("ROLE_COURIER"));
     }
 }

@@ -24,7 +24,9 @@ COPY common/ common/
 COPY services/ai-assistant/ services/ai-assistant/
 
 # Build only this module and its deps (common), skip tests
-RUN chmod +x mvnw && ./mvnw -pl services/ai-assistant -am package -DskipTests -q
+# Maven downloads are cached across builds and shared by every service image; "locked" makes
+# parallel builds take turns, so a first build does not flood the network
+RUN --mount=type=cache,target=/root/.m2,sharing=locked chmod +x mvnw && ./mvnw -pl services/ai-assistant -am package -DskipTests -q
 
 # Stage 2: Runtime
 # Not Alpine: the local embedding model (ONNX Runtime, DJL tokenizer) ships glibc native libraries
@@ -36,7 +38,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf 
 # Non-root user (conventions.md §7); the embedding model (~90 MB) is downloaded into the cache on first start
 RUN groupadd --system swiftdrop && useradd --system --gid swiftdrop swiftdrop \
     && mkdir -p /app/onnx-cache && chown swiftdrop:swiftdrop /app/onnx-cache
-ENV AI_EMBEDDING_CACHE_DIR=/app/onnx-cache
+# The model and DJL's native libraries (tokenizer, and PyTorch, which Spring AI's embedding code uses for its
+# arrays) are cached here. Compose mounts a volume on it, so they download on the first start only.
+ENV AI_EMBEDDING_CACHE_DIR=/app/onnx-cache \
+    DJL_CACHE_DIR=/app/onnx-cache/djl \
+    ENGINE_CACHE_DIR=/app/onnx-cache/djl
 USER swiftdrop
 
 # Copy the fat JAR from build stage

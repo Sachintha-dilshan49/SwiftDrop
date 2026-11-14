@@ -20,7 +20,6 @@ export type AuthSession = {
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-const AUTH_BASE_URL = import.meta.env.VITE_AUTH_BASE_URL ?? "http://localhost:8081";
 const SESSION_KEY = "swiftdrop.auth.session";
 
 async function post<TRequest, TResponse>(
@@ -64,6 +63,11 @@ export function exchangeGoogleCode(code: string): Promise<TokenResponse> {
   return post("/token", { code });
 }
 
+/** New tokens for the same account, carrying its current roles (e.g. MERCHANT right after approval). */
+export function refresh(refreshToken: string): Promise<TokenResponse> {
+  return post("/refresh", { refreshToken });
+}
+
 export async function logout(refreshToken: string): Promise<void> {
   await post("/logout", { refreshToken });
 }
@@ -93,8 +97,14 @@ export function clearSession(): void {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
+/**
+ * Google sign-in goes through the gateway (ADR-011), on the same origin as the app: nginx or the Vite dev server
+ * forward /oauth2/** and /login/oauth2/** to it, so Google's callback comes back to this address.
+ */
+export const GOOGLE_LOGIN_PATH = "/oauth2/authorization/google";
+
 export function startGoogleLogin(): void {
-  window.location.assign(`${AUTH_BASE_URL}/oauth2/authorization/google`);
+  window.location.assign(GOOGLE_LOGIN_PATH);
 }
 
 export const googleLoginEnabled =

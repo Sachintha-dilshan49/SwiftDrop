@@ -1,5 +1,7 @@
 package lk.swiftdrop.dispatch.delivery;
 
+import lk.swiftdrop.dispatch.courier.CourierRegistration;
+import org.springframework.dao.DataIntegrityViolationException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,6 +55,9 @@ class CourierDeliveryServiceTest {
     private CourierRepository courierRepository;
 
     @Mock
+    private CourierRegistration courierRegistration;
+
+    @Mock
     private ParcelServiceClient parcelServiceClient;
 
     @Mock
@@ -70,7 +75,8 @@ class CourierDeliveryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CourierDeliveryService(assignmentRepository, courierRepository, deliveryProofRepository,
+        service = new CourierDeliveryService(assignmentRepository, courierRepository, courierRegistration,
+                deliveryProofRepository,
                 parcelServiceClient, proofStorage, TransactionOperations.withoutTransaction(), CLOCK);
     }
 
@@ -118,13 +124,28 @@ class CourierDeliveryServiceTest {
     }
 
     @Test
-    void userWithoutCourierProfileIsNotFound() {
-        UUID stranger = UUID.randomUUID();
-        given(courierRepository.findByUserId(stranger)).willReturn(Optional.empty());
+    void newCourierAccountIsRegisteredOnFirstVisit() {
+        UUID newCourier = UUID.randomUUID();
+        Courier registered = new Courier();
+        registered.setUserId(newCourier);
+        given(courierRepository.findByUserId(newCourier)).willReturn(Optional.empty());
+        given(courierRegistration.register(newCourier)).willReturn(registered);
 
-        assertThatThrownBy(() -> service.getTodaysDeliveries(stranger))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("No courier profile");
+        assertThat(service.getTodaysDeliveries(newCourier)).isEmpty();
+        verify(courierRegistration).register(newCourier);
+    }
+
+    @Test
+    void parallelFirstVisitUsesTheCourierTheOtherRequestRegistered() {
+        UUID newCourier = UUID.randomUUID();
+        Courier registeredByTheOther = new Courier();
+        registeredByTheOther.setUserId(newCourier);
+        given(courierRepository.findByUserId(newCourier))
+                .willReturn(Optional.empty(), Optional.of(registeredByTheOther));
+        given(courierRegistration.register(newCourier))
+                .willThrow(new DataIntegrityViolationException("couriers_user_id_unique"));
+
+        assertThat(service.getTodaysDeliveries(newCourier)).isEmpty();
     }
 
     @Test

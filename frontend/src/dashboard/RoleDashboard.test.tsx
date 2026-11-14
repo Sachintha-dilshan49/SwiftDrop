@@ -20,7 +20,7 @@ describe("RoleDashboard", () => {
     );
 
     expect(screen.getByText("Real customer screen")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Good morning, Demo" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Good (morning|afternoon|evening), Demo$/ })).toBeInTheDocument();
     expect(screen.queryByText("Dashboard preview · sample data")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Dashboard summary" })).not.toBeInTheDocument();
   });
