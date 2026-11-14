@@ -24,6 +24,12 @@ spring:
   flyway:
     enabled: true
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
 server:
   port: 8085
 
@@ -48,3 +54,8 @@ management:
     health:
       probes:
         enabled: true
+
+rabbitmq:
+  queues:
+    # ParcelStatusChanged events for this service's orders (docs/architecture.md §6)
+    merchant-orders: merchant.orders.q
