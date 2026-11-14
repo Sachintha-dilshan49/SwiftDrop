@@ -135,7 +135,10 @@ class CourierStatusUpdateIT {
         assertThat(storageClient().statObject(StatObjectArgs.builder().bucket(BUCKET).object(key).build())
                 .contentType()).isEqualTo("image/jpeg");
         parcelService.verify(patchRequestedFor(urlMatching("/internal/parcels/" + assignment.getParcelId() + "/status"))
-                .withRequestBody(matchingJsonPath("$.proofReference", equalTo(key))));
+                .withRequestBody(matchingJsonPath("$.proofReference", equalTo(key)))
+                // parcel-service checks courierId against changedBy: both must be the courier's user ID
+                .withRequestBody(matchingJsonPath("$.courierId", equalTo(courier.getUserId().toString())))
+                .withRequestBody(matchingJsonPath("$.changedBy", equalTo(courier.getUserId().toString()))));
         assertThat(assignmentRepository.findById(assignment.getId()).orElseThrow().getStatus())
                 .isEqualTo(AssignmentStatus.COMPLETED);
     }
