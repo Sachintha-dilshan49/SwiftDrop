@@ -5,14 +5,7 @@ import { RoleDashboard } from "./RoleDashboard";
 const user = { id: "1", fullName: "Demo Customer", email: "demo@example.test", roles: ["CUSTOMER"] };
 
 describe("RoleDashboard", () => {
-  it("shows the sample preview when the role has no screen yet", () => {
-    render(<RoleDashboard role="COURIER" user={user} onSignOut={vi.fn()} />);
-
-    expect(screen.getByText("Dashboard preview · sample data")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Dashboard summary" })).toBeInTheDocument();
-  });
-
-  it("shows the role's own screen instead of the sample preview", () => {
+  it("shows the role's own screen under a greeting", () => {
     render(
       <RoleDashboard role="CUSTOMER" user={user} onSignOut={vi.fn()}>
         <p>Real customer screen</p>
@@ -27,7 +20,7 @@ describe("RoleDashboard", () => {
 
   it("uses the shared header and lists only the portals the user has", () => {
     const staff = { ...user, fullName: "Demo Admin", roles: ["ADMIN", "DISPATCHER"] };
-    render(<RoleDashboard role="ADMIN" user={staff} onSignOut={vi.fn()} />);
+    render(<RoleDashboard role="ADMIN" user={staff} onSignOut={vi.fn()}><p>Admin screen</p></RoleDashboard>);
 
     expect(screen.getByRole("link", { name: "Platform overview" })).toHaveAttribute("aria-current", "page");
     const options = screen.getAllByRole("option").map((option) => option.textContent);

@@ -28,6 +28,15 @@ spring:
     port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # A failing event is retried 3 times with back-off, then dropped instead of being requeued forever
+        # (an endless redelivery loop would also resend every notification sent before the failure)
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
 
   mail:
     host: ${MAIL_HOST:localhost}

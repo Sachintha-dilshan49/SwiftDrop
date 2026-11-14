@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,7 +33,9 @@ public class AuthServiceClient {
                     .retrieve()
                     .body(UserContactResponse.class);
             return Optional.ofNullable(response);
-        } catch (SwiftDropException e) {
+        } catch (SwiftDropException | RestClientException e) {
+            // Any failure, including a 401/403 that the shared client leaves as a Spring exception, means "no
+            // data": throwing would make RabbitMQ redeliver the event and resend the notifications already sent
             log.error("Failed to fetch contact for user {}: {}", userId, e.getMessage());
             return Optional.empty();
         }
