@@ -108,7 +108,7 @@ class ChatToolCallingIT {
         List<LoggedRequest> llmCalls = llm.findAll(postRequestedFor(urlPathEqualTo("/v1/chat/completions")));
         assertThat(llmCalls).hasSize(2);
         String toolResultCall = llmCalls.get(1).getBodyAsString();
-        assertThat(toolResultCall).contains("OUT_FOR_DELIVERY").doesNotContain("0771234567");
+        assertThat(toolResultCall).contains("Out for delivery").doesNotContain("0771234567");
         // Groq answers 400 if the model's private reasoning is sent back on the next turn
         assertThat(toolResultCall).doesNotContain("reasoning_content");
         assertThat(llmCalls.getFirst().getBodyAsString())

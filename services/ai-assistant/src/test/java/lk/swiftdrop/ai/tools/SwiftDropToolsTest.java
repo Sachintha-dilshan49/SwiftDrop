@@ -81,12 +81,15 @@ class SwiftDropToolsTest {
 
         TrackingResult result = tools.trackParcel(" sd-7k3q-9p2m ", chatContext(new ToolCallTracker()));
 
-        assertThat(result.status()).isEqualTo("OUT_FOR_DELIVERY");
+        // Customer words and Sri Lanka time (UTC+5:30), never the raw codes or ISO timestamps
+        assertThat(result.status()).isEqualTo("Out for delivery");
+        assertThat(result.statusMeaning()).contains("courier is bringing the parcel");
         assertThat(result.history()).extracting(TrackingResult.HistoryEntry::status)
-                .containsExactly("CREATED", "OUT_FOR_DELIVERY");
-        assertThat(result.history()).extracting(TrackingResult.HistoryEntry::at)
-                .containsExactly("2026-10-31T08:00:00Z", "2026-11-01T09:15:00Z");
-        assertThat(result.lastUpdatedAt()).isEqualTo("2026-11-01T09:15:00Z");
+                .containsExactly("Booked", "Out for delivery");
+        assertThat(result.history()).extracting(TrackingResult.HistoryEntry::time)
+                .containsExactly("31 Oct 2026, 1:30 pm", "1 Nov 2026, 2:45 pm");
+        assertThat(result.lastUpdated()).isEqualTo("1 Nov 2026, 2:45 pm");
+        assertThat(result.toString()).doesNotContain("OUT_FOR_DELIVERY", "2026-11-01T");
         assertThat(result.toString()).doesNotContain("Nimal", "0771234567", "Galle");
         gateway.verify(getRequestedFor(urlPathEqualTo("/api/v1/track/SD-7K3Q-9P2M"))
                 .withHeader("Authorization", equalTo("Bearer " + TOKEN)));
@@ -97,8 +100,8 @@ class SwiftDropToolsTest {
         gateway.stubFor(get("/api/v1/track/SD-AAAA-BBBB").willReturn(okJson("""
                 {"trackingNo":"SD-AAAA-BBBB","status":"CREATED","createdAt":"2026-11-01T08:00:00Z","history":[]}""")));
 
-        assertThat(tools.trackParcel("SD-AAAA-BBBB", chatContext(new ToolCallTracker())).lastUpdatedAt())
-                .isEqualTo("2026-11-01T08:00:00Z");
+        assertThat(tools.trackParcel("SD-AAAA-BBBB", chatContext(new ToolCallTracker())).lastUpdated())
+                .isEqualTo("1 Nov 2026, 1:30 pm");
     }
 
     @Test
@@ -108,7 +111,8 @@ class SwiftDropToolsTest {
 
         TrackingResult result = tools.trackParcel("SD-AAAA-BBBB", new ToolContext(Map.of()));
 
-        assertThat(result.status()).isEqualTo("CREATED");
+        assertThat(result.status()).isEqualTo("Booked");
+        assertThat(result.lastUpdated()).isNull();
         gateway.verify(getRequestedFor(urlPathEqualTo("/api/v1/track/SD-AAAA-BBBB"))
                 .withHeader("Authorization", absent()));
     }
@@ -157,8 +161,8 @@ class SwiftDropToolsTest {
 
         assertThat(estimate.amount()).isEqualByComparingTo("1250.00");
         assertThat(estimate.currency()).isEqualTo("LKR");
-        assertThat(estimate.size()).isEqualTo("EXTRA_LARGE");
-        assertThat(estimate.speed()).isEqualTo("EXPRESS");
+        assertThat(estimate.size()).isEqualTo("Extra large");
+        assertThat(estimate.speed()).isEqualTo("Express");
         assertThat(estimate.pickupZone()).isEqualTo("Colombo South");
         assertThat(estimate.dropoffZone()).isEqualTo("Kandy");
     }
@@ -171,7 +175,7 @@ class SwiftDropToolsTest {
                 .willReturn(okJson(QUOTE)));
 
         assertThat(tools.estimateFee("COLOMBO_SOUTH", "KANDY", BigDecimal.ONE, "SMALL", null,
-                chatContext(new ToolCallTracker())).speed()).isEqualTo("STANDARD");
+                chatContext(new ToolCallTracker())).speed()).isEqualTo("Standard");
     }
 
     @Test
@@ -253,6 +257,7 @@ class SwiftDropToolsTest {
         List<ParcelSummary> parcels = tools.myParcels(ParcelStatus.IN_TRANSIT, 2, chatContext(new ToolCallTracker()));
 
         assertThat(parcels).extracting(ParcelSummary::trackingNo).containsExactly("SD-AAAA-0001", "SD-AAAA-0002");
+        assertThat(parcels.getFirst()).isEqualTo(new ParcelSummary("SD-AAAA-0001", "In transit", "30 Oct 2026, 3:30 pm"));
         assertThat(parcels.toString()).doesNotContain("0771234567");
     }
 

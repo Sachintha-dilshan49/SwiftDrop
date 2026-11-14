@@ -45,7 +45,7 @@ class AssistantControllerTest {
     @Test
     void customerGetsReplyWithToolsAndSources() throws Exception {
         given(assistantService.chat(any(), any())).willReturn(new ChatResponse(CONVERSATION, "groq",
-                "Your parcel is OUT_FOR_DELIVERY.", List.of("track_parcel"),
+                "Your parcel is out for delivery.", List.of("track_parcel"),
                 List.of(new SourceRef("tracking-status-guide", "Out for delivery"))));
 
         mockMvc.perform(post("/api/v1/assistant/chat").with(user("CUSTOMER"))

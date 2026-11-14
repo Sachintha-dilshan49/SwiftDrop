@@ -60,12 +60,16 @@ public class SwiftDropTools {
         JsonNode body = gateway.get(uri -> uri.path("/api/v1/track/{trackingNo}").build(normalized), token);
 
         List<TrackingResult.HistoryEntry> history = new ArrayList<>();
+        String lastUpdatedAt = text(body, "createdAt");
         for (JsonNode entry : body.path("history").values()) {
-            history.add(new TrackingResult.HistoryEntry(text(entry, "status"), text(entry, "occurredAt")));
+            history.add(new TrackingResult.HistoryEntry(FriendlyText.statusLabel(text(entry, "status")),
+                    FriendlyText.time(text(entry, "occurredAt"))));
+            // parcel-service returns history oldest first and has no separate last-updated field
+            lastUpdatedAt = text(entry, "occurredAt");
         }
-        // parcel-service returns history oldest first and has no separate last-updated field
-        String lastUpdatedAt = history.isEmpty() ? text(body, "createdAt") : history.getLast().at();
-        return new TrackingResult(normalized, text(body, "status"), lastUpdatedAt, history);
+        String status = text(body, "status");
+        return new TrackingResult(normalized, FriendlyText.statusLabel(status), FriendlyText.statusMeaning(status),
+                FriendlyText.time(lastUpdatedAt), history);
     }
 
     @Tool(name = ESTIMATE_FEE, description = """
@@ -112,7 +116,8 @@ public class SwiftDropTools {
             throw new ToolFailureException(UNEXPECTED_RESPONSE);
         }
         String currency = body.path("currency").asString("LKR");
-        return new FeeEstimate(from.name(), to.name(), weight, normalizedSize, normalizedSpeed, total.asDecimal(),
+        return new FeeEstimate(from.name(), to.name(), weight, FriendlyText.words(normalizedSize),
+                FriendlyText.words(normalizedSpeed), total.asDecimal(),
                 currency);
     }
 
@@ -139,7 +144,8 @@ public class SwiftDropTools {
             if (parcels.size() == size) {
                 break;
             }
-            parcels.add(new ParcelSummary(text(item, "trackingNo"), text(item, "status"), text(item, "createdAt")));
+            parcels.add(new ParcelSummary(text(item, "trackingNo"), FriendlyText.statusLabel(text(item, "status")),
+                    FriendlyText.time(text(item, "createdAt"))));
         }
         return parcels;
     }

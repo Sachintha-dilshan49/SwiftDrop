@@ -97,7 +97,7 @@ else model resolved (default: groq)
     AS -> MEM : save question + reply
     AS --> AC : ChatResponse(toolsUsed = [track_parcel])
     AC --> GW : 200 OK
-    GW --> U : 200 "Your parcel is OUT_FOR_DELIVERY..."
+    GW --> U : 200 "Your parcel is Out for delivery..."
   else timeout or provider error
     LLM --> AS : error
     AS --> AC : AssistantUnavailableException
