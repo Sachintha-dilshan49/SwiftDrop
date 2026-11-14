@@ -38,12 +38,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf 
 # Non-root user (conventions.md §7); the embedding model (~90 MB) is downloaded into the cache on first start
 RUN groupadd --system swiftdrop && useradd --system --gid swiftdrop swiftdrop \
     && mkdir -p /app/onnx-cache && chown swiftdrop:swiftdrop /app/onnx-cache
-# The model and DJL's native libraries are cached here; compose mounts a volume, so they download only once.
-# The tokenizer and ONNX Runtime are all the assistant uses: without DJL_DEFAULT_ENGINE, DJL also downloads PyTorch.
+# The model and DJL's native libraries (tokenizer, and PyTorch, which Spring AI's embedding code uses for its
+# arrays) are cached here. Compose mounts a volume on it, so they download on the first start only.
 ENV AI_EMBEDDING_CACHE_DIR=/app/onnx-cache \
     DJL_CACHE_DIR=/app/onnx-cache/djl \
-    ENGINE_CACHE_DIR=/app/onnx-cache/djl \
-    DJL_DEFAULT_ENGINE=OnnxRuntime
+    ENGINE_CACHE_DIR=/app/onnx-cache/djl
 USER swiftdrop
 
 # Copy the fat JAR from build stage

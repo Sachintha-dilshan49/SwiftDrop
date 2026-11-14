@@ -64,6 +64,11 @@ export function exchangeGoogleCode(code: string): Promise<TokenResponse> {
   return post("/token", { code });
 }
 
+/** New tokens for the same account, carrying its current roles (e.g. MERCHANT right after approval). */
+export function refresh(refreshToken: string): Promise<TokenResponse> {
+  return post("/refresh", { refreshToken });
+}
+
 export async function logout(refreshToken: string): Promise<void> {
   await post("/logout", { refreshToken });
 }

@@ -9,6 +9,7 @@ import {
   readSession,
   saveSession,
   signup,
+  refresh,
 } from "./authApi";
 import {
   AuthPortalId,
@@ -45,7 +46,7 @@ function roleScreen(role: DashboardRole, token: string) {
     case "DISPATCHER":
       return <DispatchHome token={token} />;
     case "MERCHANT":
-      return <MerchantDashboardPage token={token} embedded={true} />;
+      return <MerchantDashboardPage token={token} />;
     case "ADMIN":
       return <AdminMerchantsPage adminToken={token} />;
     default:
@@ -196,7 +197,12 @@ export function AuthApp() {
         <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
           <PendingApprovalPage
             token={session.accessToken}
-            onNavigateToDashboard={() => navigate("/merchant")}
+            onOpenPortal={async () => {
+              // The current token was issued before approval; a fresh one carries the MERCHANT role
+              setSession(saveSession(await refresh(session.refreshToken)));
+              navigate("/merchant");
+            }}
+            onRegister={() => navigate("/merchant/register")}
           />
         </RoleDashboard>
       );

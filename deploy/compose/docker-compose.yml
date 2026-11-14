@@ -288,7 +288,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      # The first start downloads the embedding model (~90 MB) before it reports ready
+      start_period: 300s
     restart: unless-stopped
 
   api-gateway:
@@ -319,7 +320,8 @@ services:
       notification-service:
         condition: service_healthy
       ai-assistant:
-        condition: service_healthy
+        # Started, not healthy: a slow or broken assistant must not keep the rest of SwiftDrop offline
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
       interval: 30s
@@ -333,7 +335,9 @@ services:
       context: ../../frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        # Always /api in this image: nginx proxies it to the gateway. Not read from .env, because .env files copied
+        # before 31 Oct have http://localhost:8080, which skips the /api prefix and breaks every request.
+        VITE_API_BASE_URL: /api
         VITE_AUTH_BASE_URL: ${VITE_AUTH_BASE_URL:-http://localhost:8081}
         VITE_GOOGLE_LOGIN_ENABLED: ${VITE_GOOGLE_LOGIN_ENABLED:-false}
     container_name: swiftdrop-frontend
@@ -346,7 +350,8 @@ services:
       api-gateway:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ || exit 1"]
+      # 127.0.0.1, not localhost: on Alpine localhost resolves to ::1 first and nginx listens on IPv4 only
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
