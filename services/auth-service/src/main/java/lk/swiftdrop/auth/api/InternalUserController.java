@@ -5,7 +5,9 @@ import java.util.Locale;
 import java.util.UUID;
 import lk.swiftdrop.auth.account.RoleName;
 import lk.swiftdrop.auth.service.AuthService;
+import lk.swiftdrop.auth.service.InternalUserService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,9 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalUserController {
 
     private final AuthService authService;
+    private final InternalUserService internalUserService;
 
-    public InternalUserController(AuthService authService) {
+    public InternalUserController(AuthService authService, InternalUserService internalUserService) {
         this.authService = authService;
+        this.internalUserService = internalUserService;
     }
 
     @GetMapping("/{userId}/contact")
@@ -28,6 +32,19 @@ public class InternalUserController {
         return authService.getUserContact(userId);
     }
 
+    @PutMapping("/{userId}/roles/courier")
+    public ResponseEntity<Void> grantCourierRole(@PathVariable UUID userId) {
+        internalUserService.grantCourierRole(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/{userId}/roles/merchant")
+    public ResponseEntity<Void> grantMerchantRole(@PathVariable UUID userId) {
+        internalUserService.grantMerchantRole(userId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Used by merchant-service when an admin approves a merchant. */
     @PostMapping("/{userId}/roles")
     public ResponseEntity<Void> grantRole(
             @PathVariable UUID userId,

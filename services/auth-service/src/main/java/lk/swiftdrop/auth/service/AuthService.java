@@ -126,7 +126,7 @@ public class AuthService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found."));
         String firstName = user.getFullName().trim().split("\\s+", 2)[0];
-        return new UserContactResponse(user.getEmail(), user.getMobileNumber(), firstName);
+        return new UserContactResponse(user.getEmail(), toSriLankanE164(user.getMobileNumber()), firstName);
     }
 
     @Transactional
@@ -175,5 +175,22 @@ public class AuthService {
 
     private static boolean isPhoneIdentifier(String identifier) {
         return identifier.matches("[+0-9\\s().-]+") && identifier.chars().anyMatch(Character::isDigit);
+    }
+
+    private static String toSriLankanE164(String mobileNumber) {
+        String normalized = normalizeMobileNumber(mobileNumber);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized.startsWith("+94")) {
+            return normalized;
+        }
+        if (normalized.startsWith("94") && normalized.length() == 11) {
+            return "+" + normalized;
+        }
+        if (normalized.startsWith("0") && normalized.length() == 10) {
+            return "+94" + normalized.substring(1);
+        }
+        return normalized;
     }
 }
