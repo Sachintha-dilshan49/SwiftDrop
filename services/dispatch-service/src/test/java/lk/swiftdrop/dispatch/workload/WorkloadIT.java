@@ -63,7 +63,10 @@ class WorkloadIT {
         assign(busy, AssignmentStatus.COMPLETED);
         assign(idle, AssignmentStatus.FAILED);
 
-        List<CourierWorkloadResponse> workload = workloadService.getWorkload();
+        // only this test's couriers: the table also holds the demo courier seeded by V4
+        List<CourierWorkloadResponse> workload = workloadService.getWorkload().stream()
+                .filter(row -> row.courierId().equals(busy.getId()) || row.courierId().equals(idle.getId()))
+                .toList();
 
         assertThat(workload).extracting(CourierWorkloadResponse::courierId).containsExactly(idle.getId(), busy.getId());
         assertThat(workload).extracting(CourierWorkloadResponse::activeDeliveries).containsExactly(0L, 2L);
