@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthApp } from "./AuthApp";
 import { readSession } from "./authApi";
+import { SESSION_ENDED_EVENT } from "../api/http";
 
 const { loginMock, signupMock, exchangeGoogleCodeMock, saveSessionMock, logoutMock } = vi.hoisted(() => ({
   loginMock: vi.fn(),
@@ -154,6 +155,25 @@ describe("AuthApp", () => {
     );
     expect(logoutMock).toHaveBeenCalledWith("refresh");
     expect(saveSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("returns to sign-in with a message when the session can no longer be refreshed", () => {
+    vi.mocked(readSession).mockReturnValueOnce({
+      accessToken: "access",
+      refreshToken: "refresh",
+      user: { id: "1", fullName: "Demo Customer", email: "demo@example.test", roles: ["CUSTOMER"] },
+    });
+    window.history.replaceState({}, "", "/customer");
+    render(<AuthApp />);
+    expect(screen.getByRole("heading", { name: "Good morning, Demo" })).toBeInTheDocument();
+
+    act(() => {
+      window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Your session has ended. Please sign in again.");
+    expect(screen.getByLabelText("Email or mobile")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/");
   });
 
   describe("route guards", () => {

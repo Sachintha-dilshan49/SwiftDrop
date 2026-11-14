@@ -64,6 +64,11 @@ export function exchangeGoogleCode(code: string): Promise<TokenResponse> {
   return post("/token", { code });
 }
 
+/** New access and refresh tokens; the old refresh token stops working (rotated on use). */
+export function refreshTokens(refreshToken: string): Promise<TokenResponse> {
+  return post("/refresh", { refreshToken });
+}
+
 export async function logout(refreshToken: string): Promise<void> {
   await post("/logout", { refreshToken });
 }

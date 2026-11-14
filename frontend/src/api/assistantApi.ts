@@ -1,5 +1,7 @@
 // Client for ai-assistant through the gateway. VITE_API_BASE_URL is the gateway prefix ("/api" by
 // default, like the other clients); every path below adds "/v1/assistant/...".
+import { authorizedFetch } from "./http";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 /** The longest question the service accepts (ChatRequest @Size(max = 2000)). */
@@ -161,7 +163,7 @@ export const assistantApi = {
     handlers: ChatStreamHandlers,
     signal?: AbortSignal,
   ): Promise<void> {
-    const response = await fetch(`${API_BASE}/v1/assistant/chat/stream`, {
+    const response = await authorizedFetch(`${API_BASE}/v1/assistant/chat/stream`, {
       method: "POST",
       headers: {
         Accept: "text/event-stream, application/problem+json",
@@ -204,7 +206,7 @@ export const assistantApi = {
 
   /** Forgets a conversation on the server. A conversation that is already gone is not an error. */
   async deleteConversation(conversationId: string, token: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/v1/assistant/conversations/${encodeURIComponent(conversationId)}`, {
+    const response = await authorizedFetch(`${API_BASE}/v1/assistant/conversations/${encodeURIComponent(conversationId)}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });

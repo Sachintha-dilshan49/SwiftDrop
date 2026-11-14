@@ -1,4 +1,5 @@
 // frontend/src/api/merchantApi.ts
+import { authorizedFetch } from './http';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -79,7 +80,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await authorizedFetch(`${API_BASE}${path}`, {
     ...options,
     headers,
   });

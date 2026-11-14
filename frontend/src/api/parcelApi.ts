@@ -1,5 +1,7 @@
 // Client for parcel-service through the gateway. VITE_API_BASE_URL is the gateway prefix ("/api" by
 // default, like the other clients); every path below adds "/v1/...".
+import { authorizedFetch } from "./http";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 export type ParcelStatus =
@@ -184,7 +186,7 @@ function parseData<T>(event: Event): T | null {
 export const parcelApi = {
   /** Books a delivery for the signed-in customer; the response has the tracking number and the fee. */
   async createParcel(request: CreateParcelRequest, token: string): Promise<ParcelResponse> {
-    const response = await fetch(`${API_BASE}/v1/parcels`, {
+    const response = await authorizedFetch(`${API_BASE}/v1/parcels`, {
       method: "POST",
       headers: { ...withToken(token, "application/json"), "Content-Type": "application/json" },
       body: JSON.stringify(request),
@@ -197,7 +199,7 @@ export const parcelApi = {
 
   /** One of the caller's parcels with its full status history; someone else's parcel is a 404. */
   async getParcel(parcelId: string, token: string): Promise<ParcelResponse> {
-    const response = await fetch(`${API_BASE}/v1/parcels/${encodeURIComponent(parcelId)}`, {
+    const response = await authorizedFetch(`${API_BASE}/v1/parcels/${encodeURIComponent(parcelId)}`, {
       headers: withToken(token, "application/json"),
     });
     if (!response.ok) {
@@ -215,7 +217,7 @@ export const parcelApi = {
     if (status) {
       query.set("status", status);
     }
-    const response = await fetch(`${API_BASE}/v1/parcels?${query}`, {
+    const response = await authorizedFetch(`${API_BASE}/v1/parcels?${query}`, {
       headers: withToken(token, "application/json"),
     });
     if (!response.ok) {
@@ -226,7 +228,7 @@ export const parcelApi = {
 
   /** The booking receipt (PDF) of one of the caller's parcels. */
   async getReceipt(parcelId: string, token: string): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/v1/parcels/${encodeURIComponent(parcelId)}/receipt`, {
+    const response = await authorizedFetch(`${API_BASE}/v1/parcels/${encodeURIComponent(parcelId)}/receipt`, {
       // Errors come back as ProblemDetail JSON, so accept that too
       headers: withToken(token, "application/pdf, application/problem+json"),
     });

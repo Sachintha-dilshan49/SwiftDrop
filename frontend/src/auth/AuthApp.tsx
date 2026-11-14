@@ -25,6 +25,7 @@ import { CustomerHome } from "../features/booking/CustomerHome";
 import { CourierHome } from "../features/courier/CourierHome";
 import { DispatchHome } from "../features/dispatch/DispatchHome";
 import { AssistantWidget } from "../features/assistant/AssistantWidget";
+import { SESSION_ENDED_EVENT } from "../api/http";
 import { ForbiddenPage, NotFoundPage } from "../routes/ErrorPages";
 import { navigate, usePath } from "../routes/router";
 import { resolveRoute } from "../routes/routes";
@@ -62,6 +63,18 @@ export function AuthApp() {
   useEffect(() => {
     if (homeRedirect) navigate(homeRedirect, { replace: true });
   }, [homeRedirect]);
+
+  // The shared API client could not refresh the tokens (src/api/http.ts): back to sign-in.
+  useEffect(() => {
+    function handleSessionEnded() {
+      setSession(null);
+      setMessage("Your session has ended. Please sign in again.");
+      setMessageType("info");
+      navigate("/", { replace: true });
+    }
+    window.addEventListener(SESSION_ENDED_EVENT, handleSessionEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, handleSessionEnded);
+  }, []);
 
   useEffect(() => {
     if (!isCallback) return;
@@ -139,7 +152,8 @@ export function AuthApp() {
   async function signOut() {
     if (session) {
       try {
-        await logout(session.refreshToken);
+        // The stored refresh token is the latest one; the state may hold an older, already rotated one.
+        await logout(readSession()?.refreshToken ?? session.refreshToken);
       } catch {
         setMessage("Your session was cleared, but the server could not confirm sign out.");
       }
