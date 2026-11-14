@@ -1,5 +1,7 @@
 package lk.swiftdrop.dispatch.delivery;
 
+import lk.swiftdrop.dispatch.courier.CourierRegistration;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -35,6 +37,7 @@ public class CourierDeliveryService {
 
     private final AssignmentRepository assignmentRepository;
     private final CourierRepository courierRepository;
+    private final CourierRegistration courierRegistration;
     private final DeliveryProofRepository deliveryProofRepository;
     private final ParcelServiceClient parcelServiceClient;
     private final ProofStorage proofStorage;
@@ -42,10 +45,11 @@ public class CourierDeliveryService {
     private final Clock clock;
 
     public CourierDeliveryService(AssignmentRepository assignmentRepository, CourierRepository courierRepository,
-            DeliveryProofRepository deliveryProofRepository, ParcelServiceClient parcelServiceClient,
+            CourierRegistration courierRegistration, DeliveryProofRepository deliveryProofRepository, ParcelServiceClient parcelServiceClient,
             ProofStorage proofStorage, TransactionOperations transactions, Clock clock) {
         this.assignmentRepository = assignmentRepository;
         this.courierRepository = courierRepository;
+        this.courierRegistration = courierRegistration;
         this.deliveryProofRepository = deliveryProofRepository;
         this.parcelServiceClient = parcelServiceClient;
         this.proofStorage = proofStorage;
@@ -131,9 +135,15 @@ public class CourierDeliveryService {
         return assignment;
     }
 
+    /** The caller's courier record; a courier account opening its screens for the first time gets one. */
     private Courier currentCourier(UUID userId) {
-        return courierRepository.findByUserId(userId)
-                .orElseThrow(() -> new NotFoundException("courier-profile-not-found", "Courier profile not found",
-                        "No courier profile exists for this account."));
+        return courierRepository.findByUserId(userId).orElseGet(() -> {
+            try {
+                return courierRegistration.register(userId);
+            } catch (DataIntegrityViolationException e) {
+                // A parallel first request registered this courier a moment ago
+                return courierRepository.findByUserId(userId).orElseThrow(() -> e);
+            }
+        });
     }
 }
