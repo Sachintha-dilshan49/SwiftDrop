@@ -10,6 +10,7 @@ final class RateLimitKeys {
 
     static final String MERCHANT_API_PREFIX = "merchant-api:";
     static final String PRICING_ESTIMATE_PREFIX = "pricing-estimate:";
+    static final String ASSISTANT_CHAT_PREFIX = "assistant-chat:";
 
     private RateLimitKeys() {
     }

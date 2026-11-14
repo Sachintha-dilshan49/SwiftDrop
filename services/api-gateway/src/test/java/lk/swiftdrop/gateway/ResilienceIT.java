@@ -1,5 +1,6 @@
 package lk.swiftdrop.gateway;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.okJson;
@@ -42,6 +43,19 @@ class ResilienceIT extends AbstractGatewayIT {
         assertThat(events).extracting(Tuple2::getT2).containsExactly("one", "two");
         // If the gateway buffered, both would arrive together; the gap is longer than the general timeout
         assertThat(events.get(1).getT1()).isGreaterThan(5000);
+    }
+
+    @Test
+    void assistantChatMayTakeLongerThanTheDefaultTimeout() {
+        // Tool calls and long streamed answers outlast the default (5 s in these tests); the chat route allows 2 min
+        service("assistant").stubFor(post(urlEqualTo("/api/v1/assistant/chat"))
+                .willReturn(okJson("{\"reply\":\"ok\"}").withFixedDelay(6500)));
+
+        client.post().uri("/api/v1/assistant/chat")
+                .header(HttpHeaders.AUTHORIZATION, bearer(JWTS.valid()))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody().jsonPath("$.reply").isEqualTo("ok");
     }
 
     @Test

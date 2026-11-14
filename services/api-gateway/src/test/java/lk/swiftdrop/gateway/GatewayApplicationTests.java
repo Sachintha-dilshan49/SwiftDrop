@@ -25,12 +25,15 @@ class GatewayApplicationTests {
 
         assertThat(routes).extracting(Route::getId).containsExactly(
                 "parcel-tracking-stream",
-                "merchant-api", "pricing-estimate", "auth-admin", "pricing-admin", "merchant-admin",
+                "merchant-api", "pricing-estimate", "assistant-chat", "assistant-mcp", "auth-admin", "pricing-admin", "merchant-admin",
                 "notification-admin",
                 "auth-service", "auth-google-oauth", "pricing-service", "parcel-service", "dispatch-service",
                 "merchant-service", "ai-assistant");
         assertThat(routes).filteredOn(route -> route.getId().equals("parcel-tracking-stream"))
                 .singleElement()
                 .satisfies(route -> assertThat(route.getMetadata()).containsEntry("response-timeout", -1));
+        assertThat(routes).filteredOn(route -> route.getId().equals("assistant-chat"))
+                .singleElement()
+                .satisfies(route -> assertThat(route.getMetadata()).containsEntry("response-timeout", 120000));
     }
 }

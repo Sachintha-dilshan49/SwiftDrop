@@ -39,7 +39,9 @@ class RoutingIT extends AbstractGatewayIT {
                 Arguments.of("/api/v1/merchants/me/orders", "merchant"),
                 Arguments.of("/api/v1/admin/merchants?status=PENDING", "merchant"),
                 Arguments.of("/api/v1/admin/webhook-deliveries", "notification"),
-                Arguments.of("/api/v1/assistant/chat", "assistant"));
+                Arguments.of("/api/v1/assistant/chat", "assistant"),
+                Arguments.of("/api/v1/assistant/models", "assistant"),
+                Arguments.of("/mcp", "assistant"));
     }
 
     @ParameterizedTest(name = "{0} -> {1}")
