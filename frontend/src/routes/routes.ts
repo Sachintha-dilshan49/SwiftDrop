@@ -5,6 +5,8 @@ export type Route =
   | { kind: "tracking"; trackingNo: string } // public: /track and /track/{trackingNo}
   | { kind: "callback" } // Google sign-in returns here
   | { kind: "login" }
+  | { kind: "forgot-password" } // public: ask for a reset link
+  | { kind: "reset-password" } // public: opened from the emailed link
   | { kind: "home" } // signed in, no portal chosen yet: go to the default dashboard
   | { kind: "dashboard"; role: DashboardRole }
   | { kind: "merchant-register" }
@@ -25,6 +27,12 @@ export function resolveRoute(path: string, roles: string[] | null): Route {
   const cleanPath = path.length > 1 ? path.replace(/\/+$/, "") : path;
   if (cleanPath === "/auth/callback") {
     return roles ? { kind: "home" } : { kind: "callback" };
+  }
+  if (cleanPath === "/forgot-password") {
+    return roles ? { kind: "home" } : { kind: "forgot-password" };
+  }
+  if (cleanPath === "/reset-password") {
+    return { kind: "reset-password" }; // also when signed in on this browser
   }
   if (cleanPath === "/") {
     return roles ? { kind: "home" } : { kind: "login" };

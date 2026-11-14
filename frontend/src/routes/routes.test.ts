@@ -19,6 +19,13 @@ describe("resolveRoute", () => {
     expect(resolveRoute("/merchant/pending", ["CUSTOMER"])).toEqual({ kind: "merchant-pending" });
   });
 
+  it("opens forgot password while signed out and reset password always", () => {
+    expect(resolveRoute("/forgot-password", null)).toEqual({ kind: "forgot-password" });
+    expect(resolveRoute("/forgot-password", ["CUSTOMER"])).toEqual({ kind: "home" });
+    expect(resolveRoute("/reset-password", null)).toEqual({ kind: "reset-password" });
+    expect(resolveRoute("/reset-password/", ["CUSTOMER"])).toEqual({ kind: "reset-password" });
+  });
+
   it("handles the Google callback only while signed out", () => {
     expect(resolveRoute("/auth/callback", null)).toEqual({ kind: "callback" });
     expect(resolveRoute("/auth/callback", ["CUSTOMER"])).toEqual({ kind: "home" });

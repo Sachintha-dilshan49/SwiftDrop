@@ -17,6 +17,24 @@ spring:
     hibernate:
       ddl-auto: validate
 
+  # Password reset emails. Defaults suit Mailpit; AUTH_MAIL_* override the shared MAIL_* settings so reset emails
+  # can use a real mail server (e.g. Gmail) while notifications stay on Mailpit.
+  mail:
+    host: ${AUTH_MAIL_HOST:${MAIL_HOST:localhost}}
+    port: ${AUTH_MAIL_PORT:${MAIL_PORT:1025}}
+    username: ${AUTH_MAIL_USERNAME:${MAIL_USERNAME:}}
+    password: ${AUTH_MAIL_PASSWORD:${MAIL_PASSWORD:}}
+    properties:
+      mail:
+        smtp:
+          auth: ${AUTH_MAIL_SMTP_AUTH:${MAIL_SMTP_AUTH:false}}
+          starttls:
+            enable: ${AUTH_MAIL_SMTP_STARTTLS:${MAIL_SMTP_STARTTLS:false}}
+            required: ${AUTH_MAIL_SMTP_STARTTLS:${MAIL_SMTP_STARTTLS:false}}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
   security:
     oauth2:
       resourceserver:
@@ -49,6 +67,11 @@ swiftdrop:
   # Demo staff accounts (admin, dispatcher, courier); off unless a password is set. Local and demo use only.
   demo-accounts:
     password: ${AUTH_DEMO_ACCOUNTS_PASSWORD:}
+  password-reset:
+    reset-url: ${AUTH_PASSWORD_RESET_URL:http://localhost:3000/reset-password}
+    from-email: ${AUTH_FROM_EMAIL:noreply@swiftdrop.lk}
+    # Demo only: send every account's reset emails to this address (stored in users.password_reset_email)
+    default-recipient: ${AUTH_PASSWORD_RESET_DEFAULT_EMAIL:}
   identity-storage:
     enabled: ${AUTH_IDENTITY_STORAGE_ENABLED:false}
     endpoint: ${AUTH_IDENTITY_STORAGE_ENDPOINT:}
@@ -65,6 +88,10 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # A mail server outage must not mark auth-service unhealthy
+    mail:
+      enabled: false
 
 logging:
   level:

@@ -37,6 +37,10 @@ public class UserEntity {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
+    /** Where password reset emails go; null means the account email. */
+    @Column(name = "password_reset_email", length = 255)
+    private String passwordResetEmail;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status", nullable = false, length = 20)
     private AccountStatus accountStatus = AccountStatus.ACTIVE;
@@ -75,6 +79,23 @@ public class UserEntity {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public String getPasswordResetEmail() {
+        return passwordResetEmail;
+    }
+
+    public void setPasswordResetEmail(String passwordResetEmail) {
+        this.passwordResetEmail = passwordResetEmail;
+    }
+
+    /** The address a password reset link is sent to. */
+    public String passwordResetRecipient() {
+        return passwordResetEmail == null || passwordResetEmail.isBlank() ? email : passwordResetEmail;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public AccountStatus getAccountStatus() {

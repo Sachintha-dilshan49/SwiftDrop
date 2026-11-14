@@ -309,3 +309,10 @@ h1 { margin: 0; color: var(--ink); font-size: 27px; font-weight: 750; line-heigh
   .auth-panel { padding: 22px 20px 25px; }
   .portal-picker button { font-size: 9px; }
 }
+
+/* Forgot and reset password */
+.reset-card { text-align: left; }
+.reset-card h1 { margin: 0; }
+.reset-card .auth-form .button-primary { margin-top: 16px; }
+.reset-back { align-self: center; display: block; margin: 14px auto 0; }
+.reset-inline { display: inline; margin: 0; font-size: inherit; }

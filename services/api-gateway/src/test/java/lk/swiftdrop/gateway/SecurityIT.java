@@ -86,6 +86,8 @@ class SecurityIT extends AbstractGatewayIT {
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/refresh", "auth"),
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/logout", "auth"),
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/token", "auth"),
+                Arguments.of(HttpMethod.POST, "/api/v1/auth/password/forgot", "auth"),
+                Arguments.of(HttpMethod.POST, "/api/v1/auth/password/reset", "auth"),
                 Arguments.of(HttpMethod.GET, "/api/v1/oauth2/authorization/google", "auth"),
                 Arguments.of(HttpMethod.GET, "/oauth2/authorization/google", "auth"),
                 Arguments.of(HttpMethod.GET, "/login/oauth2/code/google?code=c&state=s", "auth"),

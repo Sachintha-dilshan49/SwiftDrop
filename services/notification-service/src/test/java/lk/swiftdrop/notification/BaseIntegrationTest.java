@@ -49,6 +49,8 @@ public abstract class BaseIntegrationTest {
         // Service URLs — unreachable on purpose (overridden per test if needed)
         registry.add("swiftdrop.services.auth-url", () -> "http://localhost:0");
         registry.add("swiftdrop.services.merchant-url", () -> "http://localhost:0");
+        // Unreachable too: the default (localhost:8083) would call a real parcel-service running on this machine
+        registry.add("swiftdrop.services.parcel-url", () -> "http://localhost:0");
     }
 }
 

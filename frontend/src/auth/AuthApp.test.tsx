@@ -29,6 +29,8 @@ vi.mock("./authApi", () => ({
   saveSession: (tokens: Parameters<typeof saveSessionMock>[0]) => saveSessionMock(tokens),
   clearSession: vi.fn(),
   startGoogleLogin: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  resetPassword: vi.fn(),
 }));
 
 describe("AuthApp", () => {
@@ -194,5 +196,14 @@ describe("AuthApp", () => {
 
       expect(screen.getByLabelText("Email or mobile")).toBeInTheDocument();
     });
+  });
+
+  it("opens the forgot password page from the sign-in form", () => {
+    render(<AuthApp />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+
+    expect(window.location.pathname).toBe("/forgot-password");
+    expect(screen.getByRole("heading", { name: "Reset your password" })).toBeInTheDocument();
   });
 });
