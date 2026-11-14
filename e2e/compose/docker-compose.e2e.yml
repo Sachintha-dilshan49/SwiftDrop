@@ -1,0 +1,94 @@
+# e2e/compose/docker-compose.e2e.yml
+# Override for the system tests in e2e/. Use it on top of the normal stack:
+#   docker compose -f deploy/compose/docker-compose.yml -f e2e/compose/docker-compose.e2e.yml up -d --build
+# It adds a webhook receiver and pins the settings the tests rely on, whatever the local .env says.
+# The values here are test-only dummies, never real secrets.
+
+x-jvm: &jvm
+  # Empty locally; CI sets E2E_JAVA_TOOL_OPTIONS to cap each JVM so the whole stack fits on one runner
+  JAVA_TOOL_OPTIONS: ${E2E_JAVA_TOOL_OPTIONS:-}
+
+x-mailpit: &mailpit
+  MAIL_HOST: mailpit
+  MAIL_PORT: "1025"
+  MAIL_USERNAME: ""
+  MAIL_PASSWORD: ""
+  MAIL_SMTP_AUTH: "false"
+  MAIL_SMTP_STARTTLS: "false"
+
+services:
+
+  # Merchant webhooks are sent here; the tests read what arrived through WireMock's admin API
+  webhook-receiver:
+    image: wiremock/wiremock:3.13.1
+    container_name: swiftdrop-webhook-receiver
+    command: ["--port", "8080", "--disable-banner", "--max-request-journal-entries", "5000"]
+    ports:
+      - "8089:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/__admin/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  auth-service:
+    environment:
+      <<: [*jvm, *mailpit]
+      AUTH_DEMO_ACCOUNTS_PASSWORD: ${E2E_DEMO_PASSWORD:-e2e-demo-password-123}
+      AUTH_GOOGLE_ENABLED: "false"
+      AUTH_PASSWORD_RESET_DEFAULT_EMAIL: ""
+      # Reset emails must stay in Mailpit too, even when the local .env routes them through a real mail server
+      AUTH_MAIL_HOST: mailpit
+      AUTH_MAIL_PORT: "1025"
+      AUTH_MAIL_USERNAME: ""
+      AUTH_MAIL_PASSWORD: ""
+      AUTH_MAIL_SMTP_AUTH: "false"
+      AUTH_MAIL_SMTP_STARTTLS: "false"
+
+  pricing-service:
+    environment:
+      <<: *jvm
+
+  parcel-service:
+    environment:
+      <<: *jvm
+
+  dispatch-service:
+    environment:
+      <<: *jvm
+
+  merchant-service:
+    environment:
+      <<: *jvm
+
+  notification-service:
+    environment:
+      <<: [*jvm, *mailpit]
+      NOTIFICATION_FROM_EMAIL: noreply@swiftdrop.lk
+    depends_on:
+      webhook-receiver:
+        condition: service_healthy
+
+  ai-assistant:
+    environment:
+      <<: *jvm
+
+  api-gateway:
+    environment:
+      <<: *jvm
+      # Many tests share one client IP; keep the public estimate limit out of the way. The merchant API limit stays
+      # at its default so the 429 test exercises the real setting.
+      GATEWAY_ESTIMATE_RATE_LIMIT_REPLENISH: "200"
+      GATEWAY_ESTIMATE_RATE_LIMIT_BURST: "400"
+
+# Own volumes, so the tests start from empty databases and `npm run stack:down` (down -v) never deletes the
+# volumes of your normal local stack
+volumes:
+  pgdata:
+    name: swiftdrop_e2e_pgdata
+  rabbitmq_data:
+    name: swiftdrop_e2e_rabbitmq_data
+  ai_model_cache:
+    name: swiftdrop_e2e_ai_model_cache
+  minio_data:
+    name: swiftdrop_e2e_minio_data
