@@ -1,0 +1,107 @@
+@startuml er-ai-assistant
+' SwiftDrop AI Assistant - Logical data model (Role 9)
+' ai-assistant has NO database (docs/architecture.md). This diagram shows the data it
+' holds in memory while running, in crow's foot notation. Nothing here is persisted.
+' Render: plantuml -tpng -tsvg er-ai-assistant.puml
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam linetype ortho
+skinparam nodesep 110
+skinparam ranksep 70
+skinparam ArrowColor #3B4A5E
+skinparam ArrowFontColor #5A6676
+skinparam ArrowFontSize 11
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #2350C8
+  HeaderBackgroundColor #EEF3FF
+  FontStyle bold
+  AttributeFontSize 11
+}
+skinparam package {
+  BorderColor #2350C8
+  BackgroundColor #FAFBFC
+  FontSize 13
+  BorderStyle dashed
+}
+skinparam legend {
+  BackgroundColor #FFFFFF
+  BorderColor #A9B3C1
+  FontSize 11
+}
+set separator none
+hide circle
+hide methods
+hide stereotype
+
+title SwiftDrop AI Assistant - Logical Data Model (in memory, not persisted)
+
+entity "User\n(auth-service)" as User #F2F2F2 {
+  * userId : UUID  <<from JWT "sub">>
+}
+
+package "Chat memory  (MessageWindowChatMemory)" {
+  entity "Conversation" as Conversation {
+    * key : String <<PK>>
+      "userId:conversationId"
+    --
+    * lastActivity : Instant
+  }
+
+  entity "ChatMessage" as ChatMessage {
+    * position : int <<PK, within conversation>>
+    --
+    * role : {USER, ASSISTANT, TOOL}
+    * content : String
+    toolName : String
+  }
+}
+
+package "Knowledge base  (SimpleVectorStore, built at startup)" {
+  entity "KnowledgeArticle" as Article {
+    * slug : String <<PK>>
+    --
+    * title : String
+    * sourcePath : String
+      "classpath:knowledge/*.md"
+  }
+
+  entity "KnowledgeChunk" as Chunk {
+    * id : String <<PK>>
+    --
+    * articleSlug : String <<FK>>
+    section : String
+    * content : String
+    * embedding : float[384]
+  }
+}
+
+package "Configuration  (application.yml)" {
+  entity "ModelConfig" as ModelConfig {
+    * name : String <<PK>>
+      e.g. "groq", "openai"
+    --
+    * baseUrl : String
+    * model : String
+    * enabled : boolean
+    apiKey : secret (env var)
+  }
+}
+
+User ||.right.o{ Conversation : owns
+Conversation ||--o{ ChatMessage : "keeps last 20"
+Article ||--|{ Chunk : "is split into"
+
+legend bottom right
+  <b>Notation</b>: crow's foot.  ● = required.  Solid line = held by key.
+  Dotted line = logical link only: the userId is the prefix of the conversation key.
+  <b>Lifetime</b>: all data is lost on restart. Conversations expire after 30 min idle;
+  the knowledge base is rebuilt from the Markdown files at every startup.
+  <b>Why no database</b>: architecture rule (ai-assistant owns no data); parcels,
+  users and fees are read live from their owning services through the gateway.
+endlegend
+
+@enduml
