@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AssistantWidget, articleTitle, replyBlocks, sourceTitles } from "./AssistantWidget";
+import { AssistantWidget } from "./AssistantWidget";
+import { articleTitle, replyBlocks, sourceTitles } from "./replyFormat";
 
 const CONVERSATION = "c0ffee00-0000-4000-8000-000000000001";
 
