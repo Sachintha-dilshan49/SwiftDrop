@@ -24,6 +24,7 @@ import { RoleDashboard } from "../dashboard/RoleDashboard";
 import { CustomerHome } from "../features/booking/CustomerHome";
 import { CourierHome } from "../features/courier/CourierHome";
 import { DispatchHome } from "../features/dispatch/DispatchHome";
+import { AssistantWidget } from "../features/assistant/AssistantWidget";
 import { ForbiddenPage, NotFoundPage } from "../routes/ErrorPages";
 import { navigate, usePath } from "../routes/router";
 import { resolveRoute } from "../routes/routes";
@@ -174,9 +175,12 @@ export function AuthApp() {
     const dashboardRole = route.kind === "dashboard" ? route.role : defaultDashboardRole(session.user.roles);
     if (dashboardRole) {
       return (
-        <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-          {roleScreen(dashboardRole, session.accessToken)}
-        </RoleDashboard>
+        <>
+          <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
+            {roleScreen(dashboardRole, session.accessToken)}
+          </RoleDashboard>
+          <AssistantWidget token={session.accessToken} />
+        </>
       );
     }
     return (
