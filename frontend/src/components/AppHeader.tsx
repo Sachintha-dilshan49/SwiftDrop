@@ -34,7 +34,7 @@ export function AppHeader({ portalLabel, portals, currentPortalHref, nav, user, 
           <span className="app-header-mark" aria-hidden="true">
             S
           </span>
-          <span>SwiftDrop</span>
+          <span className="app-header-brand-text">SwiftDrop</span>
         </Link>
 
         <nav className="app-header-nav" aria-label="Main">
