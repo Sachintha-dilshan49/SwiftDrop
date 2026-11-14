@@ -520,6 +520,7 @@ All containers have health checks; services wait for their dependencies to be he
 
 - On every PR to `dev`: build, unit + integration tests (Testcontainers), JaCoCo coverage report, frontend lint + test, Docker build check.
 - On merge to `main`: build and push images to GHCR tagged with the version and commit SHA.
+- Nightly on `dev`: the `e2e/` system tests against the full Compose stack (`docs/testing.md`).
 
 ## 13. Tech stack
 

@@ -21,6 +21,7 @@ SwiftDrop is a parcel delivery and courier management platform built as a univer
 | `services/ai-assistant` | Chatbot and MCP tools, port 8087 | Role 9 |
 | `frontend/` | React + Vite + TypeScript app | Role 7 (+ Role 1) |
 | `deploy/` | Docker Compose, Helm charts | Role 8 |
+| `e2e/` | System tests (Playwright) against the full Compose stack, see `docs/testing.md` | Testing (Devmith) |
 | `.github/workflows/` | CI pipelines | Role 8 |
 | `docs/` | Design documentation | Everyone (Role 1 compiles) |
 
@@ -47,6 +48,8 @@ docker compose -f deploy/compose/docker-compose.yml up --build                  
 
 cd frontend && npm ci && npm run dev               # frontend dev server
 npm run lint && npm run test                       # frontend checks
+
+cd e2e && npm ci && npm run stack:up && npm run stack:wait && npm test   # system tests (e2e/README.md)
 ```
 
 Run the relevant tests before saying a task is done.
