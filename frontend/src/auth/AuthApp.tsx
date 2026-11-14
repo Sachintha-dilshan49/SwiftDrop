@@ -25,6 +25,10 @@ import { RoleDashboard } from "../dashboard/RoleDashboard";
 import { CustomerHome } from "../features/booking/CustomerHome";
 import { CourierHome } from "../features/courier/CourierHome";
 import { DispatchHome } from "../features/dispatch/DispatchHome";
+import { MerchantDashboardPage } from "../features/merchant/MerchantDashboardPage";
+import { AdminMerchantsPage } from "../features/merchant/AdminMerchantsPage";
+import { MerchantRegisterPage } from "../features/merchant/MerchantRegisterPage";
+import { PendingApprovalPage } from "../features/merchant/PendingApprovalPage";
 
 type AuthMode = "login" | "signup";
 
@@ -37,6 +41,10 @@ function roleScreen(role: DashboardRole, token: string) {
       return <CourierHome token={token} />;
     case "DISPATCHER":
       return <DispatchHome token={token} />;
+    case "MERCHANT":
+      return <MerchantDashboardPage token={token} embedded={true} />;
+    case "ADMIN":
+      return <AdminMerchantsPage adminToken={token} />;
     default:
       return null;
   }
@@ -162,6 +170,37 @@ export function AuthApp() {
   }
 
   if (session) {
+    if (window.location.pathname === "/merchant/register") {
+      return (
+        <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
+          <MerchantRegisterPage
+            token={session.accessToken}
+            onBackToSignIn={() => {
+              window.history.pushState(null, "", "/customer");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+            }}
+            onRegistered={() => {
+              window.history.pushState(null, "", "/merchant/pending");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+            }}
+          />
+        </RoleDashboard>
+      );
+    }
+    if (window.location.pathname === "/merchant/pending") {
+      return (
+        <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
+          <PendingApprovalPage
+            token={session.accessToken}
+            onNavigateToDashboard={() => {
+              window.history.pushState(null, "", "/merchant");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+            }}
+          />
+        </RoleDashboard>
+      );
+    }
+
     const pathRole = dashboardRoleForPath(window.location.pathname);
     const dashboardRole =
       pathRole && session.user.roles.includes(pathRole)

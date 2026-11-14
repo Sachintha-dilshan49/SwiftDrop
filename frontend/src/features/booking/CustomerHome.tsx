@@ -21,9 +21,22 @@ export function CustomerHome({ token }: CustomerHomeProps) {
           onClose={() => setBooking(false)}
         />
       ) : (
-        <button type="button" className="customer-book-button" onClick={() => setBooking(true)}>
-          Book a delivery
-        </button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <button type="button" className="customer-book-button" onClick={() => setBooking(true)}>
+            Book a delivery
+          </button>
+          <button
+            type="button"
+            className="customer-book-button"
+            style={{ background: "#475569" }}
+            onClick={() => {
+              window.history.pushState(null, "", "/merchant/register");
+              window.dispatchEvent(new PopStateEvent("popstate"));
+            }}
+          >
+            Register as a merchant
+          </button>
+        </div>
       )}
       <MyDeliveriesPage token={token} refreshKey={refreshKey} />
     </div>
