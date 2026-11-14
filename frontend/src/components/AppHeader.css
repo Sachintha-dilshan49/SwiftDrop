@@ -175,3 +175,16 @@
     max-width: 150px;
   }
 }
+
+/* Very narrow phones (320px): keep the logo mark and hide the word visually (screen readers still read it),
+   so the portal switcher and account button stay on the same row. */
+@media (max-width: 360px) {
+  .app-header-brand-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
