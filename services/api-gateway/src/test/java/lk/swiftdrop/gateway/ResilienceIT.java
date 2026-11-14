@@ -15,17 +15,18 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import reactor.util.function.Tuple2;
 
-/** SSE streaming, timeouts and downstream failures. The general response timeout is 1 s in tests. */
+/** SSE streaming, timeouts and downstream failures. The general response timeout is 5 s in tests. */
 class ResilienceIT extends AbstractGatewayIT {
 
     @Test
     void sseEventsArriveAsTheyAreSentNotAtTheEnd() {
-        // Two equal-sized events, sent as two chunks 1 s apart: longer than the 1 s general timeout too
+        // Two equal-sized events, sent as two chunks about 6 s apart: longer than the 5 s general timeout,
+        // so the stream only survives because the SSE route has none
         String body = "data: one\n\n" + "data: two\n\n";
         service("parcel").stubFor(get(urlEqualTo("/api/v1/track/SD-1/stream")).willReturn(aResponse()
                 .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_EVENT_STREAM_VALUE)
                 .withBody(body)
-                .withChunkedDribbleDelay(2, 2400)));
+                .withChunkedDribbleDelay(2, 12000)));
 
         List<Tuple2<Long, String>> events = client.get().uri("/api/v1/track/SD-1/stream")
                 .accept(MediaType.TEXT_EVENT_STREAM)
@@ -36,17 +37,17 @@ class ResilienceIT extends AbstractGatewayIT {
                 .getResponseBody()
                 .elapsed()
                 .collectList()
-                .block(Duration.ofSeconds(15));
+                .block(Duration.ofSeconds(30));
 
         assertThat(events).extracting(Tuple2::getT2).containsExactly("one", "two");
-        // If the gateway buffered, both would arrive together
-        assertThat(events.get(1).getT1()).isGreaterThanOrEqualTo(600);
+        // If the gateway buffered, both would arrive together; the gap is longer than the general timeout
+        assertThat(events.get(1).getT1()).isGreaterThan(5000);
     }
 
     @Test
     void slowDownstreamIsGatewayTimeoutProblem() {
         service("dispatch").stubFor(get(urlEqualTo("/api/v1/dispatch/unassigned"))
-                .willReturn(okJson("{}").withFixedDelay(3000)));
+                .willReturn(okJson("{}").withFixedDelay(8000)));
 
         String body = client.get().uri("/api/v1/dispatch/unassigned")
                 .header(HttpHeaders.AUTHORIZATION, bearer(JWTS.valid()))
@@ -60,7 +61,7 @@ class ResilienceIT extends AbstractGatewayIT {
                 .contains("\"type\":\"https://swiftdrop.lk/problems/gateway-timeout\"")
                 .contains("\"detail\":\"The service did not respond in time.\"")
                 .contains("\"instance\":\"/api/v1/dispatch/unassigned\"")
-                .doesNotContain("localhost").doesNotContain("127.0.0.1").doesNotContain("1000ms")
+                .doesNotContain("localhost").doesNotContain("127.0.0.1").doesNotContain("5000ms")
                 .doesNotContain(String.valueOf(service("dispatch").port()));
     }
 

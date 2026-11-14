@@ -128,7 +128,6 @@ swiftdrop:
     public-paths:
       - { method: POST, path: /api/v1/auth/login }
       - { method: POST, path: /api/v1/auth/signup }
-      - { method: POST, path: /api/v1/auth/register }
       - { method: POST, path: /api/v1/auth/refresh }
       - { method: POST, path: /api/v1/auth/logout }
       - { method: POST, path: /api/v1/auth/token }
@@ -138,7 +137,6 @@ swiftdrop:
       - { path: /api/v1/track/** }
       - { method: GET, path: /api/v1/pricing/estimate }
       - { method: GET, path: /api/v1/pricing/zones }
-      - { method: POST, path: /api/v1/merchants/register }
       # API-key route: RequireApiKey rejects requests without X-API-Key, merchant-service verifies the key
       - { path: /api/v1/merchant-api/** }
       - { path: /actuator/health }
