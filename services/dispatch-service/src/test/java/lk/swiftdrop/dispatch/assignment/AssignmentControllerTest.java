@@ -30,6 +30,7 @@ class AssignmentControllerTest {
     private static final UUID PARCEL_ID = UUID.randomUUID();
     private static final UUID COURIER_ID = UUID.randomUUID();
     private static final UUID DISPATCHER_ID = UUID.randomUUID();
+    private static final String TOKEN = "dispatcher-token";
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,8 +44,8 @@ class AssignmentControllerTest {
     @Test
     void dispatcherAssignsParcelAndGets201WithLocation() throws Exception {
         UUID assignmentId = UUID.randomUUID();
-        given(assignmentService.assign(PARCEL_ID, COURIER_ID, DISPATCHER_ID)).willReturn(new AssignmentResponse(
-                assignmentId, PARCEL_ID, COURIER_ID, DISPATCHER_ID, AssignmentStatus.ASSIGNED, Instant.now()));
+        given(assignmentService.assign(PARCEL_ID, COURIER_ID, DISPATCHER_ID, TOKEN)).willReturn(new AssignmentResponse(
+                assignmentId, PARCEL_ID, "SD-0001", COURIER_ID, DISPATCHER_ID, AssignmentStatus.ASSIGNED, Instant.now()));
 
         mockMvc.perform(assignRequest(validBody()).with(user("DISPATCHER")))
                 .andExpect(status().isCreated())
@@ -56,8 +57,8 @@ class AssignmentControllerTest {
 
     @Test
     void adminCanAssignParcels() throws Exception {
-        given(assignmentService.assign(PARCEL_ID, COURIER_ID, DISPATCHER_ID)).willReturn(new AssignmentResponse(
-                UUID.randomUUID(), PARCEL_ID, COURIER_ID, DISPATCHER_ID, AssignmentStatus.ASSIGNED, Instant.now()));
+        given(assignmentService.assign(PARCEL_ID, COURIER_ID, DISPATCHER_ID, TOKEN)).willReturn(new AssignmentResponse(
+                UUID.randomUUID(), PARCEL_ID, "SD-0001", COURIER_ID, DISPATCHER_ID, AssignmentStatus.ASSIGNED, Instant.now()));
 
         mockMvc.perform(assignRequest(validBody()).with(user("ADMIN")))
                 .andExpect(status().isCreated());
@@ -94,7 +95,7 @@ class AssignmentControllerTest {
 
     @Test
     void unknownCourierReturns404() throws Exception {
-        given(assignmentService.assign(any(), any(), any()))
+        given(assignmentService.assign(any(), any(), any(), any()))
                 .willThrow(new NotFoundException("courier-not-found", "Courier not found", "Courier does not exist."));
 
         mockMvc.perform(assignRequest(validBody()).with(user("DISPATCHER")))
@@ -104,7 +105,7 @@ class AssignmentControllerTest {
 
     @Test
     void alreadyAssignedParcelReturns409() throws Exception {
-        given(assignmentService.assign(any(), any(), any())).willThrow(new ConflictException(
+        given(assignmentService.assign(any(), any(), any(), any())).willThrow(new ConflictException(
                 "parcel-already-assigned", "Parcel already assigned", "Parcel already has an active assignment."));
 
         mockMvc.perform(assignRequest(validBody()).with(user("DISPATCHER")))
@@ -121,7 +122,7 @@ class AssignmentControllerTest {
     }
 
     private static RequestPostProcessor user(String role) {
-        return jwt().jwt(token -> token.subject(DISPATCHER_ID.toString()))
+        return jwt().jwt(token -> token.subject(DISPATCHER_ID.toString()).tokenValue(TOKEN))
                 .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }

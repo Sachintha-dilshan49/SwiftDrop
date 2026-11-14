@@ -35,6 +35,7 @@ swiftdrop:
       - /api/v1/merchants/register
       - /merchants/register
       - /internal/**
+      - /api/v1/merchant-api/**
       - /merchant-api/**
   services:
     parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}

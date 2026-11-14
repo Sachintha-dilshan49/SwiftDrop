@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -163,6 +164,52 @@ class MerchantOrderApiControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/merchant-api/orders/" + orderId))
+                .andExpect(jsonPath("$.trackingNo").value("SD-123456"))
+                .andExpect(jsonPath("$.status").value("CREATED"))
+                .andExpect(jsonPath("$.feeAmount").value(550.00));
+    }
+
+    @Test
+    @DisplayName("Valid X-API-Key with /api/v1/merchant-api/orders creates order and returns 201")
+    void validKeyCreatesOrderSuccessfullyWithApiV1Prefix() throws Exception {
+        UUID merchantId = UUID.randomUUID();
+        Merchant merchant = new Merchant(merchantId, UUID.randomUUID(), "Apex Store", "BR-12345",
+                "Nimal Perera", "nimal@apex.lk", "0771234567", "Colombo", MerchantStatus.APPROVED);
+
+        when(apiKeyService.validateApiKey("sd_live_validkey")).thenReturn(Optional.of(merchant));
+
+        UUID orderId = UUID.randomUUID();
+        UUID parcelId = UUID.randomUUID();
+        MerchantOrderResponse orderResponse = new MerchantOrderResponse(
+                orderId, parcelId, "SD-123456", "Kamal Perera", "0771234567",
+                "456 Kandy Rd, Kelaniya", "CREATED", new BigDecimal("550.00"), "LKR", Instant.now()
+        );
+
+        when(merchantOrderService.createOrder(eq(merchant), any())).thenReturn(orderResponse);
+
+        String body = """
+                {
+                    "recipientName": "Kamal Perera",
+                    "recipientPhone": "0771234567",
+                    "recipientEmail": "kamal@example.com",
+                    "pickupAddress": "123 Galle Rd, Colombo",
+                    "dropoffAddress": "456 Kandy Rd, Kelaniya",
+                    "pickupZone": "COLOMBO_SOUTH",
+                    "dropoffZone": "COLOMBO_CENTRAL",
+                    "weightKg": 2.5,
+                    "size": "MEDIUM",
+                    "speed": "STANDARD",
+                    "idempotencyKey": "order-req-002"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/merchant-api/orders")
+                        .header("X-API-Key", "sd_live_validkey")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/v1/merchant-api/orders/" + orderId))
                 .andExpect(jsonPath("$.trackingNo").value("SD-123456"))
                 .andExpect(jsonPath("$.status").value("CREATED"))
                 .andExpect(jsonPath("$.feeAmount").value(550.00));

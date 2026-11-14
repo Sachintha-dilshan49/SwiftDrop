@@ -136,6 +136,7 @@ class CourierDeliveryServiceTest {
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, "Left at the door", "Nimali", null), null);
 
         assertThat(response.status()).isEqualTo(AssignmentStatus.COMPLETED);
+        assertThat(response.parcelStatus()).isEqualTo(ParcelStatus.DELIVERED);
         verify(parcelServiceClient).updateStatus(assignment.getParcelId(), new ParcelStatusUpdate(
                 ParcelStatus.DELIVERED, me.getId(), "Received by: Nimali. Left at the door", null, null,
                 me.getUserId(), "COURIER"));

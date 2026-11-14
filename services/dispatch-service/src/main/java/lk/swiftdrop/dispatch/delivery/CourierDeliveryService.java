@@ -108,6 +108,7 @@ public class CourierDeliveryService {
             case FAILED -> AssignmentStatus.FAILED;
             default -> AssignmentStatus.IN_PROGRESS;
         });
+        assignment.setParcelStatus(request.status());
         Assignment saved = transactions.execute(tx -> {
             if (proofKey != null) {
                 deliveryProofRepository.save(new DeliveryProof(assignmentId, proofKey));

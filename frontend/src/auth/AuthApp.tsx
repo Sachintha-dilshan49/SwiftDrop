@@ -12,6 +12,7 @@ import {
 } from "./authApi";
 import {
   AuthPortalId,
+  DashboardRole,
   authPortals,
   defaultDashboardRole,
   dashboardPathForPortal,
@@ -22,8 +23,24 @@ import {
 } from "./authPortals";
 import { RoleDashboard } from "../dashboard/RoleDashboard";
 import { CustomerHome } from "../features/booking/CustomerHome";
+import { CourierHome } from "../features/courier/CourierHome";
+import { DispatchHome } from "../features/dispatch/DispatchHome";
 
 type AuthMode = "login" | "signup";
+
+/** The role's real screen inside its dashboard; null keeps the dashboard's sample preview. */
+function roleScreen(role: DashboardRole, token: string) {
+  switch (role) {
+    case "CUSTOMER":
+      return <CustomerHome token={token} />;
+    case "COURIER":
+      return <CourierHome token={token} />;
+    case "DISPATCHER":
+      return <DispatchHome token={token} />;
+    default:
+      return null;
+  }
+}
 
 export function AuthApp() {
   const [session, setSession] = useState<AuthSession | null>(readSession);
@@ -157,7 +174,7 @@ export function AuthApp() {
     if (dashboardRole) {
       return (
         <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-          {dashboardRole === "CUSTOMER" ? <CustomerHome token={session.accessToken} /> : null}
+          {roleScreen(dashboardRole, session.accessToken)}
         </RoleDashboard>
       );
     }
