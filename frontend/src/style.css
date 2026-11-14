@@ -255,15 +255,8 @@ h1 { margin: 0; color: var(--ink); font-size: 27px; font-weight: 750; line-heigh
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .dashboard { min-height: 100vh; color: var(--ink); }
-.dashboard-header { min-height: 62px; display: flex; align-items: center; gap: 16px; padding: 0 5vw; background: white; border-bottom: 1px solid var(--line); }
 .dashboard-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 15px; font-weight: 800; text-decoration: none; }
 .dashboard-brand-mark { width: 25px; height: 25px; display: grid; place-items: center; color: white; background: var(--orange); border-radius: 7px; font-size: 12px; }
-.dashboard-portal { padding: 5px 9px; color: #677489; background: #f0f2f5; border-radius: 999px; font-size: 10px; font-weight: 650; }
-.dashboard-page-name { color: #59667b; font-size: 10px; }
-.dashboard-user { display: flex; align-items: center; gap: 14px; margin-left: auto; }
-.dashboard-user-name { color: #59667b; font-size: 11px; }
-.dashboard-signout { padding: 7px 11px; color: #47546a; background: white; border: 1px solid var(--line); border-radius: 7px; font-size: 10px; font-weight: 650; }
-.dashboard-signout:hover { background: #f7f8fa; }
 .dashboard-main { width: min(1120px, calc(100% - 48px)); margin: 0 auto; padding: 38px 0 56px; }
 .dashboard-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
 .dashboard-eyebrow { margin: 0 0 7px; color: var(--orange-dark); font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
@@ -299,9 +292,6 @@ h1 { margin: 0; color: var(--ink); font-size: 27px; font-weight: 750; line-heigh
   .auth-panel { padding: 25px 23px 27px; }
   .auth-content { width: 100%; }
   h1 { font-size: 23px; }
-  .dashboard-header { min-height: 56px; padding: 0 16px; }
-  .dashboard-user-name { display: none; }
-  .dashboard-page-name { display: none; }
   .dashboard-main { width: calc(100% - 28px); padding: 25px 0 36px; }
   .dashboard-heading { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 17px; }
   .dashboard-data-note { white-space: normal; }
