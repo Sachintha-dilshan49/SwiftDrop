@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AuthUser } from "../auth/authApi";
-import { DashboardRole } from "../auth/authPortals";
+import { DashboardRole, dashboardPathForRoles } from "../auth/authPortals";
+import { AppHeader } from "../components/AppHeader";
 
 type DashboardItem = {
   title: string;
@@ -112,21 +113,21 @@ type RoleDashboardProps = {
 
 export function RoleDashboard({ role, user, onSignOut, children }: RoleDashboardProps) {
   const content = dashboardContent[role];
+  const portalPath = (portalRole: DashboardRole) => dashboardPathForRoles([portalRole]) ?? "/";
+  const portals = (Object.keys(dashboardContent) as DashboardRole[])
+    .filter((portalRole) => user.roles.includes(portalRole))
+    .map((portalRole) => ({ label: dashboardContent[portalRole].label, href: portalPath(portalRole) }));
 
   return (
     <div className={`dashboard dashboard-${role.toLowerCase()}`}>
-      <header className="dashboard-header">
-        <div className="dashboard-brand">
-          <span className="dashboard-brand-mark" aria-hidden="true">S</span>
-          <span>SwiftDrop</span>
-        </div>
-        <span className="dashboard-portal">{content.label}</span>
-        <span className="dashboard-page-name">{content.heading}</span>
-        <div className="dashboard-user">
-          <span className="dashboard-user-name">{user.fullName}</span>
-          <button className="dashboard-signout" type="button" onClick={onSignOut}>Sign out</button>
-        </div>
-      </header>
+      <AppHeader
+        portalLabel={content.label}
+        portals={portals}
+        currentPortalHref={portalPath(role)}
+        nav={[{ label: content.heading, href: portalPath(role), active: true }]}
+        user={user}
+        onSignOut={onSignOut}
+      />
 
       <main className="dashboard-main">
         <div className="dashboard-heading">

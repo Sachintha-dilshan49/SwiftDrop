@@ -138,7 +138,7 @@ class CourierDeliveryServiceTest {
         assertThat(response.status()).isEqualTo(AssignmentStatus.COMPLETED);
         assertThat(response.parcelStatus()).isEqualTo(ParcelStatus.DELIVERED);
         verify(parcelServiceClient).updateStatus(assignment.getParcelId(), new ParcelStatusUpdate(
-                ParcelStatus.DELIVERED, me.getId(), "Received by: Nimali. Left at the door", null, null,
+                ParcelStatus.DELIVERED, me.getUserId(), "Received by: Nimali. Left at the door", null, null,
                 me.getUserId(), "COURIER"));
     }
 
@@ -222,7 +222,7 @@ class CourierDeliveryServiceTest {
                 new UpdateDeliveryStatusRequest(ParcelStatus.DELIVERED, null, "Nimali", null), JPEG);
 
         verify(parcelServiceClient).updateStatus(assignment.getParcelId(), new ParcelStatusUpdate(
-                ParcelStatus.DELIVERED, me.getId(), "Received by: Nimali", "proof-key", null,
+                ParcelStatus.DELIVERED, me.getUserId(), "Received by: Nimali", "proof-key", null,
                 me.getUserId(), "COURIER"));
         ArgumentCaptor<DeliveryProof> proof = ArgumentCaptor.forClass(DeliveryProof.class);
         verify(deliveryProofRepository).save(proof.capture());

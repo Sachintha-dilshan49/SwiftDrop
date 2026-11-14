@@ -16,7 +16,6 @@ import {
   authPortals,
   defaultDashboardRole,
   dashboardPathForPortal,
-  dashboardRoleForPath,
   dashboardPathForRoles,
   portalLabel,
   userHasPortalRole,
@@ -25,6 +24,14 @@ import { RoleDashboard } from "../dashboard/RoleDashboard";
 import { CustomerHome } from "../features/booking/CustomerHome";
 import { CourierHome } from "../features/courier/CourierHome";
 import { DispatchHome } from "../features/dispatch/DispatchHome";
+import { AssistantWidget } from "../features/assistant/AssistantWidget";
+import { ForbiddenPage, NotFoundPage } from "../routes/ErrorPages";
+import { navigate, usePath } from "../routes/router";
+import { resolveRoute } from "../routes/routes";
+import { MerchantDashboardPage } from "../features/merchant/MerchantDashboardPage";
+import { AdminMerchantsPage } from "../features/merchant/AdminMerchantsPage";
+import { MerchantRegisterPage } from "../features/merchant/MerchantRegisterPage";
+import { PendingApprovalPage } from "../features/merchant/PendingApprovalPage";
 
 type AuthMode = "login" | "signup";
 
@@ -37,6 +44,10 @@ function roleScreen(role: DashboardRole, token: string) {
       return <CourierHome token={token} />;
     case "DISPATCHER":
       return <DispatchHome token={token} />;
+    case "MERCHANT":
+      return <MerchantDashboardPage token={token} embedded={true} />;
+    case "ADMIN":
+      return <AdminMerchantsPage adminToken={token} />;
     default:
       return null;
   }
@@ -51,21 +62,21 @@ export function AuthApp() {
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [, setRouteVersion] = useState(0);
-  const isCallback = window.location.pathname === "/auth/callback";
+  const route = resolveRoute(usePath(), session ? session.user.roles : null);
+  const isCallback = route.kind === "callback";
+  // Signed in on "/" (or back on the callback page): open the default dashboard.
+  const homeRedirect = session && route.kind === "home" ? dashboardPathForRoles(session.user.roles) : null;
 
   useEffect(() => {
-    const handlePopState = () => setRouteVersion((version) => version + 1);
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+    if (homeRedirect) navigate(homeRedirect, { replace: true });
+  }, [homeRedirect]);
 
   useEffect(() => {
     if (!isCallback) return;
     const query = new URLSearchParams(window.location.search);
     const code = query.get("code");
     const oauthError = query.get("error");
-    window.history.replaceState(null, "", "/auth/callback");
+    window.history.replaceState(null, "", "/auth/callback"); // drops the one-time code from the address
     if (oauthError || !code) {
       setMessage("Google sign in did not complete. Please try again.");
       return;
@@ -79,12 +90,12 @@ export function AuthApp() {
           throw new Error("This account does not have a SwiftDrop portal assigned.");
         }
         const savedSession = saveSession(tokens);
-        window.history.replaceState(null, "", destination);
+        navigate(destination, { replace: true });
         setSession(savedSession);
         setMessage("");
       })
       .catch((error: unknown) => {
-        window.history.replaceState(null, "", "/");
+        navigate("/", { replace: true });
         setMessage(errorMessage(error));
       })
       .finally(() => setBusy(false));
@@ -124,7 +135,7 @@ export function AuthApp() {
         return;
       }
       const savedSession = saveSession(tokens);
-      window.history.pushState(null, "", destination);
+      navigate(destination);
       setSession(savedSession);
     } catch (error: unknown) {
       setMessage(errorMessage(error));
@@ -143,7 +154,7 @@ export function AuthApp() {
     }
     clearSession();
     setSession(null);
-    window.history.replaceState(null, "", "/");
+    navigate("/", { replace: true });
   }
 
   function showRecoveryNotice() {
@@ -162,20 +173,43 @@ export function AuthApp() {
   }
 
   if (session) {
-    const pathRole = dashboardRoleForPath(window.location.pathname);
-    const dashboardRole =
-      pathRole && session.user.roles.includes(pathRole)
-        ? pathRole
-        : defaultDashboardRole(session.user.roles);
-    const destination = dashboardRole ? dashboardPathForRoles([dashboardRole]) : null;
-    if (destination && destination !== window.location.pathname) {
-      window.history.replaceState(null, "", destination);
+    const homePath = dashboardPathForRoles(session.user.roles) ?? "/";
+    if (route.kind === "forbidden") {
+      return <ForbiddenPage homePath={homePath} />;
     }
+    if (route.kind === "notFound") {
+      return <NotFoundPage homePath={homePath} />;
+    }
+    if (route.kind === "merchant-register") {
+      return (
+        <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
+          <MerchantRegisterPage
+            token={session.accessToken}
+            onBackToSignIn={() => navigate("/customer")}
+            onRegistered={() => navigate("/merchant/pending")}
+          />
+        </RoleDashboard>
+      );
+    }
+    if (route.kind === "merchant-pending") {
+      return (
+        <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
+          <PendingApprovalPage
+            token={session.accessToken}
+            onNavigateToDashboard={() => navigate("/merchant")}
+          />
+        </RoleDashboard>
+      );
+    }
+    const dashboardRole = route.kind === "dashboard" ? route.role : defaultDashboardRole(session.user.roles);
     if (dashboardRole) {
       return (
-        <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-          {roleScreen(dashboardRole, session.accessToken)}
-        </RoleDashboard>
+        <>
+          <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
+            {roleScreen(dashboardRole, session.accessToken)}
+          </RoleDashboard>
+          <AssistantWidget token={session.accessToken} />
+        </>
       );
     }
     return (
@@ -195,6 +229,10 @@ export function AuthApp() {
     );
   }
 
+  if (route.kind === "notFound") {
+    return <NotFoundPage homePath="/" />;
+  }
+
   return (
     <main className="page-shell">
       <section className={`auth-layout ${mode === "signup" ? "is-signup" : ""}`}>
@@ -208,7 +246,7 @@ export function AuthApp() {
             <ul className="benefit-list">
               <li><BoltIcon /> Couriers in every Colombo zone, 6 AM to 11 PM</li>
               <li><StoreIcon /> Merchants ship orders by dashboard or API</li>
-              <li><SparkIcon /> Customers book from one message with the AI assistant</li>
+              <li><SparkIcon /> Ask the AI assistant where your parcel is or what a delivery costs</li>
             </ul>
           </div>
           <p className="brand-footnote">SwiftDrop makes every delivery feel effortless.</p>

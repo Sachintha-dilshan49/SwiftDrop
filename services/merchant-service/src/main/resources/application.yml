@@ -32,13 +32,12 @@ swiftdrop:
   security:
     # Public paths that do not require JWT
     public-paths:
-      - /api/v1/merchants/register
-      - /merchants/register
       - /internal/**
       - /api/v1/merchant-api/**
       - /merchant-api/**
   services:
     parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
+    auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
 
 management:
   endpoints:

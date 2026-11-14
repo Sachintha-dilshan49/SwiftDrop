@@ -112,3 +112,15 @@ Drawn by Role 4 to match `services/dispatch-service`; use them to review `usecas
 
 `parcel_id`, `user_id` and `assigned_by_user_id` have no foreign keys on purpose: they point
 to rows in `parcel_db` and `auth_db`, and each service talks only to its own database.
+
+## AI assistant (Role 9)
+
+Rendered with `PLANTUML_LIMIT_SIZE=16384 plantuml -tpng -tsvg <file>.puml` (the limit stops large diagrams being clipped).
+
+| File | Diagram |
+|---|---|
+| `usecase-ai-assistant.puml` | Use case — AI assistant actors, include/extend relationships |
+| `activity-ai-chat.puml` | Activity (swimlanes) — answering one chat message |
+| `seq-ai-assistant.puml` | Sequence — chat with tool call, RAG help question, MCP client |
+| `arch-ai-assistant.puml` | Architecture by layer — presentation, edge, ai-assistant internals, services, in-memory data, LLM provider |
+| `er-ai-assistant.puml` | ER (logical) — in-memory data: chat memory, knowledge base, model config (no database) |

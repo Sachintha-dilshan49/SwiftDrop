@@ -5,7 +5,7 @@
   gap: 16px;
 }
 
-.customer-book-button,
+/* The "Track this parcel" link looks like the shared primary Button; real buttons use <Button>. */
 .booking-primary {
   min-height: 44px;
   display: inline-flex;
@@ -15,25 +15,15 @@
   color: var(--ink);
   background: var(--orange);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--sd-radius-button);
+  font-family: var(--sd-font-heading);
   font-weight: 700;
   text-decoration: none;
 }
 
 .customer-book-button { justify-self: start; }
 
-.customer-book-button:hover,
-.booking-primary:hover:not(:disabled) { background: #ff7b2c; }
-
-.booking-secondary {
-  min-height: 38px;
-  padding: 0 14px;
-  color: var(--ink);
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-weight: 650;
-}
+.booking-primary:hover { background: var(--orange-dark); }
 
 .booking {
   padding: 16px;
@@ -109,21 +99,6 @@
   font-size: 12px;
 }
 
-.booking-speeds { gap: 8px; }
-
-.booking-speed {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.booking-speed:has(input:checked) { border-color: var(--orange); background: #fff8f2; }
-
 .booking .alert { font-size: 13px; }
 
 .booking-submit {
@@ -154,6 +129,5 @@
   .booking { padding: 18px 20px; }
   .booking-group { grid-template-columns: 2fr 1fr; align-items: start; }
   .booking-group legend { grid-column: 1 / -1; }
-  .booking-speeds { grid-template-columns: repeat(3, 1fr); }
   .booking-submit { width: auto; }
 }

@@ -1,0 +1,94 @@
+@startuml usecase-ai-assistant
+' SwiftDrop AI Assistant - UML Use Case Diagram (Role 9)
+' Render: PLANTUML_LIMIT_SIZE=16384 plantuml -tpng -tsvg usecase-ai-assistant.puml
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam actorStyle awesome
+skinparam nodesep 18
+skinparam ranksep 70
+skinparam ArrowColor #1E2A3A
+skinparam ArrowFontColor #1E2A3A
+skinparam ArrowFontSize 11
+skinparam titleFontSize 18
+skinparam actor {
+  BackgroundColor #F26B1D
+  BorderColor #C2510F
+  FontStyle bold
+  FontColor #1E2A3A
+}
+skinparam usecase {
+  BackgroundColor #FFF4EB
+  BorderColor #F07A2B
+  BorderThickness 1.5
+  FontColor #1E2A3A
+}
+skinparam rectangle {
+  BorderColor #1E2A3A
+  BackgroundColor #FFFFFF
+  RoundCorner 8
+  FontStyle bold
+  FontSize 15
+}
+skinparam note {
+  BackgroundColor #FFFFFF
+  BorderColor #1E2A3A
+  RoundCorner 8
+  FontSize 12
+}
+skinparam legend {
+  BackgroundColor #FFFFFF
+  BorderColor #1E2A3A
+  FontSize 12
+}
+
+title SwiftDrop - AI Assistant
+
+left to right direction
+
+' ── Primary actors (left) ──
+actor "Signed-in User\n(CUSTOMER, MERCHANT, COURIER,\nDISPATCHER, ADMIN role)" as User
+actor "External MCP Client\n(e.g. Claude Desktop)" as Mcp
+
+rectangle "AI Assistant  (ai-assistant :8087)" {
+  usecase "Chat with the assistant\nPOST /assistant/chat" as UC_CHAT
+  usecase "List available AI models\nGET /assistant/models" as UC_MODELS
+  usecase "Delete a conversation\nDELETE /assistant/conversations/{id}" as UC_DEL
+  usecase "Use SwiftDrop tools\nPOST /mcp" as UC_MCP
+
+  usecase "View my parcels\n(my_parcels tool)" as UC_MINE
+  usecase "Search help articles\n(knowledge base, RAG)" as UC_RAG
+  usecase "Track a parcel\n(track_parcel tool)" as UC_TRACK
+  usecase "Estimate a delivery fee\n(estimate_fee tool)" as UC_FEE
+  usecase "Choose an AI model\n(default: groq)" as UC_PICK
+  usecase "Receive a streamed reply\nPOST /assistant/chat/stream" as UC_STREAM
+}
+
+' Primary associations (no arrowheads)
+User -- UC_CHAT
+User -- UC_MODELS
+User -- UC_DEL
+Mcp -- UC_MCP
+
+' «include»: always performed
+UC_CHAT ..> UC_RAG : <<include>>
+
+' «extend»: optional, only under the condition shown
+UC_CHAT <.. UC_TRACK : <<extend>>\n[asks about a parcel]
+UC_CHAT <.. UC_FEE : <<extend>>\n[asks for a price]
+UC_CHAT <.. UC_MINE : <<extend>>\n[CUSTOMER or MERCHANT\nasks for own parcels]
+UC_CHAT <.. UC_PICK : <<extend>>\n[model given]
+UC_CHAT <.. UC_STREAM : <<extend>>\n[stream requested]
+
+
+legend bottom right
+  All routes are /api/v1/... through the gateway with the user's JWT.
+  Tools are read-only and call the owning services with that same JWT,
+  so users only ever see their own data. The LLM provider (Groq) and the
+  parcel, pricing and auth services are used behind these use cases.
+  MCP clients get the same tools and bring their own LLM.
+endlegend
+
+@enduml

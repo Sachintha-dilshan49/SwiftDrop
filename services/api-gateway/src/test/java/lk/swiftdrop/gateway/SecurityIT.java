@@ -4,6 +4,7 @@ import static com.github.tomakehurst.wiremock.client.WireMock.anyRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -82,7 +83,6 @@ class SecurityIT extends AbstractGatewayIT {
         return Stream.of(
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/login", "auth"),
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/signup", "auth"),
-                Arguments.of(HttpMethod.POST, "/api/v1/auth/register", "auth"),
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/refresh", "auth"),
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/logout", "auth"),
                 Arguments.of(HttpMethod.POST, "/api/v1/auth/token", "auth"),
@@ -92,8 +92,7 @@ class SecurityIT extends AbstractGatewayIT {
                 Arguments.of(HttpMethod.GET, "/api/v1/track/SD-7K3Q-9P2M", "parcel"),
                 Arguments.of(HttpMethod.GET, "/api/v1/track/SD-7K3Q-9P2M/stream", "parcel"),
                 Arguments.of(HttpMethod.GET, "/api/v1/pricing/estimate?pickupZone=A&dropoffZone=B", "pricing"),
-                Arguments.of(HttpMethod.GET, "/api/v1/pricing/zones", "pricing"),
-                Arguments.of(HttpMethod.POST, "/api/v1/merchants/register", "merchant"));
+                Arguments.of(HttpMethod.GET, "/api/v1/pricing/zones", "pricing"));
     }
 
     @ParameterizedTest(name = "{0} {1}")
@@ -118,8 +117,32 @@ class SecurityIT extends AbstractGatewayIT {
                 .withHeader(HttpHeaders.AUTHORIZATION, equalTo(stale)));
     }
 
+    @Test
+    void merchantRegistrationWithoutTokenIsUnauthorizedAndNotForwarded() {
+        client.post().uri("/api/v1/merchants/register")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON);
+
+        assertThat(forwardedRequestCount()).isZero();
+    }
+
+    @Test
+    void merchantRegistrationWithValidTokenIsForwardedWithAuthorizationUnchanged() {
+        String authorization = bearer(JWTS.valid());
+
+        client.post().uri("/api/v1/merchants/register")
+                .header(HttpHeaders.AUTHORIZATION, authorization)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(STUB_SERVICE_HEADER, "merchant");
+
+        service("merchant").verify(postRequestedFor(urlEqualTo("/api/v1/merchants/register"))
+                .withHeader(HttpHeaders.AUTHORIZATION, equalTo(authorization)));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"GET /api/v1/auth/me", "POST /api/v1/pricing/estimate", "GET /api/v1/merchants/register",
+    @ValueSource(strings = {"GET /api/v1/auth/me", "POST /api/v1/pricing/estimate", "GET /api/v1/auth/signup",
             "POST /api/v1/pricing/zones"})
     void publicRuleIsMethodSpecific(String request) {
         String[] parts = request.split(" ");

@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lk.swiftdrop.common.error.ConflictException;
 import lk.swiftdrop.common.error.NotFoundException;
+import lk.swiftdrop.merchant.client.AuthServiceClient;
 import lk.swiftdrop.merchant.dto.MerchantResponse;
 import lk.swiftdrop.merchant.dto.RegisterMerchantRequest;
 import lk.swiftdrop.merchant.entity.Merchant;
@@ -32,6 +33,9 @@ class MerchantServiceTest {
 
     @Mock
     private MerchantRepository merchantRepository;
+
+    @Mock
+    private AuthServiceClient authServiceClient;
 
     @InjectMocks
     private MerchantService merchantService;
@@ -108,6 +112,19 @@ class MerchantServiceTest {
     }
 
     @Test
+    @DisplayName("Registration fails when user ID is null")
+    void registerMerchantFailsWhenUserIdIsNull() {
+        RegisterMerchantRequest request = new RegisterMerchantRequest(
+                "Apex Electronics", "BR-NEW", "Nimal Perera",
+                "nimal@apex.lk", "+94771234567", "123 Galle Road, Colombo 03"
+        );
+
+        assertThatThrownBy(() -> merchantService.register(request, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("User ID is required");
+    }
+
+    @Test
     @DisplayName("Admin can approve merchant registration")
     void approveMerchant() {
         UUID merchantId = UUID.randomUUID();
@@ -122,6 +139,7 @@ class MerchantServiceTest {
         assertThat(response.status()).isEqualTo(MerchantStatus.APPROVED);
         assertThat(merchant.getStatus()).isEqualTo(MerchantStatus.APPROVED);
         assertThat(merchant.getRejectionReason()).isNull();
+        verify(authServiceClient).grantRole(merchant.getUserId(), "MERCHANT");
     }
 
     @Test
