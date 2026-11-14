@@ -17,11 +17,13 @@ public record ParcelStatusUpdate(
     static final int MAX_NOTE_LENGTH = 500;
 
     /**
-     * A courier's update. parcel-service has no recipient field, so the recipient's name goes into the note.
+     * A courier's update. parcel-service identifies couriers by their auth user ID: it stores {@code courierId} on
+     * the parcel and later compares it with {@code changedBy}, so both carry the user ID, never dispatch's own
+     * {@code couriers.id}. parcel-service has no recipient field, so the recipient's name goes into the note.
      */
-    public static ParcelStatusUpdate byCourier(ParcelStatus status, UUID courierId, UUID courierUserId, String note,
+    public static ParcelStatusUpdate byCourier(ParcelStatus status, UUID courierUserId, String note,
                                                String recipientName, String failureReason, String proofReference) {
-        return new ParcelStatusUpdate(status, courierId, noteWithRecipient(note, recipientName), proofReference,
+        return new ParcelStatusUpdate(status, courierUserId, noteWithRecipient(note, recipientName), proofReference,
                 failureReason, courierUserId, "COURIER");
     }
 

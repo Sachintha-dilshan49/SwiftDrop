@@ -94,8 +94,7 @@ public class CourierDeliveryService {
         String proofKey = photo == null ? null : proofStorage.store(assignmentId, photo, photoType);
         try {
             parcelServiceClient.updateStatus(assignment.getParcelId(), ParcelStatusUpdate.byCourier(request.status(),
-                    assignment.getCourierId(), userId, request.note(), request.recipientName(),
-                    request.failureReason(), proofKey));
+                    userId, request.note(), request.recipientName(), request.failureReason(), proofKey));
         } catch (RuntimeException e) {
             if (proofKey != null) {
                 proofStorage.delete(proofKey);
