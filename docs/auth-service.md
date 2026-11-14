@@ -69,8 +69,10 @@ user ID that a backend consumer can use for this lookup.
 ## Google OAuth local setup
 
 1. In Google Cloud, create a Web OAuth client. Add
-   `http://localhost:8081/login/oauth2/code/google` as an authorized redirect URI for Docker
-   Compose local demos.
+   `http://localhost:3000/login/oauth2/code/google` as an authorized redirect URI for Docker
+   Compose (and `http://localhost:5173/login/oauth2/code/google` for the Vite dev server).
+   Google login goes through nginx and the gateway, which forward `/oauth2/**` and
+   `/login/oauth2/**` to auth-service (ADR-011).
 2. Set `AUTH_GOOGLE_ENABLED=true`, `AUTH_GOOGLE_CLIENT_ID`, and `AUTH_GOOGLE_CLIENT_SECRET`
    in `deploy/compose/.env`. Keep the credentials out of Git.
 3. Keep `AUTH_OAUTH_SUCCESS_REDIRECT_URI=http://localhost:3000/auth/callback` when using the

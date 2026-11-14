@@ -126,6 +126,10 @@ spring:
               uri: ${AUTH_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/oauth2/**,/login/oauth2/**
+              filters:
+                # Keep the browser's host (e.g. localhost:3000) so auth-service builds Google's callback address
+                # on the public origin, not on auth-service:8081
+                - PreserveHostHeader
             - id: pricing-service
               uri: ${PRICING_SERVICE_URL:http://localhost:8082}
               predicates:

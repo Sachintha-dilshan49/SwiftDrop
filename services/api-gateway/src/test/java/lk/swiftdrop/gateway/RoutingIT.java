@@ -65,6 +65,28 @@ class RoutingIT extends AbstractGatewayIT {
     }
 
     @Test
+    void googleLoginKeepsTheBrowsersHostSoTheCallbackUsesThePublicOrigin() {
+        client.get().uri("/oauth2/authorization/google")
+                .header(HttpHeaders.HOST, "localhost:3000")
+                .exchange()
+                .expectStatus().isOk();
+
+        service("auth").verify(getRequestedFor(urlEqualTo("/oauth2/authorization/google"))
+                .withHeader(HttpHeaders.HOST, equalTo("localhost:3000")));
+    }
+
+    @Test
+    void otherRoutesSendTheServicesOwnHost() {
+        client.get().uri("/api/v1/pricing/zones")
+                .header(HttpHeaders.HOST, "localhost:3000")
+                .exchange()
+                .expectStatus().isOk();
+
+        service("pricing").verify(getRequestedFor(urlEqualTo("/api/v1/pricing/zones"))
+                .withHeader(HttpHeaders.HOST, equalTo("localhost:" + service("pricing").port())));
+    }
+
+    @Test
     void adminPathsGoToTheirOwnersNotToABroaderMatch() {
         String token = bearer(JWTS.valid());
         assertOwner("/api/v1/admin/users", "auth", token);

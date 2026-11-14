@@ -219,7 +219,6 @@ The gateway does not need `INTERNAL_API_TOKEN`: it never calls `/internal/**`, a
 
 #### Open items
 
-- The frontend calls auth-service directly for Google login (`VITE_AUTH_BASE_URL`); it can switch to the gateway's `/oauth2/**` route (Roles 2 and 7).
 - Swagger UI aggregation in the gateway (§5) is not built yet.
 - The per-IP limit trusts one proxy hop. Port 8080 is also published in Docker Compose for development; clients that call it directly can set `X-Forwarded-For` themselves, so the limit only holds behind nginx or the Ingress.
 

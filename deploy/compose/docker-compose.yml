@@ -338,7 +338,6 @@ services:
         # Always /api in this image: nginx proxies it to the gateway. Not read from .env, because .env files copied
         # before 31 Oct have http://localhost:8080, which skips the /api prefix and breaks every request.
         VITE_API_BASE_URL: /api
-        VITE_AUTH_BASE_URL: ${VITE_AUTH_BASE_URL:-http://localhost:8081}
         VITE_GOOGLE_LOGIN_ENABLED: ${VITE_GOOGLE_LOGIN_ENABLED:-false}
     container_name: swiftdrop-frontend
     ports:

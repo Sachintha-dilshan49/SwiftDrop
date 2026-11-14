@@ -10,6 +10,7 @@ import {
   saveSession,
   signup,
   refresh,
+  startGoogleLogin,
 } from "./authApi";
 import {
   AuthPortalId,
@@ -298,9 +299,7 @@ export function AuthApp() {
               type="button"
               onClick={() => {
                 if (googleLoginEnabled) {
-                  window.location.assign(
-                    `${import.meta.env.VITE_AUTH_BASE_URL ?? "http://localhost:8081"}/oauth2/authorization/google`,
-                  );
+                  startGoogleLogin();
                 }
               }}
               disabled={!googleLoginEnabled || busy}
