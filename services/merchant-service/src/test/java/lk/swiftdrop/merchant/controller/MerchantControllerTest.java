@@ -40,18 +40,44 @@ class MerchantControllerTest {
     private MerchantService merchantService;
 
     @Test
-    @DisplayName("Public merchant registration succeeds with 201 Created")
+    @DisplayName("Authenticated merchant registration succeeds with 201 Created and links user ID")
     void registerMerchantSuccess() throws Exception {
+        UUID userId = UUID.randomUUID();
         UUID merchantId = UUID.randomUUID();
         MerchantResponse response = new MerchantResponse(
-                merchantId, null, "Apex Electronics", "BR-12345",
+                merchantId, userId, "Apex Electronics", "BR-12345",
                 "Nimal Perera", "nimal@apex.lk", "+94771234567",
                 "123 Galle Road, Colombo 03", MerchantStatus.PENDING,
                 null, Instant.now(), null
         );
 
-        when(merchantService.register(any(RegisterMerchantRequest.class), any())).thenReturn(response);
+        when(merchantService.register(any(RegisterMerchantRequest.class), eq(userId))).thenReturn(response);
 
+        String body = """
+                {
+                    "businessName": "Apex Electronics",
+                    "businessRegNo": "BR-12345",
+                    "contactName": "Nimal Perera",
+                    "email": "nimal@apex.lk",
+                    "phone": "+94771234567",
+                    "address": "123 Galle Road, Colombo 03"
+                }
+                """;
+
+        mockMvc.perform(post("/api/v1/merchants/register")
+                        .with(jwt().jwt(builder -> builder.subject(userId.toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(merchantId.toString()))
+                .andExpect(jsonPath("$.userId").value(userId.toString()))
+                .andExpect(jsonPath("$.businessName").value("Apex Electronics"))
+                .andExpect(jsonPath("$.status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("Unauthenticated merchant registration fails with 401 Unauthorized")
+    void registerMerchantUnauthenticatedReturns401() throws Exception {
         String body = """
                 {
                     "businessName": "Apex Electronics",
@@ -66,10 +92,7 @@ class MerchantControllerTest {
         mockMvc.perform(post("/api/v1/merchants/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(merchantId.toString()))
-                .andExpect(jsonPath("$.businessName").value("Apex Electronics"))
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -87,6 +110,7 @@ class MerchantControllerTest {
                 """;
 
         mockMvc.perform(post("/api/v1/merchants/register")
+                        .with(jwt().jwt(builder -> builder.subject(UUID.randomUUID().toString())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidBody))
                 .andExpect(status().isBadRequest())
