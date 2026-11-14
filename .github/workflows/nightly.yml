@@ -1,0 +1,142 @@
+name: Nightly system tests
+
+# Builds the whole stack with Docker Compose and runs the e2e/ suites against it (docs/testing.md).
+# Scheduled runs use the default branch (dev). Run it by hand from the Actions tab or with:
+#   gh workflow run nightly.yml            (on dev)
+#   gh workflow run nightly.yml --ref <branch>
+
+on:
+  schedule:
+    # 01:00 Asia/Colombo (UTC+5:30)
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+    inputs:
+      resilience:
+        description: 'Also run the resilience suite (stops and restarts containers)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  system-tests:
+    name: system-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: e2e
+    env:
+      CI: 'true'
+      # Caps each service JVM so the full stack fits on one runner
+      E2E_JAVA_TOOL_OPTIONS: '-Xmx512m'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Create .env from the example
+        working-directory: deploy/compose
+        run: |
+          cp .env.example .env
+          # Throwaway values per run instead of the placeholders: a JWT signing key (PKCS#8, as auth-service
+          # requires) and the service-to-service token. Nothing is stored; no repository secret is needed.
+          jwt_key=$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+            | openssl pkcs8 -topk8 -nocrypt -outform DER | base64 | tr -d '\n')
+          echo "::add-mask::$jwt_key"
+          sed -i "s|^JWT_PRIVATE_KEY_B64=.*|JWT_PRIVATE_KEY_B64=${jwt_key}|" .env
+          sed -i "s|^INTERNAL_API_TOKEN=.*|INTERNAL_API_TOKEN=$(openssl rand -hex 32)|" .env
+
+      - name: Install test dependencies
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Build and start the stack
+        run: npm run stack:up
+
+      - name: Wait until every service is healthy
+        run: npm run stack:wait -- 900
+
+      - name: API, flow and UI tests
+        id: main
+        run: npx playwright test --project=api --project=flows --project=ui
+
+      - name: Resilience tests
+        id: resilience
+        if: ${{ !cancelled() && (github.event_name == 'schedule' || inputs.resilience) }}
+        # Separate output folders, so the report of the first run is kept
+        run: npx playwright test --project=resilience --output=test-results-resilience
+        env:
+          PLAYWRIGHT_HTML_OUTPUT_DIR: playwright-report-resilience
+          PLAYWRIGHT_JUNIT_OUTPUT_FILE: test-results-resilience/junit.xml
+
+      - name: Collect container logs
+        if: ${{ always() }}
+        run: npm run stack:logs
+
+      - name: Upload test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports
+          path: |
+            e2e/playwright-report/
+            e2e/playwright-report-resilience/
+            e2e/test-results/
+            e2e/test-results-resilience/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload container logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-stack-logs
+          path: e2e/stack-logs/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Stop the stack
+        if: ${{ always() }}
+        run: npm run stack:down
+
+      - name: Open or update the failure issue
+        if: ${{ failure() && github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create nightly-failure --color B60205 --description "Nightly system tests failed" --force
+          body="Nightly system tests failed on \`${GITHUB_SHA::7}\`: $RUN_URL
+
+          Download the \`e2e-reports\` artifact and open \`playwright-report/index.html\` for traces; per-service logs are in \`e2e-stack-logs\`."
+          issue=$(gh issue list --label nightly-failure --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "$body"
+          else
+            gh issue create --title "Nightly system tests failing" --label nightly-failure --body "$body"
+          fi
+
+      - name: Close the failure issue after a green run
+        if: ${{ success() && github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue=$(gh issue list --label nightly-failure --state open --json number --jq '.[0].number')
+          if [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "Green again on \`${GITHUB_SHA::7}\`: $RUN_URL"
+          fi
