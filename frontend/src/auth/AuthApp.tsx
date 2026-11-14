@@ -37,10 +37,10 @@ import { PendingApprovalPage } from "../features/merchant/PendingApprovalPage";
 type AuthMode = "login" | "signup";
 
 /** The role's real screen inside its dashboard; null keeps the dashboard's sample preview. */
-function roleScreen(role: DashboardRole, token: string) {
+function roleScreen(role: DashboardRole, token: string, roles: string[]) {
   switch (role) {
     case "CUSTOMER":
-      return <CustomerHome token={token} />;
+      return <CustomerHome token={token} isMerchant={roles.includes("MERCHANT")} />;
     case "COURIER":
       return <CourierHome token={token} />;
     case "DISPATCHER":
@@ -212,7 +212,7 @@ export function AuthApp() {
       return (
         <>
           <RoleDashboard role={dashboardRole} user={session.user} onSignOut={signOut}>
-            {roleScreen(dashboardRole, session.accessToken)}
+            {roleScreen(dashboardRole, session.accessToken, session.user.roles)}
           </RoleDashboard>
           <AssistantWidget token={session.accessToken} />
         </>

@@ -7,10 +7,12 @@ import "./BookingForm.css";
 
 type CustomerHomeProps = {
   token: string;
+  /** Already a merchant: offer the merchant portal instead of the registration form. */
+  isMerchant?: boolean;
 };
 
 /** The customer's dashboard screen: book a delivery, and the delivery list that refreshes after a booking. */
-export function CustomerHome({ token }: CustomerHomeProps) {
+export function CustomerHome({ token, isMerchant = false }: CustomerHomeProps) {
   const [booking, setBooking] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -30,9 +32,9 @@ export function CustomerHome({ token }: CustomerHomeProps) {
           <Button
             variant="secondary"
             className="customer-book-button"
-            onClick={() => navigate("/merchant/register")}
+            onClick={() => navigate(isMerchant ? "/merchant" : "/merchant/register")}
           >
-            Register as a merchant
+            {isMerchant ? "Open merchant portal" : "Register as a merchant"}
           </Button>
         </div>
       )}

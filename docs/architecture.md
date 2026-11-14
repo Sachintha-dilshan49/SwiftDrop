@@ -407,8 +407,8 @@ The weight must fit the size; otherwise the request fails with `400` (validation
 
 | Speed | Promise | Surcharge |
 |---|---|---|
-| `EXPRESS` | within 3 hours | +100 |
-| `STANDARD` | today by 8 PM | +0 |
+| `EXPRESS` | within 3 hours (booked by 8 PM; later bookings arrive the next morning) | +100 |
+| `STANDARD` | today by 8 PM (booked before 2 PM; later bookings arrive tomorrow by 8 PM) | +0 |
 | `NEXT_DAY` | tomorrow by 6 PM | +0 |
 
 ### Promo codes

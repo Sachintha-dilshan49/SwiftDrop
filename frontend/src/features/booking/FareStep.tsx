@@ -3,7 +3,7 @@ import type { DeliverySpeed } from "../../api/parcelApi";
 import { PricingApiError, PricingEstimate, RouteType, pricingApi } from "../../api/pricingApi";
 import { Button } from "../../components/Button";
 import { SIZE_LABELS, formatMoney } from "../../lib/parcelFormat";
-import { SPEED_OPTIONS } from "./bookingOptions";
+import { SPEED_OPTIONS, speedPromise } from "./bookingOptions";
 import { BookingFormValues, toCreateRequest } from "./bookingValidation";
 import "./FareStep.css";
 
@@ -115,7 +115,7 @@ export function FareStep({ values, submitting, error, onSpeedChange, onBack, onC
                   />
                   <span className="fare-speed-text">
                     <strong>{option.name}</strong>
-                    <span>{option.promise}</span>
+                    <span>{speedPromise(option.speed)}</span>
                   </span>
                   <strong className="fare-speed-price">
                     {estimate ? formatMoney(estimate.total, estimate.currency) : "Not available"}

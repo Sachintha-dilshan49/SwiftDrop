@@ -25,8 +25,34 @@ export const SIZE_OPTIONS: ReadonlyArray<{ size: ParcelSize; name: string; maxWe
 ];
 
 /** Delivery speeds and their promise; the fee itself always comes from pricing-service. */
-export const SPEED_OPTIONS: ReadonlyArray<{ speed: DeliverySpeed; name: string; promise: string }> = [
-  { speed: "STANDARD", name: "Standard", promise: "Today by 8 PM" },
-  { speed: "EXPRESS", name: "Express", promise: "Within 3 hours" },
-  { speed: "NEXT_DAY", name: "Next day", promise: "Tomorrow by 6 PM" },
+export const SPEED_OPTIONS: ReadonlyArray<{ speed: DeliverySpeed; name: string }> = [
+  { speed: "STANDARD", name: "Standard" },
+  { speed: "EXPRESS", name: "Express" },
+  { speed: "NEXT_DAY", name: "Next day" },
 ];
+
+/** Last Sri Lanka hour a Standard booking can still be delivered the same day. */
+export const STANDARD_SAME_DAY_CUTOFF_HOUR = 14;
+/** Couriers work until 11 PM (login page); an Express delivery must fit before then. */
+export const SERVICE_END_HOUR = 23;
+
+/**
+ * The delivery promise for a speed, given the time of booking in Sri Lanka (docs/architecture.md §8):
+ * Standard is same day only when booked before 2 PM, Express only when 3 hours fit before 11 PM.
+ */
+export function speedPromise(speed: DeliverySpeed, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Colombo", hour: "numeric", minute: "numeric", hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const minutes = hour * 60 + minute;
+  switch (speed) {
+    case "STANDARD":
+      return minutes < STANDARD_SAME_DAY_CUTOFF_HOUR * 60 ? "Today by 8 PM" : "Tomorrow by 8 PM";
+    case "EXPRESS":
+      return minutes + 180 <= SERVICE_END_HOUR * 60 ? "Within 3 hours" : "Tomorrow morning";
+    case "NEXT_DAY":
+      return "Tomorrow by 6 PM";
+  }
+}
