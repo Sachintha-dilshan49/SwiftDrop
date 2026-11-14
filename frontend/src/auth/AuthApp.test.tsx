@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthApp } from "./AuthApp";
+import { readSession } from "./authApi";
 
 const { loginMock, signupMock, exchangeGoogleCodeMock, saveSessionMock, logoutMock } = vi.hoisted(() => ({
   loginMock: vi.fn(),
@@ -153,5 +154,45 @@ describe("AuthApp", () => {
     );
     expect(logoutMock).toHaveBeenCalledWith("refresh");
     expect(saveSessionMock).not.toHaveBeenCalled();
+  });
+
+  describe("route guards", () => {
+    const customerSession = {
+      accessToken: "access",
+      refreshToken: "refresh",
+      user: { id: "1", fullName: "Demo Customer", email: "demo@example.test", roles: ["CUSTOMER"] },
+    };
+
+    it("shows the 403 page when a customer opens another role's portal", () => {
+      vi.mocked(readSession).mockReturnValueOnce(customerSession);
+      window.history.replaceState({}, "", "/admin");
+      render(<AuthApp />);
+
+      expect(screen.getByRole("heading", { name: "You don’t have access to this page" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Go to my dashboard" })).toHaveAttribute("href", "/customer");
+      expect(window.location.pathname).toBe("/admin");
+    });
+
+    it("opens the default dashboard when a signed-in user visits the home page", async () => {
+      vi.mocked(readSession).mockReturnValueOnce(customerSession);
+      render(<AuthApp />);
+
+      await waitFor(() => expect(window.location.pathname).toBe("/customer"));
+    });
+
+    it("shows the 404 page for an unknown address when signed out", () => {
+      window.history.replaceState({}, "", "/no-such-page");
+      render(<AuthApp />);
+
+      expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/");
+    });
+
+    it("shows the sign-in form on a portal address when signed out", () => {
+      window.history.replaceState({}, "", "/merchant");
+      render(<AuthApp />);
+
+      expect(screen.getByLabelText("Email or mobile")).toBeInTheDocument();
+    });
   });
 });
