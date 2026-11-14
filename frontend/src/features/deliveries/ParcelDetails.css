@@ -91,3 +91,13 @@
 @media (min-width: 640px) {
   .parcel-details-facts { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* Same look as the live line on the public tracking page */
+.parcel-details-live {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.parcel-details-live.is-on { color: #1f6b3a; }
+.parcel-details-live.is-on::before { content: "● "; }

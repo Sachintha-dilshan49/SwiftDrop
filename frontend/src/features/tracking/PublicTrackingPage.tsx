@@ -7,6 +7,7 @@ import {
   TERMINAL_STATUSES,
   parcelApi,
 } from "../../api/parcelApi";
+import { useLiveTracking } from "../../hooks/useLiveTracking";
 import { SIZE_LABELS, STATUS_LABELS, formatDateTime } from "../../lib/parcelFormat";
 import { isValidTrackingNo, normalizeTrackingNo, trackingPath } from "./trackingNumber";
 import "./PublicTrackingPage.css";
@@ -52,7 +53,6 @@ export function PublicTrackingPage({ initialTrackingNo = "" }: PublicTrackingPag
   const [tracking, setTracking] = useState<PublicTrackingResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [live, setLive] = useState(false);
 
   const load = useCallback(async (input: string) => {
     const trackingNo = normalizeTrackingNo(input);
@@ -88,20 +88,10 @@ export function PublicTrackingPage({ initialTrackingNo = "" }: PublicTrackingPag
   const finished = tracking !== null && TERMINAL_STATUSES.includes(tracking.status);
 
   // Live updates until the parcel is delivered or failed; every reconnect starts with a fresh snapshot.
-  useEffect(() => {
-    if (!activeTrackingNo || finished) {
-      return undefined;
-    }
-    const close = parcelApi.subscribeTrackingStream(activeTrackingNo, {
-      onSnapshot: setTracking,
-      onStatusChange: (event) => setTracking((current) => (current ? applyStatusChange(current, event) : current)),
-      onLiveChange: setLive,
-    });
-    return () => {
-      close();
-      setLive(false);
-    };
-  }, [activeTrackingNo, finished]);
+  const live = useLiveTracking(activeTrackingNo && !finished ? activeTrackingNo : null, {
+    onSnapshot: setTracking,
+    onStatusChange: (event) => setTracking((current) => (current ? applyStatusChange(current, event) : current)),
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
