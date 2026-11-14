@@ -1,0 +1,87 @@
+# Mock data
+
+One `pg_dump` per SwiftDrop database with about a month of linked demo data, for local development and demos.
+**Local use only.** Every account shares one test password, and nothing here is real.
+
+| Database | What is in it |
+|---|---|
+| `auth_db` | 63 users: 2 admins, 3 dispatchers, 10 couriers (with courier profiles), 8 merchants (with merchant profiles), 40 customers. Merchants keep the customer role from sign-up and got the merchant role when approved |
+| `pricing_db` | The seeded zones and pricing rules, `DROP100`, and 4 more promo codes: `WELCOME50` (active), `AVURUDU2026` (expired), `XMAS250` (starts 14 Dec), `STAFFTEST` (switched off) |
+| `parcel_db` | 250 parcels (170 booked by customers, 80 merchant orders) with 1,180 status history rows and their outbox events |
+| `dispatch_db` | 11 couriers (the 10 mock couriers, one offline, plus the demo courier dispatch seeds itself), 249 assignments, 126 proof-of-delivery records, daily stats |
+| `merchant_db` | 8 merchants (6 approved, 1 pending, 1 rejected), API keys, webhook endpoints, 80 orders |
+| `notification_db` | 1,638 email and SMS notifications, the processed events, 1,540 webhook delivery attempts |
+
+Parcels run from 16 Oct to 14 Nov 2026, in Sri Lanka working hours. 213 were delivered and 16 failed. 21 are
+still in progress on 14 Nov: booked and unassigned, assigned, picked up, in transit or out for delivery.
+The rows in different databases match: each parcel's status, courier, tracking number and owner are the same in
+parcel, dispatch, merchant and notification data.
+
+## Accounts
+
+The password for every account is `SwiftDrop@2026`.
+
+| Role | Sign in with |
+|---|---|
+| Customer (25 parcels) | `customer@example.com` |
+| Admin | `admin@swiftdrop.example.com`, `ops.admin@swiftdrop.example.com` |
+| Dispatcher | `dispatcher1@swiftdrop.example.com` to `dispatcher3@…` |
+| Courier | `courier01@swiftdrop.example.com` to `courier10@…` (`courier10` is offline) |
+
+| Merchant | Status | Sign in with |
+|---|---|---|
+| BookNook Lanka | Approved | `chathura.perera@merchant.example.com` |
+| Ceylon Tea Corner | Approved | `lahiru.wijesinghe@merchant.example.com` |
+| Colombo Threads | Approved | `sajith.karunaratne@merchant.example.com` |
+| Galle Fort Crafts | Approved | `pradeep.wickramasinghe@merchant.example.com` |
+| Kandy Spice House | Approved | `ruwan.fernando@merchant.example.com` |
+| Negombo Fresh Fish | Pending | `pradeep.rajapaksa@merchant.example.com` |
+| QuickFix Mobile Parts | Rejected | `oshada.weerasinghe@merchant.example.com` |
+| TechLanka Gadgets | Approved | `lahiru.senanayake@merchant.example.com` |
+
+The other 39 customers have `firstname.lastname@example.com` addresses; list them with
+`SELECT email FROM users ORDER BY email` in `auth_db`.
+
+## Load the dumps
+
+Start the stack once so Postgres creates the databases and users (`deploy/compose/postgres-init/init.sql`), then
+from the repository root:
+
+```bash
+deploy/mock-data/load_dumps.sh
+```
+
+This **replaces** the data in all six databases. It stops the services while loading, empties the RabbitMQ
+queues and starts the services again. The dumps include Flyway's history, so the services start without
+migrating.
+
+## Things to know
+
+- **Dates are fixed.** "Today" in the data is 14 Nov 2026. After that day the courier's "today" list is
+  empty. Regenerate to get fresh dates.
+- **Proof photos are not in MinIO.** The proof records point at objects that only existed in the MinIO used
+  to generate the data.
+- **Webhooks all fail.** The mock merchants' webhook URLs are `example.com` addresses, so every delivery
+  failed four times and was parked. The admin webhook screen shows those attempts.
+
+## Regenerate
+
+`generate_mock_data.py` creates the data through the services' own APIs, so every row passes their checks.
+It uses SQL only where no API exists yet, and to move timelines into the past. Run it on fresh, migrated
+databases with the whole stack running, then export:
+
+```bash
+deploy/mock-data/reset_databases.sh          # DELETES all data in the six databases, then restarts the services
+python3 deploy/mock-data/generate_mock_data.py   # about 8 minutes, most of it waiting for webhook retries
+deploy/mock-data/export_dumps.sh             # writes deploy/mock-data/dumps/*.sql
+```
+
+The generator works around gaps in the services. Each will be removed once the service handles it:
+
+- Staff roles and courier and merchant profiles are written to `auth_db` directly, because
+  `GET/PATCH /admin/users` does not exist yet.
+- Couriers are inserted into dispatch's `couriers` table, because dispatch has no courier registration yet.
+- Each merchant order's status is copied from its parcel, because merchant-service never updates it.
+
+merchant-service also needs `spring-boot-starter-flyway`, or its tables are never created on a fresh database.
+That fix is in its own pull request.
