@@ -4,6 +4,7 @@ import { Button } from "../../components/Button";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useLiveTracking } from "../../hooks/useLiveTracking";
 import { SIZE_LABELS, STATUS_LABELS, formatDateTime, formatMoney } from "../../lib/parcelFormat";
+import { Link } from "../../routes/Link";
 import { trackingPath } from "../tracking/trackingNumber";
 import "./ParcelDetails.css";
 
@@ -150,9 +151,9 @@ export function ParcelDetails({ parcelId, token, onBack }: ParcelDetailsProps) {
             </div>
           </dl>
 
-          <a className="parcel-details-track" href={trackingPath(parcel.trackingNo)}>
+          <Link className="parcel-details-track" href={trackingPath(parcel.trackingNo)}>
             Track live
-          </a>
+          </Link>
 
           <h4 className="parcel-details-history-title">History</h4>
           <ol className="parcel-details-history">

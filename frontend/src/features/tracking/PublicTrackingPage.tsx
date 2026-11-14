@@ -11,6 +11,7 @@ import { Button } from "../../components/Button";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useLiveTracking } from "../../hooks/useLiveTracking";
 import { SIZE_LABELS, STATUS_LABELS, formatDateTime } from "../../lib/parcelFormat";
+import { Link } from "../../routes/Link";
 import { isValidTrackingNo, normalizeTrackingNo, trackingPath } from "./trackingNumber";
 import "./PublicTrackingPage.css";
 
@@ -105,10 +106,10 @@ export function PublicTrackingPage({ initialTrackingNo = "" }: PublicTrackingPag
   return (
     <div className="tracking-page">
       <header className="tracking-header">
-        <a className="dashboard-brand" href="/">
+        <Link className="dashboard-brand" href="/">
           <span className="dashboard-brand-mark" aria-hidden="true">S</span>
           SwiftDrop
-        </a>
+        </Link>
       </header>
 
       <main className="tracking-main">

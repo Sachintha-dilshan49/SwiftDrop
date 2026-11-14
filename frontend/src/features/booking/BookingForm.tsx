@@ -2,6 +2,7 @@ import { FormEvent, ReactNode, useState } from "react";
 import { ParcelApiError, ParcelResponse, parcelApi } from "../../api/parcelApi";
 import { Button } from "../../components/Button";
 import { formatMoney } from "../../lib/parcelFormat";
+import { Link } from "../../routes/Link";
 import { trackingPath } from "../tracking/trackingNumber";
 import { SIZE_OPTIONS, SPEED_OPTIONS, ZONES } from "./bookingOptions";
 import {
@@ -114,9 +115,9 @@ export function BookingForm({ token, onBooked, onClose }: BookingFormProps) {
           </p>
           <p>Fee: {formatMoney(booked.feeAmount, booked.feeCurrency)}</p>
           <div className="booking-actions">
-            <a className="booking-primary" href={trackingPath(booked.trackingNo)}>
+            <Link className="booking-primary" href={trackingPath(booked.trackingNo)}>
               Track this parcel
-            </a>
+            </Link>
             <Button
               variant="secondary"
               onClick={() => {

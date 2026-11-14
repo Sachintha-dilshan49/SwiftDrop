@@ -57,6 +57,31 @@ describe("AppHeader", () => {
     expect(screen.getByRole("option", { name: "Dispatch portal" })).toBeInTheDocument();
   });
 
+  it("opens another portal through the router, without reloading the page", () => {
+    window.history.replaceState(null, "", "/admin");
+    renderHeader({
+      portalLabel: "Admin portal",
+      currentPortalHref: "/admin",
+      portals: [
+        { label: "Dispatch portal", href: "/dispatch" },
+        { label: "Admin portal", href: "/admin" },
+      ],
+    });
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Switch portal" }), { target: { value: "/dispatch" } });
+
+    expect(window.location.pathname).toBe("/dispatch");
+  });
+
+  it("follows page links without reloading", () => {
+    window.history.replaceState(null, "", "/customer");
+    renderHeader();
+
+    fireEvent.click(screen.getByRole("link", { name: "Book delivery" }));
+
+    expect(window.location.pathname).toBe("/customer/book");
+  });
+
   it("shows the user's initials and signs out from the account menu", () => {
     const { onSignOut } = renderHeader();
 

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "../routes/Link";
+import { navigate } from "../routes/router";
 import "./AppHeader.css";
 
 export type HeaderNavItem = { label: string; href: string; active?: boolean };
@@ -28,23 +30,23 @@ export function AppHeader({ portalLabel, portals, currentPortalHref, nav, user, 
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        <a className="app-header-brand" href={currentPortalHref}>
+        <Link className="app-header-brand" href={currentPortalHref}>
           <span className="app-header-mark" aria-hidden="true">
             S
           </span>
           <span>SwiftDrop</span>
-        </a>
+        </Link>
 
         <nav className="app-header-nav" aria-label="Main">
           {nav.map((item) => (
-            <a
+            <Link
               key={item.href}
               className={`app-header-link${item.active ? " is-active" : ""}`}
               href={item.href}
               aria-current={item.active ? "page" : undefined}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -54,7 +56,7 @@ export function AppHeader({ portalLabel, portals, currentPortalHref, nav, user, 
               className="app-header-portal"
               aria-label="Switch portal"
               value={currentPortalHref}
-              onChange={(event) => window.location.assign(event.target.value)}
+              onChange={(event) => navigate(event.target.value)}
             >
               {portals.map((portal) => (
                 <option key={portal.href} value={portal.href}>

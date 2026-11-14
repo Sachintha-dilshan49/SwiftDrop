@@ -3,6 +3,7 @@ import { PageResponse, ParcelApiError, ParcelStatus, ParcelSummary, parcelApi } 
 import { Button } from "../../components/Button";
 import { StatusBadge } from "../../components/StatusBadge";
 import { STATUS_LABELS, formatDateTime, formatMoney } from "../../lib/parcelFormat";
+import { Link } from "../../routes/Link";
 import { trackingPath } from "../tracking/trackingNumber";
 import { ParcelDetails } from "./ParcelDetails";
 import "./MyDeliveriesPage.css";
@@ -142,9 +143,9 @@ export function MyDeliveriesPage({ token, refreshKey = 0 }: MyDeliveriesPageProp
           {parcels.map((parcel) => (
             <li key={parcel.id} className="deliveries-item">
               <div className="deliveries-item-top">
-                <a className="deliveries-tracking" href={trackingPath(parcel.trackingNo)}>
+                <Link className="deliveries-tracking" href={trackingPath(parcel.trackingNo)}>
                   {parcel.trackingNo}
-                </a>
+                </Link>
                 <StatusBadge status={parcel.status} />
               </div>
               <p className="deliveries-route">
