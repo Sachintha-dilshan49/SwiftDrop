@@ -7,6 +7,8 @@ export type Route =
   | { kind: "login" }
   | { kind: "home" } // signed in, no portal chosen yet: go to the default dashboard
   | { kind: "dashboard"; role: DashboardRole }
+  | { kind: "merchant-register" }
+  | { kind: "merchant-pending" }
   | { kind: "forbidden" } // 403: another role's portal
   | { kind: "notFound" }; // 404
 
@@ -26,6 +28,12 @@ export function resolveRoute(path: string, roles: string[] | null): Route {
   }
   if (cleanPath === "/") {
     return roles ? { kind: "home" } : { kind: "login" };
+  }
+  if (cleanPath === "/merchant/register") {
+    return roles ? { kind: "merchant-register" } : { kind: "login" };
+  }
+  if (cleanPath === "/merchant/pending") {
+    return roles ? { kind: "merchant-pending" } : { kind: "login" };
   }
 
   const role = dashboardRoleForPath(cleanPath);

@@ -3,11 +3,12 @@ import { merchantApi, RegisterMerchantRequest } from '../../api/merchantApi';
 import './merchant.css';
 
 interface Props {
+  token?: string;
   onBackToSignIn?: () => void;
   onRegistered?: (businessName: string, regNo: string) => void;
 }
 
-export const MerchantRegisterPage: React.FC<Props> = ({ onBackToSignIn, onRegistered }) => {
+export const MerchantRegisterPage: React.FC<Props> = ({ token, onBackToSignIn, onRegistered }) => {
   const [formData, setFormData] = useState<RegisterMerchantRequest & { category?: string; zone?: string }>({
     businessName: '',
     businessRegNo: '',
@@ -62,7 +63,7 @@ export const MerchantRegisterPage: React.FC<Props> = ({ onBackToSignIn, onRegist
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
-      });
+      }, token);
       setSubmitted(true);
       if (onRegistered) {
         onRegistered(formData.businessName, formData.businessRegNo);

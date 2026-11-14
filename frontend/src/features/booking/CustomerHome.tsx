@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "../../components/Button";
+import { navigate } from "../../routes/router";
 import { MyDeliveriesPage } from "../deliveries/MyDeliveriesPage";
 import { BookingForm } from "./BookingForm";
 import "./BookingForm.css";
@@ -22,9 +23,18 @@ export function CustomerHome({ token }: CustomerHomeProps) {
           onClose={() => setBooking(false)}
         />
       ) : (
-        <Button className="customer-book-button" onClick={() => setBooking(true)}>
-          Book a delivery
-        </Button>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <Button className="customer-book-button" onClick={() => setBooking(true)}>
+            Book a delivery
+          </Button>
+          <Button
+            variant="secondary"
+            className="customer-book-button"
+            onClick={() => navigate("/merchant/register")}
+          >
+            Register as a merchant
+          </Button>
+        </div>
       )}
       <MyDeliveriesPage token={token} refreshKey={refreshKey} />
     </div>

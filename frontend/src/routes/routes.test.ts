@@ -10,6 +10,13 @@ describe("resolveRoute", () => {
   it("shows sign-in on the home page and portal addresses when signed out", () => {
     expect(resolveRoute("/", null)).toEqual({ kind: "login" });
     expect(resolveRoute("/merchant", null)).toEqual({ kind: "login" });
+    expect(resolveRoute("/merchant/register", null)).toEqual({ kind: "login" });
+    expect(resolveRoute("/merchant/pending", null)).toEqual({ kind: "login" });
+  });
+
+  it("handles merchant registration and pending approval routes when signed in", () => {
+    expect(resolveRoute("/merchant/register", ["CUSTOMER"])).toEqual({ kind: "merchant-register" });
+    expect(resolveRoute("/merchant/pending", ["CUSTOMER"])).toEqual({ kind: "merchant-pending" });
   });
 
   it("handles the Google callback only while signed out", () => {

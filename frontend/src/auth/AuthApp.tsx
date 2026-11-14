@@ -28,6 +28,10 @@ import { AssistantWidget } from "../features/assistant/AssistantWidget";
 import { ForbiddenPage, NotFoundPage } from "../routes/ErrorPages";
 import { navigate, usePath } from "../routes/router";
 import { resolveRoute } from "../routes/routes";
+import { MerchantDashboardPage } from "../features/merchant/MerchantDashboardPage";
+import { AdminMerchantsPage } from "../features/merchant/AdminMerchantsPage";
+import { MerchantRegisterPage } from "../features/merchant/MerchantRegisterPage";
+import { PendingApprovalPage } from "../features/merchant/PendingApprovalPage";
 
 type AuthMode = "login" | "signup";
 
@@ -40,6 +44,10 @@ function roleScreen(role: DashboardRole, token: string) {
       return <CourierHome token={token} />;
     case "DISPATCHER":
       return <DispatchHome token={token} />;
+    case "MERCHANT":
+      return <MerchantDashboardPage token={token} embedded={true} />;
+    case "ADMIN":
+      return <AdminMerchantsPage adminToken={token} />;
     default:
       return null;
   }
@@ -171,6 +179,27 @@ export function AuthApp() {
     }
     if (route.kind === "notFound") {
       return <NotFoundPage homePath={homePath} />;
+    }
+    if (route.kind === "merchant-register") {
+      return (
+        <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
+          <MerchantRegisterPage
+            token={session.accessToken}
+            onBackToSignIn={() => navigate("/customer")}
+            onRegistered={() => navigate("/merchant/pending")}
+          />
+        </RoleDashboard>
+      );
+    }
+    if (route.kind === "merchant-pending") {
+      return (
+        <RoleDashboard role="CUSTOMER" user={session.user} onSignOut={signOut}>
+          <PendingApprovalPage
+            token={session.accessToken}
+            onNavigateToDashboard={() => navigate("/merchant")}
+          />
+        </RoleDashboard>
+      );
     }
     const dashboardRole = route.kind === "dashboard" ? route.role : defaultDashboardRole(session.user.roles);
     if (dashboardRole) {
