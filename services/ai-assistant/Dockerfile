@@ -27,11 +27,16 @@ COPY services/ai-assistant/ services/ai-assistant/
 RUN chmod +x mvnw && ./mvnw -pl services/ai-assistant -am package -DskipTests -q
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine AS runtime
+# Not Alpine: the local embedding model (ONNX Runtime, DJL tokenizer) ships glibc native libraries
+FROM eclipse-temurin:21-jre AS runtime
 WORKDIR /app
 
-# Non-root user (conventions.md §7)
-RUN addgroup -S swiftdrop && adduser -S swiftdrop -G swiftdrop
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
+
+# Non-root user (conventions.md §7); the embedding model (~90 MB) is downloaded into the cache on first start
+RUN groupadd --system swiftdrop && useradd --system --gid swiftdrop swiftdrop \
+    && mkdir -p /app/onnx-cache && chown swiftdrop:swiftdrop /app/onnx-cache
+ENV AI_EMBEDDING_CACHE_DIR=/app/onnx-cache
 USER swiftdrop
 
 # Copy the fat JAR from build stage
