@@ -27,3 +27,20 @@ export function waitingTime(createdAt: string, now: Date = new Date()): string {
   const days = Math.floor(hours / 24);
   return days === 1 ? "1 day" : `${days} days`;
 }
+
+/** "2026-11-14" in Sri Lanka time, the day the dispatch team works in. */
+export function sriLankaDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo" }).format(date);
+}
+
+/** The first day of a range of `days` ending today. */
+export function rangeStart(days: number, today: Date = new Date()): string {
+  const start = new Date(today.getTime() - (days - 1) * 86_400_000);
+  return sriLankaDate(start);
+}
+
+/** Delivered out of all finished deliveries, e.g. "94%", or "–" when none finished. */
+export function successRate(delivered: number, failed: number): string {
+  const finished = delivered + failed;
+  return finished === 0 ? "–" : `${Math.round((delivered / finished) * 100)}%`;
+}
