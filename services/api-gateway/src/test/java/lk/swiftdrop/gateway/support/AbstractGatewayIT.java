@@ -30,7 +30,7 @@ import org.testcontainers.utility.DockerImageName;
  *   <li>auth's WireMock also serving the JWKS for {@link TestJwts};</li>
  *   <li>Redis from Testcontainers for the rate limiters (flushed before each test).</li>
  * </ul>
- * Small limits and a 1 s response timeout keep the tests fast. All subclasses share one context.
+ * Small limits keep the tests fast; the response timeout is 5 s. All subclasses share one context.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public abstract class AbstractGatewayIT {
@@ -75,7 +75,8 @@ public abstract class AbstractGatewayIT {
         registry.add("JWT_JWK_SET_URI", () -> service("auth").baseUrl() + "/.well-known/jwks.json");
         registry.add("spring.data.redis.host", REDIS::getHost);
         registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
-        registry.add("GATEWAY_HTTP_RESPONSE_TIMEOUT", () -> "1s");
+        // Long enough for the first, cold request through a new context; ResilienceIT's slow stub is slower
+        registry.add("GATEWAY_HTTP_RESPONSE_TIMEOUT", () -> "5s");
         registry.add("GATEWAY_MERCHANT_RATE_LIMIT_REPLENISH", () -> 1);
         registry.add("GATEWAY_MERCHANT_RATE_LIMIT_BURST", () -> RATE_LIMIT_BURST);
         registry.add("GATEWAY_ESTIMATE_RATE_LIMIT_REPLENISH", () -> 1);
