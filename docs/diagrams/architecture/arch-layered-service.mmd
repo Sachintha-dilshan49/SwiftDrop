@@ -14,8 +14,8 @@ flowchart TB
   subgraph P["Presentation layer"]
     direction LR
     PAGES["React pages<br/>src/features/&lt;feature&gt;"]:::pres
-    FORMS["Forms + zod validation"]:::pres
-    APIC["API clients src/api/<br/>(VITE_API_BASE_URL, TanStack Query)"]:::pres
+    FORMS["Forms + hand-written validation"]:::pres
+    APIC["API clients src/api/<br/>(fetch, VITE_API_BASE_URL)"]:::pres
     ES["EventSource (SSE)"]:::pres
     PAGES --> FORMS --> APIC
     PAGES --> ES

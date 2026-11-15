@@ -1,19 +1,25 @@
 package lk.swiftdrop.auth.api;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.UUID;
+import lk.swiftdrop.auth.account.RoleName;
 import lk.swiftdrop.auth.service.AuthService;
+import lk.swiftdrop.auth.service.InternalUserService;
 import lk.swiftdrop.common.internal.InternalTokenAuthenticationFilter;
 import lk.swiftdrop.common.internal.InternalTokenTestContextCustomizerFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 @WebMvcTest(controllers = InternalUserController.class)
 class InternalUserControllerTest {
@@ -23,6 +29,9 @@ class InternalUserControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private InternalUserService internalUserService;
 
     @Test
     void returnsContactResponseForAuthenticatedCaller() throws Exception {
@@ -41,6 +50,55 @@ class InternalUserControllerTest {
     @Test
     void rejectsAnonymousContactLookup() throws Exception {
         mockMvc.perform(get("/internal/users/{userId}/contact", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void grantsCourierRoleOnlyToAuthenticatedInternalCaller() throws Exception {
+        mockMvc.perform(put("/internal/users/{userId}/roles/courier", UUID.randomUUID())
+                        .header(InternalTokenAuthenticationFilter.HEADER,
+                                InternalTokenTestContextCustomizerFactory.TEST_TOKEN))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void rejectsCourierRoleGrantWithoutInternalToken() throws Exception {
+        mockMvc.perform(put("/internal/users/{userId}/roles/courier", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void grantsMerchantRoleOnlyToAuthenticatedInternalCaller() throws Exception {
+        mockMvc.perform(put("/internal/users/{userId}/roles/merchant", UUID.randomUUID())
+                        .header(InternalTokenAuthenticationFilter.HEADER,
+                                InternalTokenTestContextCustomizerFactory.TEST_TOKEN))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void rejectsMerchantRoleGrantWithoutInternalToken() throws Exception {
+        mockMvc.perform(put("/internal/users/{userId}/roles/merchant", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void grantsRoleForAuthenticatedCaller() throws Exception {
+        UUID userId = UUID.randomUUID();
+        mockMvc.perform(post("/internal/users/{userId}/roles", userId)
+                        .header(InternalTokenAuthenticationFilter.HEADER, InternalTokenTestContextCustomizerFactory.TEST_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"MERCHANT\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(authService).grantRole(userId, RoleName.MERCHANT);
+    }
+
+    @Test
+    void rejectsAnonymousGrantRole() throws Exception {
+        UUID userId = UUID.randomUUID();
+        mockMvc.perform(post("/internal/users/{userId}/roles", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"MERCHANT\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }

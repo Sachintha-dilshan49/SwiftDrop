@@ -1,104 +1,176 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { merchantApi, MerchantResponse } from '../../api/merchantApi';
+import './merchant.css';
 
 interface Props {
-  token: string;
+  token?: string;
+  /** Approved: open the merchant portal (the caller refreshes the session so it carries the MERCHANT role). */
+  onOpenPortal?: () => void | Promise<void>;
+  /** No application yet: go to the registration form. */
+  onRegister?: () => void;
 }
 
-export const PendingApprovalPage: React.FC<Props> = ({ token }) => {
+const DATE_TIME = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Colombo', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  hour12: true,
+});
+
+/** The merchant's application: waiting for review, approved or rejected, with what they submitted. */
+export const PendingApprovalPage: React.FC<Props> = ({ token, onOpenPortal, onRegister }) => {
   const [profile, setProfile] = useState<MerchantResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [notApplied, setNotApplied] = useState(false);
+  const [loading, setLoading] = useState(Boolean(token));
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const res = await merchantApi.getMyProfile(token);
-      setProfile(res);
-    } catch (err: any) {
-      setError(err.message || 'Unable to fetch status');
+      setProfile(await merchantApi.getMyProfile(token));
+      setNotApplied(false);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '';
+      // merchant-service answers 404 "Merchant profile not found" when this account has not applied
+      if (/not found/i.test(message)) {
+        setNotApplied(true);
+      } else {
+        setError(message || 'Could not load your application. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-    fetchStatus();
-  }, [token]);
+    void fetchStatus();
+  }, [fetchStatus]);
+
+  const openPortal = async () => {
+    if (!onOpenPortal) return;
+    setOpening(true);
+    setError(null);
+    try {
+      await onOpenPortal();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not open the merchant portal. Please sign in again.');
+      setOpening(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+      <div className="pending-shell" style={{ display: 'grid', placeItems: 'center' }}>
+        <div className="loading-indicator" aria-label="Loading application status" />
       </div>
     );
   }
 
-  if (error || !profile) {
+  if (notApplied || (!profile && !error)) {
     return (
-      <div className="max-w-md mx-auto my-12 p-6 bg-white dark:bg-gray-800 rounded-xl shadow text-center">
-        <h3 className="text-lg font-semibold text-red-600 mb-2">Error Loading Status</h3>
-        <p className="text-gray-600 dark:text-gray-300 mb-4">{error || 'No merchant registration found.'}</p>
-        <button
-          onClick={fetchStatus}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Try Again
-        </button>
+      <div className="pending-shell">
+        <div className="pending-card">
+          <h1 className="pending-title">You have not applied yet</h1>
+          <p className="pending-lead">Apply for a merchant account to send your store's orders with SwiftDrop.</p>
+          {onRegister && (
+            <button type="button" className="button button-primary pending-action" onClick={onRegister}>
+              Apply as a merchant
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
-  const isApproved = profile.status === 'APPROVED';
-  const isRejected = profile.status === 'REJECTED';
+  const isApproved = profile?.status === 'APPROVED';
+  const isRejected = profile?.status === 'REJECTED';
 
   return (
-    <div className="max-w-xl mx-auto my-12 p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg text-center">
-      <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-        isApproved ? 'bg-green-100 text-green-600' : isRejected ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'
-      }`}>
-        {isApproved ? (
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          </svg>
-        ) : isRejected ? (
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+    <div className="pending-shell">
+      <div className="pending-card">
+        <div className={`pending-icon-circle ${isApproved ? 'is-approved' : isRejected ? 'is-rejected' : 'is-pending'}`} aria-hidden="true">
+          {isApproved ? (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : isRejected ? (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          ) : (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          )}
+        </div>
+
+        <h1 className="pending-title">
+          {isApproved ? 'Your account is approved' : isRejected ? 'Your application was not approved' : 'Your application is being reviewed'}
+        </h1>
+        <p className="pending-lead">
+          {isApproved
+            ? `${profile?.businessName} can now send orders with SwiftDrop.`
+            : isRejected
+            ? `Reason: ${profile?.rejectionReason || 'not given'}. Contact SwiftDrop support if you have questions.`
+            : 'A SwiftDrop admin checks every application. This page shows the result as soon as it is decided.'}
+        </p>
+
+        {error && <div className="alert" role="alert">{error}</div>}
+
+        {profile && (
+          <>
+            <ol className="pending-timeline">
+              <li className="pending-step-item">
+                <div className="pending-step-bullet done">✓</div>
+                <div>
+                  <strong>Application submitted</strong>
+                  <span>{DATE_TIME.format(new Date(profile.createdAt))}</span>
+                </div>
+              </li>
+              <li className="pending-step-item">
+                <div className={`pending-step-bullet ${isApproved ? 'done' : isRejected ? 'idle' : 'active'}`}>
+                  {isApproved ? '✓' : isRejected ? '✕' : '2'}
+                </div>
+                <div>
+                  <strong>Review by the SwiftDrop team</strong>
+                  <span>
+                    {isApproved || isRejected
+                      ? `Decided${profile.updatedAt ? ` ${DATE_TIME.format(new Date(profile.updatedAt))}` : ''}`
+                      : 'Waiting for an admin'}
+                  </span>
+                </div>
+              </li>
+              <li className="pending-step-item">
+                <div className={`pending-step-bullet ${isApproved ? 'done' : 'idle'}`}>{isApproved ? '✓' : '3'}</div>
+                <div>
+                  <strong>Start shipping</strong>
+                  <span>Create an API key and send orders from your store</span>
+                </div>
+              </li>
+            </ol>
+
+            <dl className="pending-details">
+              <div><dt>Business name</dt><dd>{profile.businessName}</dd></div>
+              <div><dt>BR number</dt><dd>{profile.businessRegNo}</dd></div>
+              <div><dt>Contact</dt><dd>{profile.contactName}, {profile.phone}</dd></div>
+              <div><dt>Pickup address</dt><dd>{profile.address}</dd></div>
+            </dl>
+          </>
         )}
+
+        {isApproved ? (
+          <button type="button" className="button button-primary pending-action" disabled={opening} onClick={() => void openPortal()}>
+            {opening ? 'Opening…' : 'Open the merchant portal'}
+          </button>
+        ) : !isRejected ? (
+          <button type="button" className="button button-outline pending-action" onClick={() => void fetchStatus()}>
+            Check again
+          </button>
+        ) : null}
       </div>
-
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-        {isApproved ? 'Account Approved!' : isRejected ? 'Application Rejected' : 'Under Review'}
-      </h2>
-
-      <p className="text-gray-600 dark:text-gray-300 mb-6">
-        {isApproved
-          ? `Welcome ${profile.businessName}! Your account is approved. You can now access your dashboard and generate API keys.`
-          : isRejected
-          ? `Your application was rejected. Reason: ${profile.rejectionReason || 'Contact support for details.'}`
-          : `Your registration for ${profile.businessName} (BRN: ${profile.businessRegNo}) is being verified by the operations team.`}
-      </p>
-
-      {isApproved ? (
-        <a
-          href="/merchant/dashboard"
-          className="inline-block px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          Go to Dashboard
-        </a>
-      ) : (
-        <button
-          onClick={fetchStatus}
-          className="px-5 py-2 border border-gray-300 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-        >
-          Refresh Status
-        </button>
-      )}
     </div>
   );
 };

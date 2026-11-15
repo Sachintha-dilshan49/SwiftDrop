@@ -15,4 +15,11 @@ public class RestClientConfig {
             @Value("${swiftdrop.services.parcel-url}") String parcelServiceUrl) {
         return clients.create("parcel-service", parcelServiceUrl);
     }
+
+    @Bean
+    public RestClient authServiceRestClient(
+            InternalRestClientFactory clients,
+            @Value("${swiftdrop.services.auth-url:http://localhost:8081}") String authServiceUrl) {
+        return clients.create("auth-service", authServiceUrl);
+    }
 }

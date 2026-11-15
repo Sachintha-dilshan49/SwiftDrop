@@ -39,7 +39,9 @@ class RoutingIT extends AbstractGatewayIT {
                 Arguments.of("/api/v1/merchants/me/orders", "merchant"),
                 Arguments.of("/api/v1/admin/merchants?status=PENDING", "merchant"),
                 Arguments.of("/api/v1/admin/webhook-deliveries", "notification"),
-                Arguments.of("/api/v1/assistant/chat", "assistant"));
+                Arguments.of("/api/v1/assistant/chat", "assistant"),
+                Arguments.of("/api/v1/assistant/models", "assistant"),
+                Arguments.of("/mcp", "assistant"));
     }
 
     @ParameterizedTest(name = "{0} -> {1}")
@@ -60,6 +62,28 @@ class RoutingIT extends AbstractGatewayIT {
                 server.verify(0, anyRequestedFor(anyUrl()).withUrl(pathAndQuery));
             }
         });
+    }
+
+    @Test
+    void googleLoginKeepsTheBrowsersHostSoTheCallbackUsesThePublicOrigin() {
+        client.get().uri("/oauth2/authorization/google")
+                .header(HttpHeaders.HOST, "localhost:3000")
+                .exchange()
+                .expectStatus().isOk();
+
+        service("auth").verify(getRequestedFor(urlEqualTo("/oauth2/authorization/google"))
+                .withHeader(HttpHeaders.HOST, equalTo("localhost:3000")));
+    }
+
+    @Test
+    void otherRoutesSendTheServicesOwnHost() {
+        client.get().uri("/api/v1/pricing/zones")
+                .header(HttpHeaders.HOST, "localhost:3000")
+                .exchange()
+                .expectStatus().isOk();
+
+        service("pricing").verify(getRequestedFor(urlEqualTo("/api/v1/pricing/zones"))
+                .withHeader(HttpHeaders.HOST, equalTo("localhost:" + service("pricing").port())));
     }
 
     @Test

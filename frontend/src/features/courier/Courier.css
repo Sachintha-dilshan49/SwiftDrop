@@ -1,0 +1,220 @@
+/* Courier phone view, after the Figma Customer mobile pages (My deliveries, Live tracking).
+   Mobile first; colours from the :root variables in src/style.css. */
+
+.courier { display: grid; gap: 14px; max-width: 560px; }
+
+.courier-title { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+.courier-subtitle { margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+.courier-note { margin: 4px 0; color: var(--muted); font-size: 14px; }
+.courier .alert { font-size: 13px; }
+
+.courier-tabs {
+  display: inline-flex;
+  justify-self: start;
+  gap: 2px;
+  padding: 4px;
+  background: #eef1f5;
+  border-radius: 14px;
+}
+
+.courier-tab {
+  min-height: 38px;
+  padding: 0 16px;
+  color: #4d5a6e;
+  background: transparent;
+  border: 0;
+  border-radius: 11px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.courier-tab span { margin-left: 4px; font-weight: 500; }
+.courier-tab[aria-selected="true"] { color: var(--ink); background: white; box-shadow: 0 1px 2px rgb(23 36 59 / 10%); }
+
+.courier-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+
+.courier-card {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  color: var(--ink);
+  text-align: left;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.courier-card:hover,
+.courier-card:focus-visible { border-color: var(--orange); }
+
+.courier-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+.courier-tracking {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 15px;
+  letter-spacing: .03em;
+}
+
+.courier-card-meta { margin: 0; color: var(--muted); font-size: 13px; }
+
+.courier-stops { display: grid; gap: 5px; font-size: 14px; overflow-wrap: anywhere; }
+.courier-stops > span { display: flex; align-items: center; gap: 9px; }
+.courier-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; }
+.courier-dot-pickup { background: var(--orange); }
+.courier-dot-dropoff { background: var(--ink); }
+
+.courier-pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  color: #8a4b0f;
+  background: #fff1df;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.courier-pill::before { content: ""; width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+.courier-pill-created { color: #5d6878; background: #eef1f5; }
+.courier-pill-delivered { color: #1f6b3a; background: #e8f6ed; }
+.courier-pill-failed { color: #963727; background: #fff3ef; }
+
+.courier-back {
+  justify-self: start;
+  padding: 4px 0;
+  color: #4d5a6e;
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.courier-panel {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.courier-panel-title { margin: 0; font-size: 16px; }
+
+.courier-success {
+  margin: 0;
+  padding: 10px 12px;
+  color: #1f6b3a;
+  background: #e8f6ed;
+  border: 1px solid #c8ead3;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+/* Trip progress: green ticks for done, an orange ring for now, grey circles still to come. */
+.courier-progress { display: grid; margin: 0; padding: 0; list-style: none; }
+
+.courier-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  color: #8994a4;
+  font-size: 15px;
+}
+
+.courier-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 29px;
+  left: 10px;
+  width: 2px;
+  height: 22px;
+  background: var(--line);
+}
+
+.courier-step-mark {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  background: white;
+  border: 2px solid #d5dbe4;
+  border-radius: 50%;
+}
+
+.courier-step-done,
+.courier-step-current,
+.courier-step-failed { color: var(--ink); font-weight: 600; }
+.courier-step-done .courier-step-mark { background: #1f7a5a; border-color: #1f7a5a; }
+.courier-step-done .courier-step-mark::after { content: "✓"; color: white; font-size: 12px; font-weight: 800; }
+.courier-step-done:not(:last-child)::after { background: #1f7a5a; }
+.courier-step-current .courier-step-mark { border-color: var(--orange); box-shadow: inset 0 0 0 4px white; background: var(--orange); }
+.courier-step-failed .courier-step-mark { background: #c2412d; border-color: #c2412d; }
+.courier-step-failed .courier-step-mark::after { content: "!"; color: white; font-size: 12px; font-weight: 800; }
+
+/* Big thumb-sized buttons */
+.courier-actions { display: grid; gap: 10px; }
+
+.courier-button,
+.courier-button-outline {
+  min-height: 50px;
+  padding: 0 18px;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.courier-button { color: white; background: var(--orange); border: 1px solid var(--orange); }
+.courier-button:hover:not(:disabled) { background: var(--orange-dark); }
+.courier-button-danger { background: #c2412d; border-color: #c2412d; }
+.courier-button-danger:hover:not(:disabled) { background: #a5341f; }
+.courier-button-outline { color: var(--ink); background: white; border: 1px solid var(--line); }
+.courier-button:disabled,
+.courier-button-outline:disabled { opacity: .6; cursor: default; }
+
+.courier-form { gap: 14px; }
+
+.courier-field { display: grid; gap: 6px; color: #2c3a52; font-size: 14px; font-weight: 650; }
+.courier-field small { color: var(--muted); font-size: 12px; font-weight: 500; }
+
+.courier-field input:not([type="file"]),
+.courier-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+  resize: vertical;
+}
+
+.courier-field input:focus,
+.courier-field textarea:focus { outline: 2px solid rgb(255 105 15 / 25%); border-color: var(--orange); }
+
+.courier-form-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+
+.courier-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

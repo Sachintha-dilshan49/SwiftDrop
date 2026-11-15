@@ -13,7 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = {
         "spring.flyway.enabled=false",
         "spring.jpa.hibernate.ddl-auto=none",
-        "management.health.db.enabled=false"
+        "management.health.db.enabled=false",
+        "management.health.rabbit.enabled=false"
 })
 @AutoConfigureMockMvc
 class MerchantApplicationTests {

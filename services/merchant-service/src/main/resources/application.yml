@@ -24,6 +24,20 @@ spring:
   flyway:
     enabled: true
 
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        # A failing event is retried 3 times with back-off, then dropped instead of being requeued forever
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+
 server:
   port: 8085
 
@@ -32,12 +46,12 @@ swiftdrop:
   security:
     # Public paths that do not require JWT
     public-paths:
-      - /api/v1/merchants/register
-      - /merchants/register
       - /internal/**
+      - /api/v1/merchant-api/**
       - /merchant-api/**
   services:
     parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
+    auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
 
 management:
   endpoints:
@@ -48,3 +62,8 @@ management:
     health:
       probes:
         enabled: true
+
+rabbitmq:
+  queues:
+    # ParcelStatusChanged events for this service's orders (docs/architecture.md §6)
+    merchant-orders: merchant.orders.q

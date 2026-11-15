@@ -1,209 +1,260 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { merchantApi, MerchantResponse } from '../../api/merchantApi';
+import './merchant.css';
 
 interface Props {
-  adminToken: string;
+  adminToken?: string;
 }
 
-export const AdminMerchantsPage: React.FC<Props> = ({ adminToken }) => {
-  const [merchants, setMerchants] = useState<MerchantResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
-  const [error, setError] = useState<string | null>(null);
-  const [selectedMerchant, setSelectedMerchant] = useState<MerchantResponse | null>(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
+/** Up to this many merchants are listed per section. */
+const PAGE_SIZE = 100;
 
-  const fetchMerchants = async () => {
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
+}
+
+function formatDate(iso?: string): string {
+  if (!iso) return '–';
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso));
+}
+
+/** The admin's merchant screen: applications to approve or reject, and the approved merchants. */
+export const AdminMerchantsPage: React.FC<Props> = ({ adminToken }) => {
+  const [pending, setPending] = useState<MerchantResponse[]>([]);
+  const [approved, setApproved] = useState<MerchantResponse[]>([]);
+  const [loading, setLoading] = useState(Boolean(adminToken));
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<{ id: string; reason: string } | null>(null);
+
+  const load = useCallback(async () => {
+    if (!adminToken) return;
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
-      const res = await merchantApi.listPendingMerchants(adminToken, statusFilter);
-      setMerchants(res.content || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load merchants');
+      const [pendingPage, approvedPage] = await Promise.all([
+        merchantApi.listPendingMerchants(adminToken, 'PENDING', 0, PAGE_SIZE),
+        merchantApi.listPendingMerchants(adminToken, 'APPROVED', 0, PAGE_SIZE),
+      ]);
+      setPending(pendingPage?.content ?? []);
+      setApproved(approvedPage?.content ?? []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not load the merchants. Please try again.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [adminToken]);
 
   useEffect(() => {
-    fetchMerchants();
-  }, [adminToken, statusFilter]);
+    void load();
+  }, [load]);
 
-  const handleApprove = async (id: string) => {
-    if (!window.confirm('Approve this merchant account?')) return;
+  const approve = async (merchant: MerchantResponse) => {
+    if (!adminToken) return;
+    setBusyId(merchant.id);
+    setError(null);
     try {
-      setActionLoading(true);
-      await merchantApi.approveMerchant(adminToken, id);
-      fetchMerchants();
-    } catch (err: any) {
-      alert(err.message || 'Approval failed');
+      await merchantApi.approveMerchant(adminToken, merchant.id);
+      setNotice(`${merchant.businessName} is approved and can now sign in to the merchant portal.`);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Approval failed. Please try again.');
     } finally {
-      setActionLoading(false);
+      setBusyId(null);
     }
   };
 
-  const handleRejectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMerchant || !rejectReason.trim()) return;
-
+  const reject = async (merchant: MerchantResponse, reason: string) => {
+    if (!adminToken) return;
+    setBusyId(merchant.id);
+    setError(null);
     try {
-      setActionLoading(true);
-      await merchantApi.rejectMerchant(adminToken, selectedMerchant.id, rejectReason.trim());
-      setSelectedMerchant(null);
-      setRejectReason('');
-      fetchMerchants();
-    } catch (err: any) {
-      alert(err.message || 'Rejection failed');
+      await merchantApi.rejectMerchant(adminToken, merchant.id, reason.trim());
+      setRejecting(null);
+      setNotice(`${merchant.businessName}'s application was rejected.`);
+      await load();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Rejection failed. Please try again.');
     } finally {
-      setActionLoading(false);
+      setBusyId(null);
     }
   };
+
+  const query = searchQuery.trim().toLowerCase();
+  const visibleApproved = approved.filter(
+    (m) =>
+      !query ||
+      m.businessName.toLowerCase().includes(query) ||
+      m.businessRegNo.toLowerCase().includes(query) ||
+      m.contactName.toLowerCase().includes(query)
+  );
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+    <div className="merchant-body">
+      <div className="merchant-page-head">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Merchant Registrations (Admin)</h1>
-          <p className="text-sm text-gray-500">Review, approve, or reject business partner applications</p>
-        </div>
-        <div className="flex gap-2">
-          {(['PENDING', 'APPROVED', 'REJECTED'] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
-                statusFilter === s
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+          <h1>Merchants</h1>
+          <p>Review business applications and see the approved merchant accounts.</p>
         </div>
       </div>
 
+      {notice && (
+        <div className="alert merchant-notice" role="status">
+          ✓ {notice}
+        </div>
+      )}
       {error && (
-        <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
+        <div className="alert" role="alert">
           {error}
         </div>
       )}
 
-      {loading ? (
-        <div className="py-20 text-center text-gray-500">Loading registrations...</div>
-      ) : merchants.length === 0 ? (
-        <div className="py-16 text-center bg-white dark:bg-gray-800 rounded-xl shadow text-gray-500">
-          No {statusFilter.toLowerCase()} merchant registrations found.
+      <section className="merchant-admin-section" aria-labelledby="approval-queue-title">
+        <div className="merchant-admin-heading">
+          <h2 id="approval-queue-title">Approval queue</h2>
+          <span className="merchant-role-tag merchant-count-tag">{pending.length} waiting</span>
         </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-200 text-xs uppercase">
-                <tr>
-                  <th className="px-6 py-3">Business Details</th>
-                  <th className="px-6 py-3">BRN</th>
-                  <th className="px-6 py-3">Contact</th>
-                  <th className="px-6 py-3">Address</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {merchants.map((m) => (
-                  <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900 dark:text-white">{m.businessName}</div>
-                      <div className="text-xs text-gray-500">{m.email}</div>
-                    </td>
-                    <td className="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-300">
-                      {m.businessRegNo}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-gray-900 dark:text-white">{m.contactName}</div>
-                      <div className="text-xs text-gray-500">{m.phone}</div>
-                    </td>
-                    <td className="px-6 py-4 text-xs max-w-xs truncate text-gray-600 dark:text-gray-300">
-                      {m.address}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                        m.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                        m.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {m.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right space-x-2">
-                      {m.status === 'PENDING' && (
-                        <>
-                          <button
-                            disabled={actionLoading}
-                            onClick={() => handleApprove(m.id)}
-                            className="px-3 py-1 bg-green-600 text-white rounded text-xs font-medium hover:bg-green-700 disabled:opacity-50"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            disabled={actionLoading}
-                            onClick={() => setSelectedMerchant(m)}
-                            className="px-3 py-1 bg-red-600 text-white rounded text-xs font-medium hover:bg-red-700 disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
-      {/* Reject Reason Modal */}
-      {selectedMerchant && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-              Reject Registration: {selectedMerchant.businessName}
-            </h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Please enter the reason for rejecting this application. This will be visible to the merchant.
-            </p>
-            <form onSubmit={handleRejectSubmit}>
-              <textarea
-                required
-                rows={3}
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="e.g. Invalid business registration document provided."
-                className="w-full px-3 py-2 border rounded-lg mb-4 dark:bg-gray-700 dark:text-white text-sm"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedMerchant(null)}
-                  className="px-4 py-2 border rounded-lg text-sm text-gray-700 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={actionLoading}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
-                >
-                  {actionLoading ? 'Rejecting...' : 'Confirm Rejection'}
-                </button>
-              </div>
-            </form>
+        {loading ? (
+          <p className="merchant-muted">Loading merchants…</p>
+        ) : pending.length === 0 ? (
+          <div className="dev-card merchant-empty">✓ No applications are waiting for review.</div>
+        ) : (
+          <div className="merchant-queue-grid">
+            {pending.map((m) => {
+              const isRejecting = rejecting?.id === m.id;
+              return (
+                <article key={m.id} className="dev-card merchant-queue-card" aria-label={m.businessName}>
+                  <div>
+                    <div className="merchant-queue-title">
+                      <div className="merchant-avatar">{initials(m.businessName)}</div>
+                      <div>
+                        <strong>{m.businessName}</strong>
+                        <span>Applied {formatDate(m.createdAt)}</span>
+                      </div>
+                    </div>
+                    <dl className="merchant-queue-details">
+                      <div><dt>BRN</dt><dd>{m.businessRegNo}</dd></div>
+                      <div><dt>Contact</dt><dd>{m.contactName}, {m.phone}</dd></div>
+                      <div><dt>Email</dt><dd>{m.email}</dd></div>
+                      <div><dt>Address</dt><dd>{m.address}</dd></div>
+                    </dl>
+                  </div>
+
+                  {isRejecting ? (
+                    <form
+                      className="merchant-reject-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (rejecting.reason.trim()) void reject(m, rejecting.reason);
+                      }}
+                    >
+                      <label htmlFor={`reject-${m.id}`}>Reason for rejecting (shown to the merchant)</label>
+                      <textarea
+                        id={`reject-${m.id}`}
+                        value={rejecting.reason}
+                        maxLength={500}
+                        rows={2}
+                        onChange={(event) => setRejecting({ id: m.id, reason: event.target.value })}
+                      />
+                      <div className="merchant-queue-actions">
+                        <button type="button" className="button button-outline" onClick={() => setRejecting(null)}>
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="button button-primary merchant-danger"
+                          disabled={!rejecting.reason.trim() || busyId === m.id}
+                        >
+                          Reject application
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="merchant-queue-actions">
+                      <button
+                        type="button"
+                        className="button button-outline"
+                        disabled={busyId === m.id}
+                        onClick={() => setRejecting({ id: m.id, reason: '' })}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        disabled={busyId === m.id}
+                        onClick={() => void approve(m)}
+                      >
+                        {busyId === m.id ? 'Approving…' : 'Approve'}
+                      </button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section aria-labelledby="approved-title">
+        <div className="merchant-admin-heading merchant-admin-heading-split">
+          <h2 id="approved-title">Approved merchants</h2>
+          <div className="merchant-search-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="search"
+              aria-label="Search approved merchants"
+              placeholder="Search approved merchants…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
-      )}
+
+        <div className="merchant-card-box">
+          <table className="merchant-table">
+            <thead>
+              <tr>
+                <th>Merchant</th>
+                <th>BRN</th>
+                <th>Contact</th>
+                <th>Email</th>
+                <th>Approved</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!loading && visibleApproved.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="merchant-muted">
+                    {approved.length === 0 ? 'No approved merchants yet.' : 'No merchants match your search.'}
+                  </td>
+                </tr>
+              )}
+              {visibleApproved.map((m) => (
+                <tr key={m.id}>
+                  <td><strong>{m.businessName}</strong></td>
+                  <td><code>{m.businessRegNo}</code></td>
+                  <td>{m.contactName}<br /><span className="merchant-muted">{m.phone}</span></td>
+                  <td>{m.email}</td>
+                  <td>{formatDate(m.updatedAt ?? m.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 };

@@ -5,7 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 import lk.swiftdrop.dispatch.assignment.AssignmentRepository;
 import lk.swiftdrop.dispatch.assignment.AssignmentStatus;
-import lk.swiftdrop.dispatch.parcel.ParcelListClient;
+import lk.swiftdrop.dispatch.parcel.ParcelLookupClient;
 import lk.swiftdrop.dispatch.parcel.WaitingParcel;
 import org.springframework.stereotype.Service;
 
@@ -16,17 +16,17 @@ import org.springframework.stereotype.Service;
 @Service
 public class UnassignedParcelService {
 
-    private final ParcelListClient parcelListClient;
+    private final ParcelLookupClient parcelLookupClient;
     private final AssignmentRepository assignmentRepository;
 
-    public UnassignedParcelService(ParcelListClient parcelListClient, AssignmentRepository assignmentRepository) {
-        this.parcelListClient = parcelListClient;
+    public UnassignedParcelService(ParcelLookupClient parcelLookupClient, AssignmentRepository assignmentRepository) {
+        this.parcelLookupClient = parcelLookupClient;
         this.assignmentRepository = assignmentRepository;
     }
 
     /** Oldest first, from the oldest 100 CREATED parcels. */
     public List<UnassignedParcelResponse> getUnassignedParcels(String dispatcherToken) {
-        List<WaitingParcel> created = parcelListClient.oldestCreatedParcels(dispatcherToken);
+        List<WaitingParcel> created = parcelLookupClient.oldestCreatedParcels(dispatcherToken);
         if (created.isEmpty()) {
             return List.of();
         }

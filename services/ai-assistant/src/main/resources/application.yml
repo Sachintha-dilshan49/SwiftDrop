@@ -1,6 +1,19 @@
 spring:
   application:
     name: ai-assistant
+  ai:
+    mcp:
+      server:
+        name: swiftdrop
+        version: 0.1.0
+        instructions: >-
+          SwiftDrop parcel delivery tools. Track a parcel by tracking number, estimate a delivery fee,
+          list the signed-in user's own parcels and search the SwiftDrop help articles.
+        # One HTTP request per MCP message, no server-side sessions
+        protocol: STATELESS
+        type: SYNC
+        streamable-http:
+          mcp-endpoint: /mcp
   security:
     oauth2:
       resourceserver:
@@ -16,6 +29,46 @@ swiftdrop:
   security:
     # Paths that need no token, e.g. /api/v1/track/**. Health and /v3/api-docs are always public.
     public-paths: []
+  gateway:
+    # Tools call the public API through the gateway with the caller's JWT
+    base-url: ${GATEWAY_URL:http://localhost:8080}
+    connect-timeout: 2s
+    read-timeout: 5s
+  ai:
+    memory:
+      max-messages: ${AI_MEMORY_MAX_MESSAGES:20}
+      idle-timeout: 30m
+    knowledge:
+      enabled: true
+      location: classpath:knowledge/*.md
+      top-k: ${AI_RAG_TOP_K:4}
+      # Measured with all-MiniLM-L6-v2 on these articles: relevant questions score 0.45-0.66, off-topic ~0.1
+      similarity-threshold: ${AI_RAG_SIMILARITY_THRESHOLD:0.4}
+      # local = all-MiniLM-L6-v2 (ONNX) in-process; downloaded once into the cache dir on first start
+      embedding-provider: ${AI_EMBEDDING_PROVIDER:local}
+      embedding-cache-dir: ${AI_EMBEDDING_CACHE_DIR:}
+    # Name of the entry below that is used when a request names no model
+    default-model: ${AI_DEFAULT_MODEL:groq}
+    timeout: ${AI_CHAT_TIMEOUT:30s}
+    # Every entry is an OpenAI-compatible API. A model without an API key is listed but unavailable (503).
+    models:
+      groq:
+        enabled: true
+        base-url: ${AI_GROQ_BASE_URL:https://api.groq.com/openai/v1}
+        api-key: ${AI_GROQ_API_KEY:}
+        # llama-3.3-70b-versatile was retired by Groq in Aug 2026; check console.groq.com/docs/models
+        model: ${AI_GROQ_MODEL:openai/gpt-oss-120b}
+        temperature: 0.2
+      openai:
+        enabled: ${AI_OPENAI_ENABLED:false}
+        base-url: ${AI_OPENAI_BASE_URL:https://api.openai.com/v1}
+        api-key: ${AI_OPENAI_API_KEY:}
+        model: ${AI_OPENAI_MODEL:gpt-4.1-mini}
+      ollama:
+        enabled: ${AI_OLLAMA_ENABLED:false}
+        base-url: ${AI_OLLAMA_BASE_URL:http://localhost:11434/v1}
+        requires-key: false
+        model: ${AI_OLLAMA_MODEL:llama3.2}
 
 management:
   endpoints:

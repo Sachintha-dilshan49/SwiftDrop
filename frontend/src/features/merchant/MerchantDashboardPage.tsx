@@ -1,166 +1,268 @@
 import React, { useEffect, useState } from 'react';
-import { merchantApi, MerchantOrderResponse } from '../../api/merchantApi';
+import { merchantApi, MerchantOrderResponse, MerchantResponse } from '../../api/merchantApi';
+import type { ParcelStatus } from '../../api/parcelApi';
+import { StatusBadge } from '../../components/StatusBadge';
+import { ApiKeysPage } from './ApiKeysPage';
+import { WebhookSettingsPage } from './WebhookSettingsPage';
+import { LIVE_STATUSES as LIVE, orderStats } from './merchantStats';
+import './merchant.css';
 
-interface Props {
-  token: string;
+type TabKey = 'overview' | 'orders' | 'developer';
+type Filter = 'ALL' | 'LIVE' | 'DELIVERED' | 'ISSUES';
+
+const TABS: { id: TabKey; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'orders', label: 'Orders' },
+  { id: 'developer', label: 'Developer settings' },
+];
+
+/** The most recent orders this screen loads. */
+const ORDER_LIMIT = 100;
+const RECENT_ON_OVERVIEW = 10;
+
+const PARCEL_STATUSES: ParcelStatus[] = ['CREATED', 'PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'FAILED'];
+
+const FILTERS: { id: Filter; label: string; matches: (status: string) => boolean }[] = [
+  { id: 'ALL', label: 'All', matches: () => true },
+  { id: 'LIVE', label: 'Live', matches: (s) => (LIVE as string[]).includes(s) },
+  { id: 'DELIVERED', label: 'Delivered', matches: (s) => s === 'DELIVERED' },
+  { id: 'ISSUES', label: 'Failed', matches: (s) => s === 'FAILED' },
+];
+
+const SL_TIME = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Colombo', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
+});
+
+function isParcelStatus(status: string): status is ParcelStatus {
+  return (PARCEL_STATUSES as string[]).includes(status);
 }
 
-export const MerchantDashboardPage: React.FC<Props> = ({ token }) => {
-  const [orders, setOrders] = useState<MerchantOrderResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
+function money(amount: number | null | undefined, currency: string): string {
+  return amount == null ? '–' : `${currency} ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-  const fetchOrders = async (pageNo: number) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await merchantApi.listOrders(token, pageNo, 15);
-      setOrders(res.content || []);
-      setTotalElements(res.totalElements || 0);
-      setPage(pageNo);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load merchant orders');
-    } finally {
-      setLoading(false);
-    }
-  };
+interface Props {
+  token?: string;
+  initialTab?: TabKey;
+}
+
+/** The merchant's portal: their orders and how they are doing, and their API keys and webhook. */
+export const MerchantDashboardPage: React.FC<Props> = ({ token, initialTab = 'overview' }) => {
+  const [tab, setTab] = useState<TabKey>(initialTab);
+  const [profile, setProfile] = useState<MerchantResponse | null>(null);
+  const [orders, setOrders] = useState<MerchantOrderResponse[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>('ALL');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
-    fetchOrders(0);
+    if (!token) return;
+    let current = true;
+    Promise.all([merchantApi.getMyProfile(token), merchantApi.listOrders(token, 0, ORDER_LIMIT)])
+      .then(([me, page]) => {
+        if (!current) return;
+        setProfile(me);
+        setOrders(page?.content ?? []);
+        setTotal(page?.totalElements ?? page?.content?.length ?? 0);
+      })
+      .catch((err: unknown) => {
+        if (current) setError(err instanceof Error ? err.message : 'Could not load your orders. Please try again.');
+      });
+    return () => {
+      current = false;
+    };
   }, [token]);
 
-  const getStatusBadge = (status: string) => {
-    const base = 'px-2.5 py-1 text-xs font-semibold rounded-full';
-    switch (status) {
-      case 'DELIVERED':
-        return `${base} bg-green-100 text-green-800`;
-      case 'OUT_FOR_DELIVERY':
-      case 'IN_TRANSIT':
-      case 'PICKED_UP':
-        return `${base} bg-blue-100 text-blue-800`;
-      case 'FAILED':
-        return `${base} bg-red-100 text-red-800`;
-      default:
-        return `${base} bg-gray-100 text-gray-800`;
-    }
-  };
+  const stats = orders ? orderStats(orders) : null;
+  const matching = (orders ?? []).filter((o) => FILTERS.find((f) => f.id === filter)!.matches(o.status));
+  const query = search.trim().toLowerCase();
+  const searched = matching.filter(
+    (o) =>
+      !query ||
+      o.trackingNo.toLowerCase().includes(query) ||
+      o.recipientName.toLowerCase().includes(query) ||
+      o.dropoffAddress.toLowerCase().includes(query)
+  );
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Merchant Order Dashboard</h1>
-          <p className="text-sm text-gray-500">Track orders created via SwiftDrop API</p>
-        </div>
-        <div className="flex gap-2">
-          <a
-            href="/merchant/api-keys"
-            className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+    <div className="merchant-portal">
+      {profile && (
+        <p className="merchant-business">
+          <strong>{profile.businessName}</strong>
+          <span>{profile.status === 'APPROVED' ? 'Approved merchant' : profile.status.toLowerCase()}</span>
+        </p>
+      )}
+
+      <div className="merchant-tabs" role="tablist" aria-label="Merchant portal">
+        {TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            id={`merchant-tab-${item.id}`}
+            aria-selected={tab === item.id}
+            aria-controls={`merchant-panel-${item.id}`}
+            className="merchant-tab"
+            onClick={() => setTab(item.id)}
           >
-            Manage API Keys
-          </a>
-          <a
-            href="/merchant/webhooks"
-            className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-          >
-            Webhook Settings
-          </a>
-        </div>
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
-          {error}
-        </div>
-      )}
+      <div role="tabpanel" id={`merchant-panel-${tab}`} aria-labelledby={`merchant-tab-${tab}`}>
+        {error && tab !== 'developer' && <div className="alert" role="alert">{error}</div>}
 
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      ) : orders.length === 0 ? (
-        <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-100 dark:border-gray-700">
-          <svg className="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">No orders created yet</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            Integrate your e-commerce store with SwiftDrop by generating an API key.
-          </p>
-          <a
-            href="/merchant/api-keys"
-            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
-          >
-            Create Your First API Key
-          </a>
-        </div>
-      ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-200 uppercase text-xs">
-                <tr>
-                  <th className="px-6 py-3">Tracking No</th>
-                  <th className="px-6 py-3">Recipient</th>
-                  <th className="px-6 py-3">Destination</th>
-                  <th className="px-6 py-3">Fee</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3">Created At</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
-                    <td className="px-6 py-4 font-mono font-medium text-blue-600 dark:text-blue-400">
-                      <a href={`/track/${o.trackingNo}`} className="hover:underline">
-                        {o.trackingNo}
-                      </a>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-900 dark:text-white">{o.recipientName}</div>
-                      <div className="text-xs text-gray-500">{o.recipientPhone}</div>
-                    </td>
-                    <td className="px-6 py-4 max-w-xs truncate text-gray-600 dark:text-gray-300">
-                      {o.dropoffAddress}
-                    </td>
-                    <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
-                      {o.feeCurrency} {Number(o.feeAmount).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={getStatusBadge(o.status)}>{o.status}</span>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-gray-500">
-                      {new Date(o.createdAt).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {tab === 'overview' && (
+          <>
+            <section className="merchant-stats-grid" aria-label="Order summary">
+              <Stat label="Orders today" value={stats?.today} sub={stats ? `${stats.todayWaiting} waiting for pickup` : ''} />
+              <Stat label="Live right now" value={stats?.live} sub="Not yet delivered" />
+              <Stat label="Delivered" value={stats?.deliveredWeek} sub="Last 7 days" />
+              <Stat label="Failed" value={stats?.failedWeek} sub="Last 7 days" />
+            </section>
+            <OrderList
+              title="Recent orders"
+              orders={matching.slice(0, RECENT_ON_OVERVIEW)}
+              all={orders}
+              filter={filter}
+              onFilter={setFilter}
+              loading={!orders && !error}
+            />
+          </>
+        )}
 
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center text-sm">
-            <span className="text-gray-500">Total Orders: {totalElements}</span>
-            <div className="space-x-2">
-              <button
-                disabled={page === 0}
-                onClick={() => fetchOrders(page - 1)}
-                className="px-3 py-1 border rounded disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <button
-                disabled={(page + 1) * 15 >= totalElements}
-                onClick={() => fetchOrders(page + 1)}
-                className="px-3 py-1 border rounded disabled:opacity-40"
-              >
-                Next
-              </button>
+        {tab === 'orders' && (
+          <>
+            <div className="merchant-search-wrapper merchant-orders-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="search"
+                aria-label="Search orders"
+                placeholder="Search by tracking number, recipient or address…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
+            <OrderList
+              title={total > ORDER_LIMIT ? `Your latest ${ORDER_LIMIT} of ${total} orders` : 'All orders'}
+              orders={searched}
+              all={orders}
+              filter={filter}
+              onFilter={setFilter}
+              loading={!orders && !error}
+            />
+          </>
+        )}
+
+        {tab === 'developer' && token && (
+          <div className="merchant-developer">
+            <section className="dev-card">
+              <h2 className="dev-card-title">Create orders</h2>
+              <p className="merchant-muted">
+                Your store creates orders through the Merchant API with one of your API keys. Each order books a
+                SwiftDrop delivery and appears here with its tracking number. Zone codes such as{' '}
+                <code>COLOMBO_SOUTH</code> or <code>KANDY</code> are listed at <code>GET /api/v1/pricing/zones</code>.
+              </p>
+              <pre className="merchant-code">{`curl -X POST ${window.location.origin}/api/v1/merchant-api/orders \\
+  -H "X-API-Key: <your API key>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"recipientName": "Nimal Perera", "recipientPhone": "0771234567",
+       "recipientEmail": "nimal@example.com",
+       "pickupAddress": "${profile?.address ?? '12 Galle Road, Colombo 03'}",
+       "pickupZone": "<your pickup zone code>", "dropoffAddress": "5 Station Road, Nugegoda",
+       "dropoffZone": "NUGEGODA_MAHARAGAMA", "weightKg": 1.5, "size": "SMALL",
+       "speed": "STANDARD", "idempotencyKey": "order-1001"}'`}</pre>
+            </section>
+            <ApiKeysPage token={token} />
+            <WebhookSettingsPage token={token} />
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
+
+function Stat({ label, value, sub }: { label: string; value: number | undefined; sub: string }) {
+  return (
+    <div className="merchant-stat-card">
+      <span className="merchant-stat-label">{label}</span>
+      <strong className="merchant-stat-value">{value ?? '–'}</strong>
+      <span className="merchant-stat-sub">{sub}</span>
+    </div>
+  );
+}
+
+function OrderList(props: {
+  title: string;
+  orders: MerchantOrderResponse[];
+  all: MerchantOrderResponse[] | null;
+  filter: Filter;
+  onFilter: (filter: Filter) => void;
+  loading: boolean;
+}) {
+  const { title, orders, all, filter, onFilter, loading } = props;
+  return (
+    <section aria-label={title}>
+      <div className="merchant-filters-row">
+        <h2 className="merchant-list-title">{title}</h2>
+        <div className="merchant-filter-pills" role="group" aria-label="Filter orders">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              aria-pressed={filter === f.id}
+              className={`merchant-filter-pill ${filter === f.id ? 'is-active' : ''}`}
+              onClick={() => onFilter(f.id)}
+            >
+              {f.label} {all ? all.filter((o) => f.matches(o.status)).length : ''}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="merchant-card-box">
+        <table className="merchant-table">
+          <thead>
+            <tr>
+              <th>Tracking no</th>
+              <th>Recipient</th>
+              <th>Destination</th>
+              <th>Fee</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr><td colSpan={6} className="merchant-muted">Loading orders…</td></tr>
+            )}
+            {!loading && orders.length === 0 && (
+              <tr>
+                <td colSpan={6} className="merchant-muted">
+                  {all && all.length === 0
+                    ? 'No orders yet. Create one through the Merchant API (see Developer settings).'
+                    : 'No orders match.'}
+                </td>
+              </tr>
+            )}
+            {orders.map((o) => (
+              <tr key={o.id}>
+                <td><code className="merchant-tracking">{o.trackingNo}</code></td>
+                <td><strong>{o.recipientName}</strong><br /><span className="merchant-muted">{o.recipientPhone}</span></td>
+                <td>{o.dropoffAddress}</td>
+                <td>{money(o.feeAmount, o.feeCurrency)}</td>
+                <td>{isParcelStatus(o.status) ? <StatusBadge status={o.status} /> : o.status}</td>
+                <td className="merchant-muted">{SL_TIME.format(new Date(o.createdAt))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

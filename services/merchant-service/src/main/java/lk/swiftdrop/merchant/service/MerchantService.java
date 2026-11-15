@@ -3,6 +3,7 @@ package lk.swiftdrop.merchant.service;
 import java.util.UUID;
 import lk.swiftdrop.common.error.ConflictException;
 import lk.swiftdrop.common.error.NotFoundException;
+import lk.swiftdrop.merchant.client.AuthServiceClient;
 import lk.swiftdrop.merchant.dto.MerchantResponse;
 import lk.swiftdrop.merchant.dto.RegisterMerchantRequest;
 import lk.swiftdrop.merchant.entity.Merchant;
@@ -21,20 +22,25 @@ public class MerchantService {
     private static final Logger log = LoggerFactory.getLogger(MerchantService.class);
 
     private final MerchantRepository merchantRepository;
+    private final AuthServiceClient authServiceClient;
 
-    public MerchantService(MerchantRepository merchantRepository) {
+    public MerchantService(MerchantRepository merchantRepository, AuthServiceClient authServiceClient) {
         this.merchantRepository = merchantRepository;
+        this.authServiceClient = authServiceClient;
     }
 
     @Transactional
     public MerchantResponse register(RegisterMerchantRequest request, UUID userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID is required to register a merchant");
+        }
         if (merchantRepository.existsByBusinessRegNo(request.businessRegNo())) {
             throw new ConflictException("Business registration number is already registered");
         }
         if (merchantRepository.existsByEmail(request.email())) {
             throw new ConflictException("Email is already registered");
         }
-        if (userId != null && merchantRepository.existsByUserId(userId)) {
+        if (merchantRepository.existsByUserId(userId)) {
             throw new ConflictException("User already has a registered merchant account");
         }
 
@@ -98,6 +104,9 @@ public class MerchantService {
         merchant.setRejectionReason(null);
         Merchant saved = merchantRepository.save(merchant);
         log.info("Merchant {} approved by admin", id);
+        if (saved.getUserId() != null) {
+            authServiceClient.grantRole(saved.getUserId(), "MERCHANT");
+        }
         return MerchantResponse.from(saved);
     }
 

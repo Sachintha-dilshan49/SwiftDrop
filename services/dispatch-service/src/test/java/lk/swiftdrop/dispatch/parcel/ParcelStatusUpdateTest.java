@@ -8,16 +8,17 @@ import org.junit.jupiter.api.Test;
 
 class ParcelStatusUpdateTest {
 
-    private static final UUID COURIER_ID = UUID.randomUUID();
     private static final UUID USER_ID = UUID.randomUUID();
 
     @Test
-    void courierUpdateRecordsWhoMadeTheChange() {
+    void courierIsIdentifiedByTheirUserIdAsParcelServiceExpects() {
         ParcelStatusUpdate update = ParcelStatusUpdate.byCourier(
-                ParcelStatus.FAILED, COURIER_ID, USER_ID, "Gate locked", null, "Nobody at home", "proof-key");
+                ParcelStatus.FAILED, USER_ID, "Gate locked", null, "Nobody at home", "proof-key");
 
-        assertThat(update).isEqualTo(new ParcelStatusUpdate(ParcelStatus.FAILED, COURIER_ID, "Gate locked",
+        // parcel-service stores courierId on the parcel and compares it with changedBy on the next update
+        assertThat(update).isEqualTo(new ParcelStatusUpdate(ParcelStatus.FAILED, USER_ID, "Gate locked",
                 "proof-key", "Nobody at home", USER_ID, "COURIER"));
+        assertThat(update.courierId()).isEqualTo(update.changedBy());
     }
 
     @Test
@@ -34,7 +35,7 @@ class ParcelStatusUpdateTest {
     }
 
     private static String note(String note, String recipientName) {
-        return ParcelStatusUpdate.byCourier(ParcelStatus.DELIVERED, COURIER_ID, USER_ID, note, recipientName, null, null)
+        return ParcelStatusUpdate.byCourier(ParcelStatus.DELIVERED, USER_ID, note, recipientName, null, null)
                 .note();
     }
 }

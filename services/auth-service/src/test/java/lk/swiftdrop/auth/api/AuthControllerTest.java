@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.UUID;
+import lk.swiftdrop.auth.reset.PasswordResetService;
 import lk.swiftdrop.auth.service.AuthService;
 import lk.swiftdrop.auth.service.GoogleOAuthService;
 import lk.swiftdrop.auth.token.TokenResponse;
@@ -24,9 +25,12 @@ class AuthControllerTest {
     @Mock
     private GoogleOAuthService googleOAuthService;
 
+    @Mock
+    private PasswordResetService passwordResetService;
+
     @Test
     void delegatesSignupAndLoginRequests() {
-        AuthController controller = new AuthController(authService, googleOAuthService);
+        AuthController controller = new AuthController(authService, googleOAuthService, passwordResetService);
         SignupRequest signup = new SignupRequest("Demo", "demo@example.test", null, "long-enough-password");
         LoginRequest login = new LoginRequest("demo@example.test", "long-enough-password");
         TokenResponse tokens = tokenResponse();
@@ -43,7 +47,7 @@ class AuthControllerTest {
 
     @Test
     void delegatesRefreshLogoutAndGoogleCodeExchange() {
-        AuthController controller = new AuthController(authService, googleOAuthService);
+        AuthController controller = new AuthController(authService, googleOAuthService, passwordResetService);
         RefreshRequest refresh = new RefreshRequest("refresh");
         LogoutRequest logout = new LogoutRequest("refresh");
         OAuthTokenRequest oauth = new OAuthTokenRequest("code");

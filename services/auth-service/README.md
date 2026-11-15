@@ -17,6 +17,7 @@ flowchart LR
     customer[Customer]
     accountHolder[Registered user]
     operator[Merchant, courier, dispatcher, or admin]
+    admin[Admin]
     google[Google OAuth]
     backend[Authenticated backend service]
 
@@ -28,6 +29,7 @@ flowchart LR
         logout([Sign out])
         jwks([Read public signing keys])
         contact([Look up user contact])
+        manageUsers([Manage users and roles])
     end
 
     customer --> signup
@@ -37,15 +39,15 @@ flowchart LR
     accountHolder --> refresh
     accountHolder --> logout
     operator --> credentials
+    admin --> manageUsers
     googleLogin <--> google
     backend --> jwks
     backend --> contact
 ```
 
-New password and Google signups receive the `CUSTOMER` role. Merchant, courier,
-dispatcher, and admin accounts must already have the corresponding role assigned;
-role provisioning and administrative user management are outside the current
-auth-service API.
+New password and Google signups receive the `CUSTOMER` role. Administrators can
+list users, replace their assigned roles, and update account status through the
+admin API.
 
 ## Architecture
 
@@ -59,9 +61,11 @@ flowchart LR
 
     subgraph service["auth-service · Spring Boot · :8081"]
         authApi["AuthController<br/>/api/v1/auth/**"]
+        adminApi["AdminUserController<br/>/api/v1/admin/users/**"]
         oauthConfig["Google OAuth filter chain"]
         internalApi["InternalUserController<br/>/internal/users/**"]
         authLogic["AuthService"]
+        adminLogic["AdminUserService"]
         oauthLogic["GoogleOAuthService"]
         jwt["JwtTokenService<br/>RS256 signing"]
         migrations["Flyway migrations"]
@@ -73,9 +77,11 @@ flowchart LR
     oauthConfig <--> google
     oauthConfig --> oauthLogic
     authApi --> authLogic
+    adminApi --> adminLogic
     authApi --> oauthLogic
     internalApi --> authLogic
     authLogic --> db
+    adminLogic --> db
     oauthLogic --> db
     migrations --> db
     authLogic --> jwt
@@ -84,8 +90,9 @@ flowchart LR
     keyEndpoint --> jwt
 ```
 
-The gateway routes public `/api/v1/auth/**` traffic to auth-service. The internal
-contact endpoint is not routed by the gateway and requires a valid bearer token.
+The gateway routes public `/api/v1/auth/**` and `/api/v1/admin/users/**` traffic to
+auth-service. The admin API requires the `ADMIN` role. The internal contact endpoint
+is not routed by the gateway and requires `X-Internal-Token`.
 The JWKS endpoint is used by the gateway and services to verify access tokens;
 they verify tokens locally instead of asking auth-service to validate every request.
 
@@ -96,6 +103,7 @@ they verify tokens locally instead of asking auth-service to validate every requ
 | `AuthController` | Signup, password login, refresh, logout, and Google-code exchange API |
 | `GoogleOAuthSecurityConfiguration` | Google authorization-code flow and frontend callback |
 | `AuthService` | User lookup, password verification, refresh-token lifecycle, and contact lookup |
+| `AdminUserController` / `AdminUserService` | ADMIN-only user listing, role updates, account status changes, and refresh-token revocation |
 | `GoogleOAuthService` | Verify Google profile, link/create the local account, and exchange one-time login codes |
 | `JwtTokenService` | Create RS256 access tokens and secure random refresh/login codes |
 | `InternalUserController` | Expose authenticated `GET /internal/users/{userId}/contact` |
@@ -190,7 +198,38 @@ sequenceDiagram
 ```
 
 This endpoint is intended for backend-to-backend calls. The browser should not call
-it, and callers should handle phone numbers and email as personal data.
+it, and callers should handle phone numbers and email as personal data. Local
+Sri Lankan mobile numbers are returned in `+94` format.
+The actual credential is `X-Internal-Token`, enforced by the shared internal-service
+filter; it is not a user JWT.
+
+## Administrative user management
+
+Only a caller with the `ADMIN` role can access `/api/v1/admin/users`. The user list
+is paginated (`page`, `size`, default size 20, maximum size 100). A role/status
+update replaces the user's role set and account status. Existing refresh tokens
+are revoked after an update, so the user must authenticate again. Already-issued
+access JWTs can remain valid until their 15-minute expiry because downstream
+services validate those tokens locally.
+
+| Method and path | Description |
+|---|---|
+| `GET /api/v1/admin/users` | List users with roles and account status |
+| `PATCH /api/v1/admin/users/{userId}` | Replace the user's roles and set `accountStatus` (`ACTIVE`, `SUSPENDED`, or `DISABLED`) |
+
+Example update:
+
+```json
+{
+  "roles": ["MERCHANT"],
+  "accountStatus": "ACTIVE"
+}
+```
+
+The admin UI can display each user's name, email, roles, and status; role/status
+controls should submit the complete update body above. Frontend work belongs to
+`frontend/` (Role 7), so this module documents the API and handoff rather than
+changing the React app.
 
 ## API reference
 
@@ -203,7 +242,9 @@ it, and callers should handle phone numbers and email as personal data.
 | `GET /oauth2/authorization/google` | Start Google OAuth login (when configured) |
 | `GET /login/oauth2/code/google` | Google OAuth callback handled by Spring Security |
 | `POST /api/v1/auth/token` | Exchange a single-use Google login code for SwiftDrop tokens |
-| `GET /internal/users/{userId}/contact` | Return contact details to an authenticated backend caller |
+| `GET /api/v1/admin/users` | ADMIN-only paginated user list |
+| `PATCH /api/v1/admin/users/{userId}` | ADMIN-only role and account-status update |
+| `GET /internal/users/{userId}/contact` | Return contact details to a backend caller with `X-Internal-Token` |
 | `GET /.well-known/jwks.json` | Publish public signing keys for access-token verification |
 
 Signup passwords must contain 12–72 characters. Login accepts a password up to 72
@@ -242,9 +283,9 @@ share real tokens or personal data.
 }
 ```
 
-The contact route is protected by shared bearer-token security. “Internal” means it
-is not exposed through the API gateway; network-level isolation should also be
-maintained in deployment.
+The contact route is protected by the shared internal-service token (`X-Internal-Token`),
+not a user bearer token. “Internal” means it is not exposed through the API gateway;
+network-level isolation should also be maintained in deployment.
 
 ## Database
 
@@ -293,8 +334,9 @@ sudo docker compose -f deploy/compose/docker-compose.yml logs --tail=100 auth-se
 
 The Compose setup reads `deploy/compose/.env` when present. Do not add real keys or
 passwords to this README. Once started, check the JWKS endpoint at
-`http://localhost:8081/.well-known/jwks.json`. In Compose, PostgreSQL is exposed on
-host port `5433`; the service connects to `auth_db` over the Compose network.
+`http://localhost:8181/.well-known/jwks.json`. In Compose, auth-service is exposed on
+host port `8181` and PostgreSQL on host port `5434`; other containers use the service
+port `auth-service:8081` and connect to PostgreSQL over the Compose network.
 
 Google login is optional. Configure the OAuth client ID, secret, callback URI, and
 frontend feature flag before enabling it. Follow the setup steps in
@@ -305,8 +347,8 @@ frontend feature flag before enabling it. Follow the setup steps in
 From the repository root:
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
-PATH=/usr/lib/jvm/java-21-openjdk-amd64/bin:$PATH \
+JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64 \
+PATH=/usr/lib/jvm/java-25-openjdk-amd64/bin:$PATH \
 bash ./mvnw -pl services/auth-service -am test
 ```
 

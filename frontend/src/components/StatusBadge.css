@@ -1,0 +1,31 @@
+.sd-status-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--sd-radius-pill);
+  font-family: var(--sd-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.sd-status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sd-status-created { color: var(--sd-status-created-text); background: var(--sd-status-created-bg); }
+.sd-status-picked-up { color: var(--sd-status-picked-up-text); background: var(--sd-status-picked-up-bg); }
+.sd-status-in-transit { color: var(--sd-status-in-transit-text); background: var(--sd-status-in-transit-bg); }
+.sd-status-out-for-delivery {
+  color: var(--sd-status-out-for-delivery-text);
+  background: var(--sd-status-out-for-delivery-bg);
+}
+.sd-status-delivered { color: var(--sd-status-delivered-text); background: var(--sd-status-delivered-bg); }
+.sd-status-failed { color: var(--sd-status-failed-text); background: var(--sd-status-failed-bg); }

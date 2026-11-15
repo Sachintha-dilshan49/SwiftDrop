@@ -1,0 +1,161 @@
+/* Fare and confirmation step (Figma Customer 03). Mobile first; colours from :root in src/style.css. */
+
+.fare {
+  display: grid;
+  gap: 14px;
+}
+
+.fare-back {
+  justify-self: start;
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fare-back:hover {
+  color: var(--ink);
+}
+
+.fare-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.fare-problem {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.fare-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  background: var(--sd-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--sd-radius-card);
+}
+
+.fare-card legend,
+.fare-card h3 {
+  margin: 0 0 4px;
+  padding: 0;
+  color: var(--ink);
+  font-family: var(--sd-font-heading);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* legend sits on the border by default; float it into the card like the h3 */
+.fare-card legend {
+  float: left;
+  width: 100%;
+}
+
+.fare-speed {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.fare-speed.is-selected {
+  background: var(--sd-orange-soft);
+  border-color: var(--orange);
+}
+
+.fare-speed input {
+  accent-color: var(--orange);
+}
+
+.fare-speed-text {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.fare-speed-text span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fare-speed-price {
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.fare-lines {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.fare-lines div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.fare-lines dt {
+  color: var(--muted);
+}
+
+.fare-lines dd {
+  margin: 0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fare-discount dt,
+.fare-discount dd {
+  color: var(--sd-status-delivered-text);
+}
+
+.fare-total {
+  align-items: baseline;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.fare-total dd {
+  font-family: var(--sd-font-heading);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.fare-confirm {
+  width: 100%;
+}
+
+.fare-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Wide screens: speeds on the left, the breakdown beside them (Figma desktop). */
+@media (min-width: 900px) {
+  .fare {
+    grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+    align-items: start;
+  }
+
+  .fare-back,
+  .fare-summary,
+  .fare-problem,
+  .fare > .fare-note {
+    grid-column: 1 / -1;
+  }
+}

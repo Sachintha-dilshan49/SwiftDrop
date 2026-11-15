@@ -1,5 +1,6 @@
 package lk.swiftdrop.gateway;
 
+import org.springframework.http.HttpHeaders;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.anyUrl;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
@@ -31,6 +32,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class RateLimitIT extends AbstractGatewayIT {
 
     private static final String ORDERS = "/api/v1/merchant-api/orders";
+    private static final String CHAT = "/api/v1/assistant/chat";
     private static final String ESTIMATE = "/api/v1/pricing/estimate?pickupZone=A&dropoffZone=B&weightKg=1";
 
     @Autowired
@@ -174,6 +176,53 @@ class RateLimitIT extends AbstractGatewayIT {
     }
 
     // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    // ─── AI assistant chat ──────────────────────────────────────────────
+
+    @Test
+    void assistantChatOverBurstIsTooManyRequestsForThatUserOnly() {
+        String user = bearer(JWTS.valid());
+        List<HttpStatus> statuses = chatBurst(user);
+
+        assertThat(statuses.subList(0, RATE_LIMIT_BURST)).containsOnly(HttpStatus.OK);
+        assertThat(statuses).contains(HttpStatus.TOO_MANY_REQUESTS);
+        client.post().uri(CHAT).header(HttpHeaders.AUTHORIZATION, user)
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
+                .expectHeader().contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody().jsonPath("$.type").isEqualTo("https://swiftdrop.lk/problems/too-many-requests");
+
+        // Another user, same network: their own limit
+        client.post().uri(CHAT).header(HttpHeaders.AUTHORIZATION, bearer(JWTS.valid()))
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    void assistantChatWithoutTokenIsUnauthorizedAndNotForwarded() {
+        client.post().uri(CHAT).exchange().expectStatus().isUnauthorized();
+
+        service("assistant").verify(0, anyRequestedFor(anyUrl()));
+    }
+
+    @Test
+    void otherAssistantPathsAreNotLimitedWithChat() {
+        String user = bearer(JWTS.valid());
+        chatBurst(user);
+
+        client.get().uri("/api/v1/assistant/models").header(HttpHeaders.AUTHORIZATION, user)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    private List<HttpStatus> chatBurst(String authorization) {
+        List<HttpStatus> statuses = new ArrayList<>();
+        for (int i = 0; i < RATE_LIMIT_BURST + 2; i++) {
+            statuses.add(HttpStatus.resolve(client.post().uri(CHAT).header(HttpHeaders.AUTHORIZATION, authorization)
+                    .exchange().returnResult(String.class).getStatus().value()));
+        }
+        return statuses;
+    }
 
     private List<HttpStatus> merchantBurst(String apiKey) {
         List<HttpStatus> statuses = new ArrayList<>();

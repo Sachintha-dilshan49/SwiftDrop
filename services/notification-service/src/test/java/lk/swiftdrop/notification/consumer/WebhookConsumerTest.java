@@ -22,6 +22,9 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.mockito.ArgumentCaptor;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -116,6 +119,46 @@ class WebhookConsumerTest {
         verify(rabbitTemplate).send(eq(""), eq("webhook.parking"), any(Message.class));
     }
 
+    @Test
+    void exhaustedRetry_recordsParkedAndRoutesToParkingQueue() {
+        ParcelStatusChanged event = buildEvent(MERCHANT_ID);
+        Message message = buildMessageWithTypeId(3);
+        when(messageConverter.fromMessage(message)).thenReturn(event);
+        when(merchantServiceClient.getWebhookConfig(MERCHANT_ID)).thenReturn(Optional.of(WEBHOOK_CONFIG));
+        when(webhookSender.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new WebhookSendResult(false, 503, null, "Service unavailable"));
+
+        consumer.onStatusChange(message);
+
+        // Exhausted delivery must be PARKED, not FAILED
+        verify(webhookDeliveryService).recordParked(eq(event.eventId()), any(), eq(MERCHANT_ID),
+                eq("https://store.example.com/hook"), eq(4), anyString(), eq("Service unavailable"));
+        verify(webhookDeliveryService, never()).recordFailure(any(UUID.class), any(UUID.class), any(UUID.class),
+                anyString(), anyInt(), anyString(), anyInt(), anyString(), anyString());
+        verify(rabbitTemplate).send(eq(""), eq("webhook.parking"), any(Message.class));
+    }
+
+    @Test
+    void retryMessage_preservesTypeIdHeader() {
+        ParcelStatusChanged event = buildEvent(MERCHANT_ID);
+        Message message = buildMessageWithTypeId(0);
+        when(messageConverter.fromMessage(message)).thenReturn(event);
+        when(idempotencyService.isAlreadyProcessed(any(), any())).thenReturn(false);
+        when(merchantServiceClient.getWebhookConfig(MERCHANT_ID)).thenReturn(Optional.of(WEBHOOK_CONFIG));
+        when(webhookSender.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(new WebhookSendResult(false, 500, null, "Server error"));
+
+        consumer.onStatusChange(message);
+
+        ArgumentCaptor<Message> captor = ArgumentCaptor.forClass(Message.class);
+        verify(rabbitTemplate).send(eq(""), eq("webhook.retry.10s"), captor.capture());
+        Message sent = captor.getValue();
+        assertThat(sent.getMessageProperties().getHeaders())
+                .containsKey("__TypeId__");
+        assertThat((String) sent.getMessageProperties().getHeader("__TypeId__"))
+                .isEqualTo(ParcelStatusChanged.class.getName());
+    }
+
     private ParcelStatusChanged buildEvent(UUID merchantId) {
         return new ParcelStatusChanged(EVENT_ID, ParcelStatusChanged.TYPE, ParcelStatusChanged.VERSION,
                 Instant.now(), UUID.randomUUID(), "SD-TEST-0001", UUID.randomUUID(),
@@ -126,6 +169,16 @@ class WebhookConsumerTest {
         String json = "{\"eventId\":\"%s\"}".formatted(EVENT_ID);
         MessageProperties props = new MessageProperties();
         props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        if (retryCount > 0) { props.setHeader("x-retry-count", retryCount); }
+        return new Message(json.getBytes(), props);
+    }
+
+    /** Like buildMessage but also sets __TypeId__ as Jackson2JsonMessageConverter would. */
+    private Message buildMessageWithTypeId(int retryCount) {
+        String json = "{\"eventId\":\"%s\"}".formatted(EVENT_ID);
+        MessageProperties props = new MessageProperties();
+        props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        props.setHeader("__TypeId__", ParcelStatusChanged.class.getName());
         if (retryCount > 0) { props.setHeader("x-retry-count", retryCount); }
         return new Message(json.getBytes(), props);
     }

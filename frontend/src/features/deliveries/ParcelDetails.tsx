@@ -1,5 +1,8 @@
-import { useEffect, useState } from "react";
-import { ParcelApiError, ParcelResponse, parcelApi } from "../../api/parcelApi";
+import { useEffect, useRef, useState } from "react";
+import { ParcelApiError, ParcelResponse, TERMINAL_STATUSES, parcelApi } from "../../api/parcelApi";
+import { Button } from "../../components/Button";
+import { StatusBadge } from "../../components/StatusBadge";
+import { useLiveTracking } from "../../hooks/useLiveTracking";
 import { SIZE_LABELS, STATUS_LABELS, formatDateTime, formatMoney } from "../../lib/parcelFormat";
 import { trackingPath } from "../tracking/trackingNumber";
 import "./ParcelDetails.css";
@@ -55,11 +58,38 @@ export function ParcelDetails({ parcelId, token, onBack }: ParcelDetailsProps) {
     };
   }, [parcelId, token]);
 
+  // The live stream only carries status and time, so reload the parcel to show who changed it, the note
+  // and the proof. A reply for a parcel that is no longer open is ignored.
+  const openParcelId = useRef(parcelId);
+  openParcelId.current = parcelId;
+  function reload() {
+    parcelApi
+      .getParcel(parcelId, token)
+      .then((loaded) => {
+        if (loaded.id === openParcelId.current) {
+          setParcel(loaded);
+        }
+      })
+      .catch(() => {
+        // Keep showing what we have; the next update or a page refresh tries again.
+      });
+  }
+
+  const finished = parcel !== null && TERMINAL_STATUSES.includes(parcel.status);
+  const live = useLiveTracking(parcel && !finished ? parcel.trackingNo : null, {
+    onSnapshot: (snapshot) => {
+      if (snapshot.status !== parcel?.status) {
+        reload();
+      }
+    },
+    onStatusChange: reload,
+  });
+
   return (
     <div className="parcel-details">
-      <button type="button" className="parcel-details-back" onClick={onBack}>
+      <Button variant="secondary" className="parcel-details-back" onClick={onBack}>
         ← Back to my deliveries
-      </button>
+      </Button>
 
       {error && (
         <p className="alert" role="alert">
@@ -75,10 +105,13 @@ export function ParcelDetails({ parcelId, token, onBack }: ParcelDetailsProps) {
               <p className="parcel-details-label">Tracking number</p>
               <h3 className="parcel-details-number">{parcel.trackingNo}</h3>
             </div>
-            <span className={`deliveries-status deliveries-status-${parcel.status.toLowerCase()}`}>
-              {STATUS_LABELS[parcel.status]}
-            </span>
+            <StatusBadge status={parcel.status} />
           </div>
+          {!finished && (
+            <p className={live ? "parcel-details-live is-on" : "parcel-details-live"} aria-live="polite">
+              {live ? "Live: updates appear automatically" : "Connecting to live updates…"}
+            </p>
+          )}
 
           {parcel.status === "FAILED" && parcel.failureReason && (
             <p className="parcel-details-failed">

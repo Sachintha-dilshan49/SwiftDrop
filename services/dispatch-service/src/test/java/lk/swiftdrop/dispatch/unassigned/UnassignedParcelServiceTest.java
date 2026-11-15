@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import lk.swiftdrop.dispatch.assignment.AssignmentRepository;
 import lk.swiftdrop.dispatch.assignment.AssignmentStatus;
-import lk.swiftdrop.dispatch.parcel.ParcelListClient;
+import lk.swiftdrop.dispatch.parcel.ParcelLookupClient;
 import lk.swiftdrop.dispatch.parcel.WaitingParcel;
 import org.junit.jupiter.api.Test;
 
@@ -20,9 +20,10 @@ class UnassignedParcelServiceTest {
 
     private static final String TOKEN = "dispatcher-token";
 
-    private final ParcelListClient parcelListClient = mock(ParcelListClient.class);
+    private final ParcelLookupClient parcelLookupClient = mock(ParcelLookupClient.class);
     private final AssignmentRepository assignmentRepository = mock(AssignmentRepository.class);
-    private final UnassignedParcelService service = new UnassignedParcelService(parcelListClient, assignmentRepository);
+    private final UnassignedParcelService service =
+            new UnassignedParcelService(parcelLookupClient, assignmentRepository);
 
     @Test
     void leavesOutParcelsThatAlreadyHaveAnActiveAssignment() {
@@ -30,7 +31,7 @@ class UnassignedParcelServiceTest {
         WaitingParcel assigned = parcel("SD-0002");
         WaitingParcel alsoWaiting = parcel("SD-0003");
         List<UUID> ids = List.of(waiting.id(), assigned.id(), alsoWaiting.id());
-        given(parcelListClient.oldestCreatedParcels(TOKEN)).willReturn(List.of(waiting, assigned, alsoWaiting));
+        given(parcelLookupClient.oldestCreatedParcels(TOKEN)).willReturn(List.of(waiting, assigned, alsoWaiting));
         given(assignmentRepository.findParcelIdsWithStatus(ids, AssignmentStatus.ACTIVE))
                 .willReturn(Set.of(assigned.id()));
 
@@ -43,7 +44,7 @@ class UnassignedParcelServiceTest {
 
     @Test
     void noCreatedParcelsMeansNothingToLookUp() {
-        given(parcelListClient.oldestCreatedParcels(TOKEN)).willReturn(List.of());
+        given(parcelLookupClient.oldestCreatedParcels(TOKEN)).willReturn(List.of());
 
         assertThat(service.getUnassignedParcels(TOKEN)).isEmpty();
         verifyNoInteractions(assignmentRepository);

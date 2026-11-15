@@ -18,4 +18,6 @@ public interface MerchantOrderRepository extends JpaRepository<MerchantOrder, UU
     Optional<MerchantOrder> findByMerchantIdAndIdempotencyKey(UUID merchantId, String idempotencyKey);
 
     Optional<MerchantOrder> findByTrackingNo(String trackingNo);
+
+    Optional<MerchantOrder> findByParcelId(UUID parcelId);
 }

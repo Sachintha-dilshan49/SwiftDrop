@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/merchant-api/orders")
+@RequestMapping({"/api/v1/merchant-api/orders", "/merchant-api/orders"})
 public class MerchantOrderApiController {
 
     private final MerchantOrderService merchantOrderService;
@@ -28,7 +28,7 @@ public class MerchantOrderApiController {
             @AuthenticationPrincipal Merchant merchant,
             @Valid @RequestBody MerchantCreateOrderRequest request) {
         MerchantOrderResponse response = merchantOrderService.createOrder(merchant, request);
-        return ResponseEntity.created(URI.create("/merchant-api/orders/" + response.id()))
+        return ResponseEntity.created(URI.create("/api/v1/merchant-api/orders/" + response.id()))
                 .body(response);
     }
 }

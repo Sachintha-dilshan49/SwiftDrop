@@ -32,6 +32,8 @@ swiftdrop:
   services:
     # parcel-service owns parcel status; dispatch calls its /internal API directly
     parcel-url: ${PARCEL_SERVICE_URL:http://localhost:8083}
+    # courier first names for the dispatcher's workload view
+    auth-url: ${AUTH_SERVICE_URL:http://localhost:8081}
   storage:
     # MinIO (S3 API) for proof-of-delivery photos; the bucket is created by Role 8's minio-init
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}

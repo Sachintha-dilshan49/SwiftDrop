@@ -1,0 +1,8 @@
+node_modules/
+playwright-report/
+test-results/
+blob-report/
+stack-logs/
+.auth/
+playwright-report-resilience/
+test-results-resilience/

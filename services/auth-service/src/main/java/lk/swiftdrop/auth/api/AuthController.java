@@ -1,6 +1,7 @@
 package lk.swiftdrop.auth.api;
 
 import jakarta.validation.Valid;
+import lk.swiftdrop.auth.reset.PasswordResetService;
 import lk.swiftdrop.auth.service.AuthService;
 import lk.swiftdrop.auth.service.GoogleOAuthService;
 import lk.swiftdrop.auth.token.TokenResponse;
@@ -17,10 +18,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final GoogleOAuthService googleOAuthService;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService, GoogleOAuthService googleOAuthService) {
+    public AuthController(AuthService authService, GoogleOAuthService googleOAuthService,
+                          PasswordResetService passwordResetService) {
         this.authService = authService;
         this.googleOAuthService = googleOAuthService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/signup")
@@ -47,5 +51,18 @@ public class AuthController {
     @PostMapping("/token")
     public TokenResponse exchangeGoogleCode(@Valid @RequestBody OAuthTokenRequest request) {
         return googleOAuthService.exchangeLoginCode(request.code());
+    }
+
+    /** Always 202, whether or not the account exists. */
+    @PostMapping("/password/forgot")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/password/reset")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
     }
 }

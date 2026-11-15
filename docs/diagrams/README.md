@@ -88,6 +88,7 @@ All diagrams are checked against [`architecture.md`](../architecture.md) v1.2.
 | `usecase-merchant.md` | Use case — merchant platform | Role 5 | Superseded by `usecase/uc-merchant.puml` |
 | `er-merchant.md` | ER — `merchant_db` | Role 5 | Current; rendered as `er/er-merchant-db.mmd` |
 | `seq-merchant-order.md` | Sequence — merchant API order creation | Role 5 | Superseded by `sequence/seq-merchant-api-order.mmd` |
+| `activity-merchant.md` | Activity — complete merchant lifecycle & order fulfillment workflow | Role 5 | Current |
 | `architecture-overview.html` | Architecture overview (21 Oct) | Role 1 | Out of date; superseded by `architecture/arch-system-overview.mmd` |
 | `seq-google-login.mmd` | Sequence — Google login | Role 2 | Superseded by `sequence/seq-oauth2-google-login.mmd` (gateway, Spring default OAuth paths) |
 | `Auth-Use case diagram.png` | Use case — auth-service | Role 2 | Current |
@@ -106,8 +107,20 @@ Drawn by Role 4 to match `services/dispatch-service`; use them to review `usecas
 |---|---|
 | `usecase-courier.mmd` | Courier use cases: today's list, status update, proof photo, failed with reason; ownership check |
 | `usecase-dispatcher.mmd` | Dispatcher/admin use cases: unassigned parcels, assign, workload, reports |
-| `er-dispatch.mmd` | `dispatch_db` tables, matching `V1__create_dispatch_tables.sql` |
+| `er-dispatch.mmd` | `dispatch_db` tables, matching the Flyway migrations (V1–V3) |
 | `seq-courier-status-dispatch.mmd` | Courier status update inside dispatch-service: 403/400 paths, proof photo to MinIO, `dispatch.q` counters |
 
 `parcel_id`, `user_id` and `assigned_by_user_id` have no foreign keys on purpose: they point
 to rows in `parcel_db` and `auth_db`, and each service talks only to its own database.
+
+## AI assistant (Role 9)
+
+Rendered with `PLANTUML_LIMIT_SIZE=16384 plantuml -tpng -tsvg <file>.puml` (the limit stops large diagrams being clipped).
+
+| File | Diagram |
+|---|---|
+| `usecase-ai-assistant.puml` | Use case — AI assistant actors, include/extend relationships |
+| `activity-ai-chat.puml` | Activity (swimlanes) — answering one chat message |
+| `seq-ai-assistant.puml` | Sequence — chat with tool call, RAG help question, MCP client |
+| `arch-ai-assistant.puml` | Architecture by layer — presentation, edge, ai-assistant internals, services, in-memory data, LLM provider |
+| `er-ai-assistant.puml` | ER (logical) — in-memory data: chat memory, knowledge base, model config (no database) |

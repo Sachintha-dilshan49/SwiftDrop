@@ -1,14 +1,17 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ParcelApiError, ParcelResponse, parcelApi } from "../../api/parcelApi";
+import { ParcelApiError, ParcelResponse, TrackingStreamHandlers, parcelApi } from "../../api/parcelApi";
 import { ParcelDetails } from "./ParcelDetails";
 
 vi.mock("../../api/parcelApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/parcelApi")>();
-  return { ...actual, parcelApi: { getParcel: vi.fn() } };
+  return { ...actual, parcelApi: { getParcel: vi.fn(), subscribeTrackingStream: vi.fn() } };
 });
 
 const getParcel = vi.mocked(parcelApi.getParcel);
+const subscribeTrackingStream = vi.mocked(parcelApi.subscribeTrackingStream);
+const closeStream = vi.fn();
+let stream: TrackingStreamHandlers | null = null;
 
 const parcel: ParcelResponse = {
   id: "p-1",
@@ -41,6 +44,13 @@ const parcel: ParcelResponse = {
 describe("ParcelDetails", () => {
   beforeEach(() => {
     getParcel.mockReset();
+    closeStream.mockReset();
+    stream = null;
+    subscribeTrackingStream.mockReset();
+    subscribeTrackingStream.mockImplementation((_trackingNo, handlers) => {
+      stream = handlers;
+      return closeStream;
+    });
   });
 
   it("shows the delivery, its fee and the full history newest first with who made each change", async () => {
@@ -96,5 +106,65 @@ describe("ParcelDetails", () => {
     fireEvent.click(screen.getByRole("button", { name: "← Back to my deliveries" }));
 
     expect(onBack).toHaveBeenCalled();
+  });
+
+  describe("live updates", () => {
+    const outForDelivery: ParcelResponse = {
+      ...parcel,
+      status: "OUT_FOR_DELIVERY",
+      history: [...parcel.history, { status: "OUT_FOR_DELIVERY", changedBy: "k-1", changedByRole: "COURIER",
+        note: "On the way to Kandy", proofReference: null, createdAt: "2026-11-06T14:00:00Z" }],
+    };
+
+    it("reloads the delivery when its status changes, so the new entry shows who made it", async () => {
+      getParcel.mockResolvedValueOnce(parcel).mockResolvedValueOnce(outForDelivery);
+      render(<ParcelDetails parcelId="p-1" token="token-1" onBack={vi.fn()} />);
+      await screen.findByRole("heading", { name: "SD-7K3Q-9P2M" });
+      expect(subscribeTrackingStream).toHaveBeenCalledWith("SD-7K3Q-9P2M", expect.any(Object));
+
+      act(() => stream?.onLiveChange?.(true));
+      expect(screen.getByText("Live: updates appear automatically")).toBeInTheDocument();
+
+      act(() =>
+        stream?.onStatusChange({ trackingNo: "SD-7K3Q-9P2M", status: "OUT_FOR_DELIVERY",
+          previousStatus: "IN_TRANSIT", occurredAt: "2026-11-06T14:00:00Z" }),
+      );
+
+      expect(await screen.findByText("On the way to Kandy")).toBeInTheDocument();
+      expect(getParcel).toHaveBeenCalledTimes(2);
+    });
+
+    it("reloads on connect only when the snapshot shows a newer status", async () => {
+      getParcel.mockResolvedValue(parcel);
+      render(<ParcelDetails parcelId="p-1" token="token-1" onBack={vi.fn()} />);
+      await screen.findByRole("heading", { name: "SD-7K3Q-9P2M" });
+      const snapshot = { trackingNo: "SD-7K3Q-9P2M", size: "MEDIUM" as const, weightKg: 2.5,
+        createdAt: parcel.createdAt, history: [] };
+
+      act(() => stream?.onSnapshot({ ...snapshot, status: "IN_TRANSIT" }));
+      expect(getParcel).toHaveBeenCalledTimes(1);
+
+      act(() => stream?.onSnapshot({ ...snapshot, status: "OUT_FOR_DELIVERY" }));
+      expect(getParcel).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not open the stream for a delivered parcel", async () => {
+      getParcel.mockResolvedValue({ ...parcel, status: "DELIVERED" });
+      render(<ParcelDetails parcelId="p-1" token="token-1" onBack={vi.fn()} />);
+      await screen.findByRole("heading", { name: "SD-7K3Q-9P2M" });
+
+      expect(subscribeTrackingStream).not.toHaveBeenCalled();
+      expect(screen.queryByText(/live updates/i)).not.toBeInTheDocument();
+    });
+
+    it("closes the stream when the page is left", async () => {
+      getParcel.mockResolvedValue(parcel);
+      const { unmount } = render(<ParcelDetails parcelId="p-1" token="token-1" onBack={vi.fn()} />);
+      await screen.findByRole("heading", { name: "SD-7K3Q-9P2M" });
+
+      unmount();
+
+      expect(closeStream).toHaveBeenCalledTimes(1);
+    });
   });
 });

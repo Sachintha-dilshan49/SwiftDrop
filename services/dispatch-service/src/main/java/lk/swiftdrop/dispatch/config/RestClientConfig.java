@@ -21,6 +21,13 @@ public class RestClientConfig {
         return clients.builder("parcel-service", baseUrl).requestFactory(requestFactory()).build();
     }
 
+    /** auth-service {@code /internal/**} calls (courier names); GET only, so the factory's default client is fine. */
+    @Bean
+    public RestClient authServiceRestClient(InternalRestClientFactory clients,
+                                            @Value("${swiftdrop.services.auth-url}") String baseUrl) {
+        return clients.create("auth-service", baseUrl);
+    }
+
     /**
      * Public {@code /api/v1/**} calls made with the signed-in user's own JWT, so parcel-service applies its
      * usual role checks. Never carries the internal token.

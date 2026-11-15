@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { merchantApi, RegisterMerchantRequest } from '../../api/merchantApi';
+import './merchant.css';
 
-export const MerchantRegisterPage: React.FC = () => {
+interface Props {
+  token?: string;
+  onBackToSignIn?: () => void;
+  onRegistered?: (businessName: string, regNo: string) => void;
+}
+
+export const MerchantRegisterPage: React.FC<Props> = ({ token, onBackToSignIn, onRegistered }) => {
   const [formData, setFormData] = useState<RegisterMerchantRequest>({
     businessName: '',
     businessRegNo: '',
@@ -10,164 +17,186 @@ export const MerchantRegisterPage: React.FC = () => {
     phone: '',
     address: '',
   });
+  const [agreedTerms, setAgreedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!agreedTerms) {
+      setError('Please agree to the Merchant Terms & Conditions.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
-      await merchantApi.register(formData);
-      setSubmitted(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit registration');
+      await merchantApi.register({
+        businessName: formData.businessName,
+        businessRegNo: formData.businessRegNo,
+        contactName: formData.contactName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+      }, token);
+      if (onRegistered) {
+        onRegistered(formData.businessName, formData.businessRegNo);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to submit registration';
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (submitted) {
-    return (
-      <div className="max-w-xl mx-auto my-12 p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg text-center">
-        <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Registration Submitted!</h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-6">
-          Your merchant application is currently pending review by our administrator team. You will be notified once approved.
-        </p>
-        <a
-          href="/merchant/status"
-          className="inline-block px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          Check Approval Status
-        </a>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-2xl mx-auto my-8 p-6 bg-white dark:bg-gray-800 rounded-xl shadow">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Register as a Merchant</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Deliver parcels with SwiftDrop. Enter your business details for verification.
-      </p>
+    <div className="reg-shell">
+      <div className="reg-container">
+        {onBackToSignIn && (
+          <button type="button" className="reg-back-link" onClick={onBackToSignIn}>
+            ← Back to my deliveries
+          </button>
+        )}
 
-      {error && (
-        <div className="mb-4 p-4 text-sm text-red-700 bg-red-100 rounded-lg">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Business Name *
-          </label>
-          <input
-            type="text"
-            name="businessName"
-            required
-            value={formData.businessName}
-            onChange={handleChange}
-            placeholder="e.g. Acme Retailers (Pvt) Ltd"
-            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
-          />
+        {/* Title Section */}
+        <div className="reg-header">
+          <p className="eyebrow" style={{ color: 'var(--orange-dark)', fontWeight: 800, fontSize: '10px', letterSpacing: '0.12em', margin: 0 }}>
+            MERCHANT REGISTRATION
+          </p>
+          <h1>Register your business</h1>
+          <p>Send your store's orders with SwiftDrop across Colombo and to Kandy, Galle and Negombo. A SwiftDrop admin reviews every application.</p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Business Registration Number (BRN) *
-          </label>
-          <input
-            type="text"
-            name="businessRegNo"
-            required
-            value={formData.businessRegNo}
-            onChange={handleChange}
-            placeholder="e.g. PV-123456"
-            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Contact Person Name *
-          </label>
-          <input
-            type="text"
-            name="contactName"
-            required
-            value={formData.contactName}
-            onChange={handleChange}
-            placeholder="e.g. Nimal Perera"
-            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Business Email *
-            </label>
-            <input
-              type="email"
-              name="email"
-              required
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="orders@acme.lk"
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
-            />
+        {error && (
+          <div className="alert" role="alert" style={{ marginBottom: '20px' }}>
+            {error}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Phone Number *
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              required
-              value={formData.phone}
-              onChange={handleChange}
-              placeholder="+94 77 123 4567"
-              className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
-            />
+        )}
+
+        <form onSubmit={handleSubmit}>
+          {/* Card 1: Business Details */}
+          <div className="reg-card">
+            <h2 className="reg-card-title">1. Business details</h2>
+
+            <div className="reg-form-group">
+              <label htmlFor="businessName">Business Name *</label>
+              <input
+                id="businessName"
+                name="businessName"
+                type="text"
+                required
+                value={formData.businessName}
+                onChange={handleChange}
+                placeholder="e.g. Lotus Leaf Bakery (Pvt) Ltd"
+              />
+            </div>
+
+            <div className="reg-form-group">
+              <label htmlFor="businessRegNo">Business Registration Number (BRN) *</label>
+              <input
+                id="businessRegNo"
+                name="businessRegNo"
+                type="text"
+                required
+                value={formData.businessRegNo}
+                onChange={handleChange}
+                placeholder="e.g. PV-104928"
+              />
+              <p className="reg-hint">Your registered PV or sole-proprietor business registration number.</p>
+            </div>
+
+            <div className="reg-form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="address">Pickup address *</label>
+              <input
+                id="address"
+                name="address"
+                type="text"
+                required
+                value={formData.address}
+                onChange={handleChange}
+                placeholder="e.g. No. 42, Ward Place, Colombo 07"
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Registered Address / Warehouse Address *
-          </label>
-          <textarea
-            name="address"
-            rows={3}
-            required
-            value={formData.address}
-            onChange={handleChange}
-            placeholder="No. 123, Galle Road, Colombo 03"
-            className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:text-white"
-          />
-        </div>
+          {/* Card 2: Contact Person */}
+          <div className="reg-card">
+            <h2 className="reg-card-title">2. Contact person</h2>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
-        >
-          {loading ? 'Submitting Application...' : 'Submit Application'}
-        </button>
-      </form>
+            <div className="reg-grid-2">
+              <div className="reg-form-group">
+                <label htmlFor="contactName">Full Name *</label>
+                <input
+                  id="contactName"
+                  name="contactName"
+                  type="text"
+                  required
+                  value={formData.contactName}
+                  onChange={handleChange}
+                  placeholder="e.g. Ayesha Rodrigo"
+                />
+              </div>
+
+              <div className="reg-form-group">
+                <label htmlFor="phone">Mobile Number *</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="+94 77 123 4567"
+                />
+                <p className="reg-hint">We send SMS verification and order alerts here.</p>
+              </div>
+            </div>
+
+            <div className="reg-form-group" style={{ marginBottom: 0 }}>
+              <label htmlFor="email">Work Email *</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="e.g. ayesha@lotusleaf.lk"
+              />
+            </div>
+          </div>
+
+          {/* Terms & Actions */}
+          <div style={{ marginBottom: '24px' }}>
+            <label className="terms-check" style={{ cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={agreedTerms}
+                onChange={(e) => setAgreedTerms(e.target.checked)}
+              />
+              <span style={{ fontSize: '12px', color: '#48566c' }}>
+                I confirm this business is legally registered in Sri Lanka and agree to the <strong>SwiftDrop Merchant Terms & Conditions</strong>.
+              </span>
+            </label>
+          </div>
+
+          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+            <button
+              type="submit"
+              disabled={loading || !agreedTerms}
+              className="button button-primary"
+              style={{ flex: 1, minWidth: '200px' }}
+            >
+              {loading ? 'Submitting…' : 'Submit for approval'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

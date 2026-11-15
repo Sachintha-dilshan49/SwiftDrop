@@ -9,6 +9,8 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "merchant_orders")
@@ -41,6 +43,7 @@ public class MerchantOrder {
     @Column(name = "fee_amount", precision = 10, scale = 2)
     private BigDecimal feeAmount;
 
+    @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "fee_currency", nullable = false, length = 3)
     private String feeCurrency = "LKR";
 

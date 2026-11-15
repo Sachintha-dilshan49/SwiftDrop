@@ -16,7 +16,14 @@ erDiagram
         uuid courier_id FK
         uuid assigned_by_user_id "dispatcher or admin"
         varchar status "ASSIGNED | IN_PROGRESS | COMPLETED | FAILED"
+        varchar parcel_status "last status parcel-service accepted (V3)"
         timestamptz assigned_at
+        varchar tracking_no "copied from parcel-service at assign (V2)"
+        varchar pickup_address "copy, personal data"
+        varchar dropoff_address "copy, personal data"
+        varchar recipient_name "copy, personal data"
+        varchar parcel_size
+        numeric weight_kg
         timestamptz created_at
         timestamptz updated_at
     }

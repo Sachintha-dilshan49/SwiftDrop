@@ -1,0 +1,131 @@
+@startuml arch-ai-assistant
+' SwiftDrop AI Assistant - Architecture by layer (Role 9)
+' Same visual style as the system "by layer" figure in the design report.
+' Render: PLANTUML_LIMIT_SIZE=16384 plantuml -tpng -tsvg arch-ai-assistant.puml
+
+skinparam dpi 220
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 10
+skinparam linetype ortho
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam padding 3
+skinparam ArrowColor #555555
+skinparam ArrowThickness 0.8
+skinparam ArrowFontColor #333333
+skinparam ArrowFontSize 9
+skinparam titleFontSize 14
+skinparam titleFontStyle normal
+
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  BorderThickness 0.8
+  FontColor #222222
+  RoundCorner 0
+}
+skinparam rectangle<<layer>> {
+  BackgroundColor #FBFBFB
+  BorderColor #BBBBBB
+  FontColor #777777
+  FontSize 9
+  FontStyle normal
+}
+skinparam rectangle<<edge>> {
+  BackgroundColor #EAF1FB
+  BorderColor #3C5E9A
+}
+skinparam rectangle<<external>> {
+  BackgroundColor #FFFFFF
+  BorderColor #777777
+  BorderStyle dashed
+}
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  FontSize 9
+}
+skinparam legend {
+  BackgroundColor #FFFFFF
+  BorderColor #BBBBBB
+  FontSize 9
+}
+hide stereotype
+
+title SwiftDrop AI Assistant - by layer
+
+' ── Presentation layer ──
+rectangle "Presentation layer" <<layer>> as PL {
+  rectangle "Customer / Merchant /\nCourier / Dispatcher browser" as BR
+  rectangle "frontend · React SPA\nchat widget · nginx :80" as FE
+  rectangle "External MCP client\n(e.g. Claude Desktop)" as MC
+}
+
+' ── Edge ──
+rectangle "Edge" <<layer>> as EL {
+  rectangle "api-gateway :8080\nrouting · JWT check (JWKS)\nRedis rate limit per user\n/api/v1/assistant/** and /mcp\nnever routes /internal/**" <<edge>> as GW
+}
+
+' ── Business logic: ai-assistant ──
+rectangle "Business logic layer - ai-assistant :8087 (Controller -> Service -> Tools)" <<layer>> as BL {
+  rectangle "AssistantController\nchat · chat/stream (SSE)\nmodels · conversations/{id}" as AC
+  rectangle "MCP server\n/mcp (Streamable HTTP)" as MCPS
+  rectangle "AssistantService\nChatClient + advisors\n(memory, RAG)" as AS
+  rectangle "ChatModelRegistry\ngroq (default) · openai · ..." as REG
+  rectangle "SwiftDropTools (@Tool, read-only)\ntrack_parcel · estimate_fee\nmy_parcels · search_help_articles" as T
+  rectangle "GatewayClient\nRestClient + caller's JWT\nPII removed from results" as GC
+}
+
+' ── Other SwiftDrop services ──
+rectangle "SwiftDrop services (called through the gateway)" <<layer>> as SL {
+  rectangle "parcel-service :8083\ntracking · my parcels" as PS
+  rectangle "pricing-service :8082\nfee quote" as PR
+  rectangle "auth-service :8081\nJWKS public keys" as AU
+}
+
+' ── External ──
+rectangle "External" <<layer>> as XL {
+rectangle "LLM provider\nGroq (default) / other\nOpenAI-compatible APIs" <<external>> as LLM
+}
+
+' ── Data layer ──
+rectangle "Data layer - in memory, no database" <<layer>> as DL {
+  database "Knowledge base\nknowledge/*.md\n(loaded into the\nvector store at startup)" as KB
+  database "Vector store\nSimpleVectorStore\n384-dim vectors" as VS
+  rectangle "Embedding model\nall-MiniLM-L6-v2\n(ONNX, runs locally)" as EMB
+  database "Chat memory\nlast 20 messages\nper userId:conversationId" as MEM
+}
+
+' Presentation -> edge
+BR -right-> FE
+FE --> GW : HTTPS REST + SSE\nBearer JWT
+MC --> GW : MCP over HTTPS\nBearer JWT
+
+' Edge -> business logic
+GW --> AC : /api/v1/assistant/**
+GW --> MCPS : /mcp
+
+' Inside ai-assistant
+AC --> AS
+AS -right-> REG
+AS --> T : tool calls (max 5)
+MCPS --> T : same tools
+T -right-> GC
+AS --> VS : top-4 search
+AS --> MEM : load / save
+VS -right-> EMB
+
+' Outbound
+REG --> LLM : HTTPS + API key
+GC --> SL : REST via api-gateway\n+ caller's JWT
+PS -[hidden]right- PR
+PR -[hidden]right- AU
+
+legend bottom right
+  ai-assistant owns no database: tools call the owning service with the
+  caller's JWT, so ownership checks still apply. All in-memory data is
+  rebuilt on restart. JWTs are verified with auth-service's JWKS keys.
+endlegend
+
+@enduml

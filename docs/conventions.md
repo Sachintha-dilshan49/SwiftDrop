@@ -290,18 +290,22 @@ The skeletons start without persistence so they boot with no database. Add it in
 
 ```
 frontend/src
-├── api/            typed API clients (one file per service), axios/fetch instance with auth
+├── api/            typed API clients (one file per service), shared fetch wrapper with auth
 ├── components/     shared UI (buttons, tables, status badges, layout)
 ├── features/
 │   ├── auth/  booking/  tracking/  merchant/  courier/  dispatch/  admin/  assistant/
-├── hooks/
-├── routes/         route definitions, role guards
-└── lib/            utils, formatting (LKR, dates)
+├── hooks/          shared data-loading and form hooks
+├── routes/         in-house router: route definitions, role guards, 403 and 404 pages
+├── lib/            utils, formatting (LKR, dates), shared validators
+└── style.css       global styles and :root design tokens
 ```
 
+- Stack is React 18, Vite and TypeScript only (ADR-012). Any new runtime dependency needs a new ADR; ESLint and Prettier are allowed as dev tools.
 - TypeScript strict; no `any` without a comment explaining why.
-- Server state with TanStack Query; no ad-hoc `useEffect` fetching.
-- Forms with react-hook-form + zod schemas that mirror the backend validation.
+- Server state: `fetch` through the `src/api/` clients, loaded with `useState`/`useEffect`. Components never call `fetch` directly; repeated loading logic goes in a shared hook in `src/hooks/`.
+- Forms with controlled inputs and hand-written validation that mirrors the backend Bean Validation rules; shared validators live in `src/lib/`.
+- Styling with plain CSS files per feature; colours, spacing and fonts come from the `:root` variables in `src/style.css`.
+- Routing only through the in-house router in `src/routes/`; protected pages use its role guards.
 - Access token in memory; refresh token in an httpOnly cookie set by auth-service.
 - Base URL from `VITE_API_BASE_URL`. No hard-coded hosts.
 - Mobile-first: every page checked at 375 px width.

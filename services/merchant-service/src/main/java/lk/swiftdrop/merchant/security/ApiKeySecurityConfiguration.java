@@ -25,7 +25,7 @@ public class ApiKeySecurityConfiguration {
 
         ApiKeyAuthenticationFilter apiKeyFilter = new ApiKeyAuthenticationFilter(apiKeyService, entryPoint);
 
-        http.securityMatcher("/merchant-api/**")
+        http.securityMatcher("/api/v1/merchant-api/**", "/merchant-api/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)

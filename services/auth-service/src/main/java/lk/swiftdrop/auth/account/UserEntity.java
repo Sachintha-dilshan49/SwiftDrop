@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +36,10 @@ public class UserEntity {
 
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
+
+    /** Where password reset emails go; null means the account email. */
+    @Column(name = "password_reset_email", length = 255)
+    private String passwordResetEmail;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status", nullable = false, length = 20)
@@ -76,6 +81,23 @@ public class UserEntity {
         return passwordHash;
     }
 
+    public String getPasswordResetEmail() {
+        return passwordResetEmail;
+    }
+
+    public void setPasswordResetEmail(String passwordResetEmail) {
+        this.passwordResetEmail = passwordResetEmail;
+    }
+
+    /** The address a password reset link is sent to. */
+    public String passwordResetRecipient() {
+        return passwordResetEmail == null || passwordResetEmail.isBlank() ? email : passwordResetEmail;
+    }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public AccountStatus getAccountStatus() {
         return accountStatus;
     }
@@ -90,5 +112,14 @@ public class UserEntity {
 
     public void disable() {
         accountStatus = AccountStatus.DISABLED;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
+    }
+
+    public void replaceRoles(Collection<RoleEntity> roles) {
+        this.roles.clear();
+        this.roles.addAll(roles);
     }
 }

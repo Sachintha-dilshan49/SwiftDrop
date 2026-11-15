@@ -1,0 +1,100 @@
+@startuml activity-ai-chat
+' SwiftDrop AI Assistant - UML Activity Diagram with swimlanes (Role 9)
+' One chat message, from the user typing it to the reply being shown.
+' Render: plantuml -tpng -tsvg activity-ai-chat.puml
+
+skinparam dpi 200
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #3B4A5E
+skinparam activity {
+  BackgroundColor #EEF3FF
+  BorderColor #2350C8
+  FontColor #141B24
+  DiamondBackgroundColor #FFF6E6
+  DiamondBorderColor #B86E00
+  StartColor #141B24
+  EndColor #141B24
+  BarColor #141B24
+}
+skinparam swimlane {
+  BorderColor #A9B3C1
+  BorderThickness 1
+  TitleFontStyle bold
+  TitleFontSize 14
+}
+skinparam note {
+  BackgroundColor #FFF6E6
+  BorderColor #E0A447
+  FontSize 11
+}
+
+title SwiftDrop AI Assistant - Activity Diagram: Answering a Chat Message
+
+|#F7F9FC|User|
+start
+:Type a question in the chat window;
+
+|#FFFFFF|API Gateway|
+:Verify JWT and apply\nper-user rate limit;
+if (Token valid and\nunder rate limit?) then (no)
+  :Return 401 / 429\nProblemDetail;
+  |User|
+  :See "please sign in"\nor "try again later";
+  stop
+else (yes)
+endif
+|API Gateway|
+:Route to ai-assistant;
+
+|#F7F9FC|AI Assistant|
+:Validate request\n(message, model, conversationId);
+if (Request valid and\nmodel enabled?) then (no)
+  :Return 400 ProblemDetail;
+  |User|
+  :See validation message;
+  stop
+else (yes)
+endif
+|AI Assistant|
+:Load last 20 messages of the\nconversation from chat memory;
+:Embed the question\n(local embedding model);
+:Search in-memory vector store\nfor help passages (top 4);
+:Build prompt: system rules +\nhistory + passages + tool definitions;
+
+|#FFFFFF|LLM Provider|
+:Generate response;
+note right
+  Timeout or provider error
+  -> 503 ProblemDetail to the user
+end note
+
+|AI Assistant|
+while (Model requested\na tool call?) is (yes)
+  if (Fewer than 5 tool\ncalls so far?) then (yes)
+    :Call tool through the gateway\nwith the user's own JWT;
+    |#F7F9FC|SwiftDrop Services|
+    :Check ownership and read\nfrom the service's own database;
+    :Return result (JSON);
+    |AI Assistant|
+    :Remove personal data\nfrom the result;
+  else (no)
+    :Tell the model the\ntool limit was reached;
+  endif
+  |LLM Provider|
+  :Generate response\nusing the tool results;
+  |AI Assistant|
+endwhile (no)
+
+fork
+  :Save question and reply\nto chat memory;
+fork again
+  :Return ChatResponse\n(reply, toolsUsed, sources);
+end fork
+
+|User|
+:Read the answer\n(with sources if any);
+stop
+
+@enduml

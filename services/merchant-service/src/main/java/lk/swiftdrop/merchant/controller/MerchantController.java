@@ -26,8 +26,9 @@ public class MerchantController {
     }
 
     @PostMapping({"/api/v1/merchants/register", "/merchants/register"})
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MerchantResponse> register(@Valid @RequestBody RegisterMerchantRequest request) {
-        UUID authenticatedUserId = SecurityUtils.getOptionalAuthenticatedUserId();
+        UUID authenticatedUserId = SecurityUtils.getAuthenticatedUserId();
         MerchantResponse response = merchantService.register(request, authenticatedUserId);
         return ResponseEntity.created(URI.create("/api/v1/merchants/me"))
                 .body(response);

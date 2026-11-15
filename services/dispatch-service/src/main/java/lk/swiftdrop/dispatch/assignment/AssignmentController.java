@@ -28,7 +28,7 @@ public class AssignmentController {
     public ResponseEntity<AssignmentResponse> assign(@Valid @RequestBody AssignParcelRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         AssignmentResponse assignment = assignmentService.assign(
-                request.parcelId(), request.courierId(), UUID.fromString(jwt.getSubject()));
+                request.parcelId(), request.courierId(), UUID.fromString(jwt.getSubject()), jwt.getTokenValue());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}").buildAndExpand(assignment.id()).toUri();
         return ResponseEntity.created(location).body(assignment);

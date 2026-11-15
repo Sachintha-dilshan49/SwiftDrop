@@ -1,0 +1,26 @@
+{
+  "name": "swiftdrop-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "description": "System tests for SwiftDrop: API, end-to-end flows, resilience and UI smoke tests against the full Docker Compose stack",
+  "type": "module",
+  "scripts": {
+    "stack:up": "docker compose -f ../deploy/compose/docker-compose.yml -f compose/docker-compose.e2e.yml up -d --build",
+    "stack:wait": "bash scripts/wait-for-stack.sh",
+    "stack:logs": "bash scripts/collect-logs.sh",
+    "stack:down": "docker compose -f ../deploy/compose/docker-compose.yml -f compose/docker-compose.e2e.yml down -v",
+    "test": "playwright test --project=api --project=flows",
+    "test:api": "playwright test --project=api",
+    "test:flows": "playwright test --project=flows",
+    "test:resilience": "playwright test --project=resilience",
+    "test:ui": "playwright test --project=ui",
+    "test:all": "playwright test --project=api --project=flows --project=ui && playwright test --project=resilience",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@types/node": "^22.15.0",
+    "typescript": "~5.8.3"
+  }
+}

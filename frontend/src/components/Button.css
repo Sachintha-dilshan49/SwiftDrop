@@ -1,0 +1,27 @@
+.sd-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-button);
+  font-family: var(--sd-font-heading);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.sd-button-primary { color: var(--sd-navy); background: var(--sd-orange); }
+.sd-button-primary:hover:not(:disabled) { background: var(--sd-orange-hover); }
+
+.sd-button-secondary { color: var(--sd-navy); background: var(--sd-surface); border-color: var(--sd-line); }
+.sd-button-secondary:hover:not(:disabled) { background: var(--sd-subtle); }
+
+.sd-button-danger { color: #ffffff; background: var(--sd-danger); }
+.sd-button-danger:hover:not(:disabled) { filter: brightness(0.92); }
+
+.sd-button-ghost { color: var(--sd-navy); background: var(--sd-subtle); }
+.sd-button-ghost:hover:not(:disabled) { background: var(--sd-line); }

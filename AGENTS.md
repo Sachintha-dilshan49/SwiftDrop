@@ -21,6 +21,7 @@ SwiftDrop is a parcel delivery and courier management platform built as a univer
 | `services/ai-assistant` | Chatbot and MCP tools, port 8087 | Role 9 |
 | `frontend/` | React + Vite + TypeScript app | Role 7 (+ Role 1) |
 | `deploy/` | Docker Compose, Helm charts | Role 8 |
+| `e2e/` | System tests (Playwright) against the full Compose stack, see `docs/testing.md` | Testing (Devmith) |
 | `.github/workflows/` | CI pipelines | Role 8 |
 | `docs/` | Design documentation | Everyone (Role 1 compiles) |
 
@@ -31,7 +32,7 @@ Stay inside the module you were asked to change. If a task needs a change in ano
 - Java 21, Spring Boot 4.1.x, Spring Cloud 2025.1.x, Spring AI 2.x (ADR-009). Exact versions are pinned in the root `pom.xml`; never override them in a module.
 - Maven multi-module build. Use the wrapper: `./mvnw`.
 - PostgreSQL 16 + Flyway, RabbitMQ (Spring AMQP), Redis 7, MinIO (S3 API).
-- Frontend: React 18, Vite, TypeScript (strict), Tailwind, React Router, TanStack Query, react-hook-form + zod, Recharts.
+- Frontend: React 18, Vite, TypeScript (strict), no other runtime libraries (ADR-012): `fetch` through `src/api/` clients, controlled forms with hand-written validation, plain CSS with `src/style.css` tokens, in-house router in `src/routes/`. ESLint and Prettier as dev tools only.
 - Tests: JUnit 5, Mockito, Testcontainers, WireMock, Awaitility, JaCoCo; Vitest + React Testing Library.
 
 ## 4. Commands
@@ -47,6 +48,8 @@ docker compose -f deploy/compose/docker-compose.yml up --build                  
 
 cd frontend && npm ci && npm run dev               # frontend dev server
 npm run lint && npm run test                       # frontend checks
+
+cd e2e && npm ci && npm run stack:up && npm run stack:wait && npm test   # system tests (e2e/README.md)
 ```
 
 Run the relevant tests before saying a task is done.
@@ -77,7 +80,7 @@ Full detail in `docs/conventions.md`.
 - IDs are UUIDs. Timestamps are `Instant` in UTC, serialized ISO-8601.
 - Money is `BigDecimal` with 2 decimals, currency LKR.
 - Configuration in `application.yml` uses `${ENV_VAR:default}` placeholders; defaults only for non-secrets.
-- Frontend: feature folders under `src/features/<feature>`, API calls only through `src/api/` clients, no hard-coded URLs (use `VITE_API_BASE_URL`).
+- Frontend: feature folders under `src/features/<feature>`, API calls only through `src/api/` clients with `fetch`, no hard-coded URLs (use `VITE_API_BASE_URL`). Forms use controlled inputs with validation that mirrors the backend rules; styling is plain CSS per feature using the `:root` tokens in `src/style.css`; routing goes through the in-house router in `src/routes/`. No new runtime dependency without an ADR (ADR-012).
 
 ## 7. Tests expected with every change
 

@@ -170,7 +170,7 @@ class AuthServiceTest {
         UserContactResponse contact = authService.getUserContact(userId);
 
         assertThat(contact.email()).isEqualTo("demo@example.test");
-        assertThat(contact.phone()).isEqualTo("0771234567");
+        assertThat(contact.phone()).isEqualTo("+94771234567");
         assertThat(contact.firstName()).isEqualTo("Demo");
     }
 

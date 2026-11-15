@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lk.swiftdrop.auth.account.AccountStatus;
+import lk.swiftdrop.auth.account.RoleEntity;
 import lk.swiftdrop.auth.account.RoleName;
 import lk.swiftdrop.auth.account.RoleRepository;
 import lk.swiftdrop.auth.account.UserEntity;
@@ -125,7 +126,17 @@ public class AuthService {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found."));
         String firstName = user.getFullName().trim().split("\\s+", 2)[0];
-        return new UserContactResponse(user.getEmail(), user.getMobileNumber(), firstName);
+        return new UserContactResponse(user.getEmail(), toSriLankanE164(user.getMobileNumber()), firstName);
+    }
+
+    @Transactional
+    public void grantRole(UUID userId, RoleName roleName) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User not found."));
+        RoleEntity role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new NotFoundException("Role not found: " + roleName));
+        user.addRole(role);
+        userRepository.save(user);
     }
 
     private TokenResponse issueTokens(UserEntity user) {
@@ -164,5 +175,22 @@ public class AuthService {
 
     private static boolean isPhoneIdentifier(String identifier) {
         return identifier.matches("[+0-9\\s().-]+") && identifier.chars().anyMatch(Character::isDigit);
+    }
+
+    private static String toSriLankanE164(String mobileNumber) {
+        String normalized = normalizeMobileNumber(mobileNumber);
+        if (normalized == null) {
+            return null;
+        }
+        if (normalized.startsWith("+94")) {
+            return normalized;
+        }
+        if (normalized.startsWith("94") && normalized.length() == 11) {
+            return "+" + normalized;
+        }
+        if (normalized.startsWith("0") && normalized.length() == 10) {
+            return "+94" + normalized.substring(1);
+        }
+        return normalized;
     }
 }
