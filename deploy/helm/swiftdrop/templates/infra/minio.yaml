@@ -30,6 +30,8 @@ spec:
                   key: minio-root-password
             - name: MINIO_DEFAULT_BUCKETS
               value: "delivery-proofs:download"
+            - name: MINIO_BROWSER
+              value: "on"
           ports:
             - containerPort: 9000
               name: s3
