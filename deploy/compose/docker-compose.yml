@@ -277,6 +277,7 @@ services:
         required: false
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      GATEWAY_URL: ${GATEWAY_URL:-http://api-gateway:8080}
     volumes:
       # Embedding model and native libraries, downloaded on the first start only
       - ai_model_cache:/app/onnx-cache
