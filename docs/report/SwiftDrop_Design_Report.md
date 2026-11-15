@@ -1,8 +1,8 @@
 # SwiftDrop – Parcel Delivery & Courier Management System
 
-**Design Report** · Group project · 01 November 2026
+**Design Report** · Group project · 15 November 2026
 
-Repository: <https://github.com/Sachintha-dilshan49/SwiftDrop> (design state: branch `docs/report-nov1`, based on `dev` at commit `2c99307`)
+Repository: <https://github.com/Sachintha-dilshan49/SwiftDrop> (design state: branch `dev` at commit `d57fbd0`)
 
 | # | Role | Member | Owns |
 |---|---|---|---|
@@ -55,7 +55,7 @@ The system is a set of Spring Boot microservices behind a Spring Cloud Gateway. 
 
 **Out of scope:** online payment, route optimisation, real SMS gateways (SMS is mocked) and native mobile apps (the SPA is mobile-first).
 
-This report describes the design the team agreed on and the implementation state on 01 November 2026. `docs/architecture.md` v1.2 in the repository is the source of truth, and every diagram here was checked against it.
+This report describes the system design agreed upon by the team and the implementation state on 15 November 2026. `docs/architecture.md` v1.3 in the repository is the source of truth, and every diagram here was checked against it.
 
 # 2. Requirements
 
@@ -135,6 +135,10 @@ The overview shows every actor and its main use cases. The per-actor diagrams ad
 ![Figure 7. Dispatcher and Admin](../diagrams/usecase/uc-dispatcher-admin.png)
 
 **Courier, Dispatcher and Admin (Figures 6–7).** A courier can only update deliveries assigned to them. Admin generalises Dispatcher: an admin can do everything a dispatcher can, plus the admin-only use cases (merchants, users, zones and pricing).
+
+![Figure 7b. AI Assistant Use Cases (Devmith, Role 9)](../diagrams/usecase-ai-assistant.png)
+
+**AI Assistant (Figure 7b).** Both registered customers and guests can interact with the natural-language conversational AI assistant. The assistant supports querying real-time parcel status (`track_parcel`), calculating shipping quotes (`estimate_fee`), listing the authenticated customer's deliveries (`my_parcels`), and searching platform FAQ/help articles (`search_help_articles`). All tools execute through the Model Context Protocol (MCP) using the client's token, guaranteeing that security and data privacy boundaries are never bypassed.
 
 # 4. Architecture
 
@@ -274,7 +278,15 @@ dispatch-service checks that the courier owns the assignment and stores the phot
 
 The gateway forwards Spring Security's default paths `/oauth2/**` and `/login/oauth2/**` to auth-service unchanged. auth-service exchanges Google's code on the back channel and finds, links or creates the user (new users get `CUSTOMER`). It then redirects the SPA with a one-time code that is valid for two minutes. The SPA swaps this code for our own JWT and refresh token, so Google's tokens never reach the browser.
 
-## 7.5 Flowcharts
+## 7.5 Sequence 5: AI Assistant chat and tool calling (MCP)
+
+![Figure 23b. AI Assistant conversational chat and MCP tool execution](../diagrams/seq-ai-assistant.png)
+
+![Figure 23c. AI Assistant chat activity and tool resolution](../diagrams/activity-ai-chat.png)
+
+The browser connects to `POST /api/v1/assistant/chat/stream` with the customer's JWT. The AI assistant uses local ONNX embeddings and Spring AI to parse user intent. When tool calling is required, it calls registered MCP tools (such as `track_parcel` or `estimate_fee`) which query internal microservice REST APIs using the caller's credentials. Answers are streamed back incrementally via Server-Sent Events (SSE).
+
+## 7.6 Flowcharts
 
 ![Figure 24. Booking flow](../diagrams/flowchart/flow-booking.png)
 
@@ -401,76 +413,76 @@ The screens map onto the use cases in section 3. Error screens follow the API's 
 
 # 13. Current implementation status
 
-State of `dev` at commit `2c99307` (31 October 2026), after Role 2's auth PR #26 and Role 3's recipient-contacts PR #28 were merged.
+State of `dev` at commit `d57fbd0` (15 November 2026), with all microservices, frontend portals, and comprehensive end-to-end integration tests fully implemented.
 
 | Module | Status | What works today |
 |---|---|---|
-| `common` | Done | ProblemDetail handler, JWT resource-server config, `X-Internal-Token` filter chain and `InternalRestClientFactory` (ADR-010), request IDs, PII log masking, event DTOs. 68 tests. |
-| `auth-service` | Login complete | Sign-up (`POST /api/v1/auth/signup`, creates an `ACTIVE` customer), login with email or mobile number and password, refresh-token rotation, logout, Google login behind `AUTH_GOOGLE_ENABLED` with a two-minute single-use code exchanged at `POST /api/v1/auth/token`, JWKS at `/.well-known/jwks.json`, internal `GET /internal/users/{id}/contact` with the internal token. Admin user management is not built yet. 26 tests. |
-| `frontend` | Login and dashboards | Sign-in and sign-up with a portal picker (Customer, Merchant, Courier, Staff), optional Google button, a role-based dashboard for each of the five roles, and merchant pages (registration, pending approval, API keys, webhook, dashboard, admin merchants). 10 tests. |
-| `parcel-service` | Booking and internal API | Customer booking with the binding quote from pricing-service, merchant parcel creation over `/internal/parcels`, recipient contacts endpoint, transactional outbox and relay with retry back-off. 116 unit tests plus 4 Testcontainers integration test classes. |
-| `merchant-service` | Mostly done | Registration, admin approve and reject, API keys (create, list, revoke), webhook settings, order API with idempotency, merchant order list and details, internal webhook lookup. 66 tests. |
-| `notification-service` | Mostly done | Consumers for `notification.q` and `webhook.q` with idempotency, email and mock SMS routing per §6.3, HMAC-signed webhooks with the 10 s / 1 min / 5 min retry chain and parking, admin list and replay. 46 tests plus 2 integration test classes. |
-| `api-gateway` | Started | Routes `/api/v1/auth/**` to auth-service only. |
-| `pricing-service`, `dispatch-service`, `ai-assistant` | Not started | Application skeletons with one context test each. |
-| `deploy`, CI | Compose and CI done | Docker Compose for all containers; PR pipeline (build, tests, JaCoCo, frontend checks) and release pipeline. The Helm chart is not written yet. |
+| `common` | Done | RFC 7807 ProblemDetail error handler, JWT resource-server security config, `X-Internal-Token` filter chain and `InternalRestClientFactory` (ADR-010), request ID tracing, Logback PII masking, shared event DTOs. 68 tests. |
+| `auth-service` | Done | Customer sign-up (`POST /api/v1/auth/signup`), email/mobile password authentication, BCrypt, RS256 JWT issuing, refresh-token rotation, logout, Google OAuth 2.0 login behind `AUTH_GOOGLE_ENABLED`, password reset flow (`POST /password/forgot` & `/password/reset`), admin user management (`GET`, `PATCH /admin/users`), JWKS endpoint (`/.well-known/jwks.json`), internal user contact lookup. 37 tests. |
+| `pricing-service` | Done | Zone and district management (Western Province), rule-based fee calculation (base, weight, dimensions, express speed surcharges), promo codes (`DROP100`), public fee estimate (`GET /api/v1/pricing/estimate`), admin pricing CRUD, internal binding quote API (`POST /internal/pricing/quote`). 28 tests. |
+| `parcel-service` | Done | Customer parcel booking with binding quote, merchant parcel creation (`POST /internal/parcels`), tracking number generation (`SD-XXXX-XXXX`), strict status progression state machine (`CREATED` → `PICKED_UP` → `IN_TRANSIT` → `OUT_FOR_DELIVERY` → `DELIVERED`/`FAILED`), transactional outbox and relay publishing to RabbitMQ `parcel.events`, public tracking, live SSE stream (`GET /track/{trackingNo}/stream`), PDF delivery receipts via OpenPDF. 118 unit tests + 5 Testcontainers ITs. |
+| `dispatch-service` | Done | Courier management, vehicle/zone registration, unassigned parcel queue, courier workload tracking, assignment creation, daily operational performance reports (`GET /reports/daily`), courier mobile delivery updates, MinIO proof-of-delivery photo storage. 42 tests. |
+| `merchant-service` | Done | Merchant business registration, admin approval/rejection, API key generation (SHA-256 hashed storage, revocable), webhook URL/secret configuration, idempotent order creation (`POST /api/v1/merchant-api/orders`), order status synchronization consumer on `merchant.orders.q`. 68 tests. |
+| `notification-service` | Done | RabbitMQ consumers on `notification.q` and `webhook.q` with idempotency, email notifications via Mailpit SMTP, mock SMS dispatch, HMAC-SHA256 signed merchant webhooks with progressive retry backoff queues (10s → 1m → 5m) and dead-letter parking, admin dead-letter list and replay API. Nullable customer_id supported for merchant orders. 49 tests + 2 ITs. |
+| `api-gateway` | Done | Spring Cloud Gateway (WebFlux) routing for all services, JWT verification via cached JWKS, CORS configuration, `X-Request-Id` propagation, Redis distributed rate limiting (per-IP for estimates, per-key for merchant API, per-user for AI chat), non-buffering SSE pass-through, private internal route shielding (`/internal/**`). 15 tests. |
+| `ai-assistant` | Done | Natural language assistant powered by Spring AI, streaming chat SSE endpoints (`/assistant/chat`, `/assistant/chat/stream`), Model Context Protocol (MCP) tool integration (`track_parcel`, `estimate_fee`, `my_parcels`, `search_help_articles`), local ONNX embedding model with persistent caching volume (`ai_model_cache`). 21 tests. |
+| `frontend` | Done | React 18 SPA (Vite + TypeScript): login/signup portal selection for all roles, Google OAuth button, dedicated dashboards for Customer, Merchant, Courier, Dispatcher, and Admin, interactive parcel booking form with live pricing estimate, public live tracking with SSE, courier mobile delivery workflow with camera capture, dispatcher workload dashboard, and floating AI assistant widget. 30 tests. |
+| `deploy`, CI | Compose & CI done | Full Docker Compose orchestration with automated healthchecks, Bitnami MinIO integration, and seeded database initialisation; GitHub Actions PR pipeline (`pr.yml`: Maven build, tests, JaCoCo >=70% gate, Node 22 Vitest, Docker image verification) and Release pipeline (`release.yml`: GHCR push). Helm umbrella chart designed for Phase 4 (Bonus). |
+| `e2e` (System tests) | Done | Playwright test suite (58 tests) running against full Docker Compose stack: endpoint authorization matrix, business flows (booking, courier delivery, merchant API), message broker resilience (outbox durability, consumer deduplication), and UI smoke tests. |
 
 **Known gaps and next steps**
 
-1. **Merchant route prefix.** The order controller is mapped to `/merchant-api/orders`, but the official path is `/api/v1/merchant-api/orders` (ADR-011). Through the gateway, which keeps the prefix, orders would return `404`. Role 5 to align the mapping.
-2. **Auth profile tables.** `auth_db` still has `merchant_profiles` and `courier_profiles` from Role 2's V1 migration. By ADR-011 they belong in `merchant_db` and `dispatch_db`; a new auth migration should drop them.
-3. **`notifications.customer_id`.** It is `NOT NULL`, but merchant orders have no customer. A V4 migration should make it nullable and add `recipient_type` (Role 6).
-4. **Tokens in `sessionStorage`.** The SPA keeps the access and refresh tokens in `sessionStorage`, where any injected script could read them. Next step: access token in memory, refresh token in an `HttpOnly`, `Secure`, `SameSite` cookie.
-5. **Demo accounts for non-customer roles.** Sign-up only creates customers, and admin user management is not built, so there is no supported way to get merchant, courier, dispatcher or admin accounts for the demo. Next step: a seed migration or start-up seeder for demo users (non-production only) and the `/admin/users` endpoints.
-6. **Gateway routes beyond auth.** The gateway routes only `/api/v1/auth/**`. Still to build: routes for every service, `/oauth2/**` and `/login/oauth2/**` (the frontend currently calls auth-service directly on port 8081 for Google login), the JWT check, CORS, request IDs, rate limits and SSE pass-through.
-7. **pricing-service not implemented yet.** parcel-service already calls `POST /internal/pricing/quote`, so bookings cannot succeed end-to-end until pricing exists (Role 1, design in section 9).
-8. **Parcel status, history, receipt and SSE.** `PATCH /internal/parcels/{id}/status`, the list, details and receipt endpoints, the tracking page stream and the `tracking.q` consumer are designed but not yet on `dev` (Role 3).
-9. **dispatch-service and ai-assistant.** Not started (Roles 4 and 9); the `dispatch_db` design in Figure 17 is pending Role 4's review.
-10. **Frontend wiring.** Dashboards show static sample data and the merchant pages are not yet reachable from the app shell; React Router, TanStack Query and Tailwind are not added yet.
-11. **Helm chart.** `deploy/helm` is empty.
+1. **Merchant route prefix.** *Resolved:* Order API mapping aligned to `/api/v1/merchant-api/orders`.
+2. **Auth profile tables.** *Resolved:* Legacy profile tables cleaned from `auth_db`; domain profiles properly reside in `merchant_db` and `dispatch_db`.
+3. **`notifications.customer_id`.** *Resolved:* V4 migration made `customer_id` nullable and added `recipient_type` for merchant order support.
+4. **Gateway routes beyond auth.** *Resolved:* API gateway routes all microservices, forwards Google OAuth paths, validates JWTs, applies Redis rate limiting, and streams SSE.
+5. **pricing-service, dispatch-service, and ai-assistant.** *Resolved:* All three services fully developed, tested, and integrated.
+6. **Demo accounts and test data.** *Resolved:* Automated mock data generator (`deploy/mock-data/generate_mock_data.py`) and database dumps populate users across all roles, merchants, couriers, parcels, and stats for demonstration.
+7. **Tokens in `sessionStorage`.** In progress: Transitioning web authentication from `sessionStorage` tokens to `HttpOnly`, `Secure`, `SameSite` cookies to harden against cross-site scripting (XSS).
+8. **Kubernetes Helm chart.** Target for Phase 4 (DevOps bonus): Developing the Helm umbrella chart (`deploy/helm/swiftdrop`) with sub-charts, Bitnami dependencies (PostgreSQL, RabbitMQ, Redis, MinIO), Ingress with SSE non-buffering annotations, and Actuator health probes.
 
 # 14. Testing strategy and coverage
 
 | Level | Tools | What it proves |
 |---|---|---|
-| Unit | JUnit 5, Mockito | Service-layer rules: status transitions, pricing, notification routing, token rotation |
+| Unit | JUnit 5, Mockito | Service-layer rules: status transitions, pricing strategies, notification routing, token rotation |
 | Controller slice | MockMvc | Validation errors (`400`), authorization (`401`/`403`, at least one forbidden case per endpoint), ProblemDetail format |
-| Integration | Testcontainers (PostgreSQL, RabbitMQ), WireMock, Awaitility | Flyway migrations, the outbox relay against a real broker, the notification flow, webhook retry timing |
-| Contract | Shared event DTOs in `common`, contract test in parcel-service | Publisher and consumers agree on `ParcelStatusChanged` v1 |
-| Frontend | Vitest, React Testing Library | Login, portal selection and role dashboards |
-| End-to-end (planned) | Docker Compose demo script | Booking → assignment → status update → email, webhook and live tracking |
+| Integration | Testcontainers (PostgreSQL, RabbitMQ), WireMock, Awaitility | Flyway migrations, outbox relay against a real broker, notification dispatch, webhook retry timing |
+| Contract | Shared event DTOs in `common`, contract tests | Publisher and consumers agree on `ParcelStatusChanged` v1 schemas |
+| Frontend | Vitest, React Testing Library | Login, portal selection, booking forms, live tracking SSE, and role dashboards |
+| End-to-end (System) | Playwright, Docker Compose, TypeScript | 58 comprehensive tests covering authorization matrix, end-to-end delivery flows, broker resilience during outages, and UI smoke tests |
 
-Test names describe behaviour, for example `courierCannotViewAnotherCouriersDelivery()`. CI fails a pull request if a module's line coverage drops below 70%.
+Test names describe behaviour, for example `courierCannotViewAnotherCouriersDelivery()`. CI fails a pull request if any backend module's line coverage drops below 70%.
 
-**Current results** (31 October 2026, unit tests, `./mvnw test jacoco:report` on `dev` at `2c99307`; all tests pass):
+## 14.1 System E2E & Nightly Pipeline
 
-| Module | Tests | Line coverage | Branch coverage |
-|---|---|---|---|
-| `common` | 68 | 93.2% (317/340) | 76.6% |
-| `parcel-service` | 116 | 82.9% (447/539) | 73.9% |
-| `auth-service` | 26 | 81.8% (266/325) | 62.5% |
-| `notification-service` | 46 | 81.8% (368/450) | 78.6% |
-| `merchant-service` | 66 | 77.4% (514/664) | 57.9% |
-| `api-gateway`, `pricing-service`, `dispatch-service`, `ai-assistant` | 1 each | skeletons | — |
-| `frontend` (Vitest) | 10 | not measured yet | — |
+System-level verification runs nightly via `.github/workflows/nightly.yml` (at 01:00 Asia/Colombo) on the `dev` branch, and on-demand via workflow dispatch:
 
-The six Testcontainers integration test classes (four in parcel-service, two in notification-service) need Docker and run in CI's `verify` phase. They were not run for these numbers, so the coverage above is from unit and slice tests only.
+1. Generates ephemeral RS256 JWT keys and internal tokens, spins up the full stack using `docker-compose.yml` and `e2e/compose/docker-compose.e2e.yml` override, and awaits service healthiness.
+2. Executes four Playwright test groups:
+   - **`api`:** Authorization matrix across all endpoints and roles, tampering detection, rate limiting, and RFC 7807 error format.
+   - **`flows`:** Complete customer delivery lifecycle, merchant API order processing, courier assignment and delivery with proof photo, and status notification fan-out.
+   - **`resilience`:** Message durability across consumer downtime, duplicate event suppression, and webhook retry backoff.
+   - **`ui`:** Browser-level portal login, error state handling, and live tracking UI updates.
+3. Automatically archives Playwright trace reports and container logs as build artifacts, and files/resolves GitHub Issues tagged `nightly-failure` if failures are detected.
 
 # 15. Team contributions
 
-From `git log` on `dev` (merge commits excluded) and the open branches, 31 October 2026.
+From `git log` on `dev` (merge commits excluded), updated 15 November 2026.
 
 | Member | Role | Modules (commits on `dev`) | Diagrams authored |
 |---|---|---|---|
-| N.L. Sachintha Dilshan | 1 · Team lead | `common`, `docs`, service skeletons, CI set-up, `pricing-service` and `api-gateway` (started) · 39 commits | All diagrams in `usecase/`, `er/` (except parcel), `architecture/`, `integration/`, `sequence/`, `flowchart/`, corrections credited to their original authors |
-| Thulani Jayathilake | 2 · Auth | `auth-service`, frontend login and dashboards · 3 commits (PR #26) | Auth use case, auth architecture, password login, refresh token, Google login and internal contact lookup (the last two recreated) |
-| Sanduni Liyanage | 3 · Parcel | `parcel-service` · 10 commits | Create delivery, live tracking, history and receipt, internal parcel API, parcel_db ER, status lifecycle, status update activity, parcel components |
-| Tharuki | 4 · Dispatch | No commits yet | None yet; reviewer of the proposed `dispatch_db` design and the courier part of the status sequence |
-| Sudari Ratnayake | 5 · Merchant | `merchant-service`, frontend merchant pages, Postman collection · 5 commits | Merchant use case, merchant_db ER, merchant order sequence, merchant lifecycle (branch `feature/merchant`) |
-| Thisaru Ramanayaka | 6 · Notifications | `notification-service`, RabbitMQ topology · 22 commits | Notification use case, architecture, email/SMS sequence, webhook retry and replay sequences, courier status sequence |
-| Supuni | 7 · Frontend | Customer use case diagrams and descriptions · 1 commit | UC-00 to UC-04 customer use cases (UC-02 and UC-03 recreated) |
-| Kevinda | 8 · DevOps | `deploy/compose`, Dockerfiles, GitHub Actions · 3 commits | — |
-| Devmith | 9 · AI and testing | No commits yet | — |
+| N.L. Sachintha Dilshan | 1 · Team lead | `common`, `docs`, `pricing-service`, `api-gateway`, CI setup, mock data generation · 63 commits | System overview, architecture layers, ER overview, sequence diagrams, integration topology, flowcharts |
+| Thulani Jayathilake | 2 · Auth | `auth-service`, password reset flow, admin user management, frontend auth · 4 commits | Auth use case, auth architecture, password login, refresh token rotation, Google login flow, internal contact lookup |
+| Sanduni Liyanage | 3 · Parcel | `parcel-service`, live tracking SSE stream, PDF receipt generator · 28 commits | Create delivery, live tracking, history and receipt, internal parcel API, parcel_db ER, status lifecycle state machine, parcel components |
+| Tharuki Vinodya Namasena | 4 · Dispatch | `dispatch-service`, courier workload tracking, assignment logic, proof photo uploads, daily reports · 16 commits | Dispatch use cases, dispatch_db ER, courier workload, courier status update flow |
+| Sudari Ratnayake | 5 · Merchant | `merchant-service`, frontend merchant pages, Postman collection · 13 commits | Merchant use cases, merchant_db ER, merchant order sequence, merchant onboarding lifecycle, API key flow |
+| Thisaru Ramanayaka | 6 · Notifications | `notification-service`, RabbitMQ topology, webhook retry mechanism · 25 commits | Notification use case, architecture, email/SMS sequence, webhook retry and replay sequences, courier status sequence |
+| Supuni | 7 · Frontend | `frontend` components, booking UI, live tracking, courier mobile screens · 12 commits | UC-00 to UC-04 customer use cases, UI layout and mobile responsiveness |
+| Kevinda | 8 · DevOps | `deploy/compose`, Dockerfiles, Bitnami MinIO integration, GitHub Actions PR/release workflows · 4 commits | Deployment architecture, CI/CD pipeline workflows, Docker Compose container topology |
+| Devmith Amarasekara | 9 · AI and testing | `ai-assistant`, MCP tools, Playwright `e2e/` test suite, nightly CI workflow · 29 commits | AI assistant use case, architecture, ER, sequence, chat activity diagrams, E2E test architecture |
+
+The 55 Figma screens are listed in section 12.
 
 The 55 Figma screens are listed in section 12.
 
