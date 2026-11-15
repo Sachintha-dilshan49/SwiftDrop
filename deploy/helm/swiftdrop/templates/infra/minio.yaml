@@ -1,0 +1,76 @@
+{{- if .Values.infrastructure.standalone }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+  labels:
+    app.kubernetes.io/name: minio
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minio
+    spec:
+      containers:
+        - name: minio
+          image: "bitnamilegacy/minio:2025.7.23"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MINIO_ROOT_USER
+              value: "minioadmin"
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: swiftdrop-secrets
+                  key: minio-root-password
+            - name: MINIO_DEFAULT_BUCKETS
+              value: "delivery-proofs:download"
+          ports:
+            - containerPort: 9000
+              name: s3
+            - containerPort: 9001
+              name: console
+          readinessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app.kubernetes.io/name: minio
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: s3
+    - port: 9001
+      targetPort: 9001
+      name: console
+  selector:
+    app.kubernetes.io/name: minio
+{{- end }}

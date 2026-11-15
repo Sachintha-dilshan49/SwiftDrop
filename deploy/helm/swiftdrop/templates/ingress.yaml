@@ -1,0 +1,62 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: swiftdrop-ingress
+  labels:
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.ingress.className | default "nginx" | quote }}
+    # Critical for SSE: Disable proxy buffering so Server-Sent Events stream in real-time
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # Long timeouts for streaming connections (SSE and AI chat stream)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Max upload body size for proof of delivery photos (10 MB)
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    # Enable CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization,X-API-Key,X-Request-Id"
+    nginx.ingress.kubernetes.io/cors-expose-headers: "X-Request-Id,X-RateLimit-Remaining,X-RateLimit-Retry-After-Seconds"
+spec:
+  ingressClassName: {{ .Values.ingress.className | default "nginx" | quote }}
+  rules:
+    {{- if .Values.ingress.host }}
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+    {{- else }}
+    - http:
+    {{- end }}
+        paths:
+          # Gateway API route: all backend requests, including SSE live tracking and AI chat
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+          # Google OAuth callback routes forwarded to gateway -> auth-service
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+          - path: /login/oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080
+          # Frontend SPA (React application)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

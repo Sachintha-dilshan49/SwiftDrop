@@ -1,0 +1,66 @@
+{{- if .Values.infrastructure.standalone }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  labels:
+    app.kubernetes.io/name: mailpit
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mailpit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mailpit
+    spec:
+      containers:
+        - name: mailpit
+          image: "axllent/mailpit:latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 1025
+              name: smtp
+            - containerPort: 8025
+              name: web
+          readinessProbe:
+            httpGet:
+              path: /api/v1/info
+              port: 8025
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/v1/info
+              port: 8025
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  labels:
+    app.kubernetes.io/name: mailpit
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 1025
+      targetPort: 1025
+      name: smtp
+    - port: 8025
+      targetPort: 8025
+      name: web
+  selector:
+    app.kubernetes.io/name: mailpit
+{{- end }}

@@ -1,0 +1,144 @@
+# deploy/helm/swiftdrop/values.yaml
+# SwiftDrop - Default Values for Helm Umbrella Chart
+
+global:
+  image:
+    registry: ghcr.io/sachintha-dilshan49
+    tag: latest
+    pullPolicy: IfNotPresent
+  springProfile: docker
+
+infrastructure:
+  # Deploy internal lightweight pods for Postgres, RabbitMQ, Redis, MinIO, and Mailpit
+  standalone: true
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ""
+
+secrets:
+  internalApiToken: "swiftdrop-internal-secret-token-change-in-production"
+  jwtPrivateKeyB64: ""
+  jwtPublicKeyB64: ""
+  postgresPassword: "postgres"
+  authDbPassword: "auth_pass"
+  pricingDbPassword: "pricing_pass"
+  parcelDbPassword: "parcel_pass"
+  dispatchDbPassword: "dispatch_pass"
+  merchantDbPassword: "merchant_pass"
+  notifDbPassword: "notif_pass"
+  rabbitmqPassword: "guest"
+  minioRootPassword: "minioadmin"
+
+# ─── Microservices ────────────────────────────────────────────────────────────
+
+apiGateway:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-api-gateway
+  corsAllowedOrigins: "*"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+authService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-auth-service
+  googleEnabled: "false"
+  resources:
+    requests:
+      cpu: 150m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+pricingService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-pricing-service
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+parcelService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-parcel-service
+  resources:
+    requests:
+      cpu: 150m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+dispatchService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-dispatch-service
+  resources:
+    requests:
+      cpu: 150m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+merchantService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-merchant-service
+  resources:
+    requests:
+      cpu: 150m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+notificationService:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-notification-service
+  resources:
+    requests:
+      cpu: 150m
+      memory: 384Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+aiAssistant:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-ai-assistant
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1536Mi
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/sachintha-dilshan49/swiftdrop-frontend
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

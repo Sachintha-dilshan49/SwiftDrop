@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: swiftdrop-config
+  labels:
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+data:
+  SPRING_PROFILES_ACTIVE: {{ .Values.global.springProfile | default "docker" | quote }}
+  JWT_JWK_SET_URI: "http://auth-service:8081/.well-known/jwks.json"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
+  PRICING_SERVICE_URL: "http://pricing-service:8082"
+  PARCEL_SERVICE_URL: "http://parcel-service:8083"
+  DISPATCH_SERVICE_URL: "http://dispatch-service:8084"
+  MERCHANT_SERVICE_URL: "http://merchant-service:8085"
+  NOTIFICATION_SERVICE_URL: "http://notification-service:8086"
+  AI_ASSISTANT_URL: "http://ai-assistant:8087"
+  GATEWAY_URL: "http://api-gateway:8080"
+  
+  # Infrastructure
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_PORT: "5672"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  MINIO_ENDPOINT: "http://minio:9000"
+  MINIO_BUCKET: "delivery-proofs"
+  MAIL_HOST: "mailpit"
+  MAIL_PORT: "1025"
+
+  # Database URLs per service
+  AUTH_DB_URL: "jdbc:postgresql://postgres:5432/auth_db"
+  PRICING_DB_URL: "jdbc:postgresql://postgres:5432/pricing_db"
+  PARCEL_DB_URL: "jdbc:postgresql://postgres:5432/parcel_db"
+  DISPATCH_DB_URL: "jdbc:postgresql://postgres:5432/dispatch_db"
+  MERCHANT_DB_URL: "jdbc:postgresql://postgres:5432/merchant_db"
+  NOTIFICATION_DB_URL: "jdbc:postgresql://postgres:5432/notification_db"
+
+  # Service Database Users
+  AUTH_DB_USER: "auth"
+  PRICING_DB_USER: "pricing"
+  PARCEL_DB_USER: "parcel"
+  DISPATCH_DB_USER: "dispatch"
+  MERCHANT_DB_USER: "merchant"
+  NOTIFICATION_DB_USER: "notification"
