@@ -36,7 +36,7 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"
+      - "${RABBITMQ_HOST_PORT:-5672}:5672"
       - "15672:15672"   # RabbitMQ Management Web UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
