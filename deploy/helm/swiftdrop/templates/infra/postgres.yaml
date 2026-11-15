@@ -1,0 +1,121 @@
+{{- if .Values.infrastructure.standalone }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+  labels:
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+data:
+  init.sql: |
+    CREATE USER auth WITH PASSWORD 'auth_pass';
+    CREATE DATABASE auth_db OWNER auth;
+    GRANT ALL PRIVILEGES ON DATABASE auth_db TO auth;
+
+    CREATE USER pricing WITH PASSWORD 'pricing_pass';
+    CREATE DATABASE pricing_db OWNER pricing;
+    GRANT ALL PRIVILEGES ON DATABASE pricing_db TO pricing;
+
+    CREATE USER parcel WITH PASSWORD 'parcel_pass';
+    CREATE DATABASE parcel_db OWNER parcel;
+    GRANT ALL PRIVILEGES ON DATABASE parcel_db TO parcel;
+
+    CREATE USER dispatch WITH PASSWORD 'dispatch_pass';
+    CREATE DATABASE dispatch_db OWNER dispatch;
+    GRANT ALL PRIVILEGES ON DATABASE dispatch_db TO dispatch;
+
+    CREATE USER merchant WITH PASSWORD 'merchant_pass';
+    CREATE DATABASE merchant_db OWNER merchant;
+    GRANT ALL PRIVILEGES ON DATABASE merchant_db TO merchant;
+
+    CREATE USER notif WITH PASSWORD 'notif_pass';
+    CREATE DATABASE notification_db OWNER notif;
+    GRANT ALL PRIVILEGES ON DATABASE notification_db TO notif;
+
+    CREATE USER swiftdrop WITH PASSWORD 'swiftdrop';
+    GRANT ALL PRIVILEGES ON DATABASE notification_db TO swiftdrop;
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: "postgres:16-alpine"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: swiftdrop-secrets
+                  key: postgres-password
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+          readinessProbe:
+            exec:
+              command: ["psql", "-U", "postgres", "-c", "SELECT 1"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["psql", "-U", "postgres", "-c", "SELECT 1"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: init-script
+          configMap:
+            name: postgres-init-script
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app.kubernetes.io/name: postgres
+{{- end }}

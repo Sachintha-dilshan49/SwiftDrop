@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}-minio-init"
+  labels:
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+    "helm.sh/hook-weight": "1"
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      name: "{{ .Release.Name }}-minio-init"
+      labels:
+        {{- include "swiftdrop.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-mc
+          image: "quay.io/minio/mc:latest"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Waiting for MinIO service to respond...";
+              until curl -s -f http://minio:9000/minio/health/live; do
+                sleep 2;
+              done;
+              echo "Configuring mc alias...";
+              mc alias set local http://minio:9000 minioadmin minioadmin;
+              echo "Creating delivery-proofs bucket...";
+              mc mb --ignore-existing local/delivery-proofs;
+              echo "Setting public download policy on delivery-proofs bucket...";
+              mc anonymous set download local/delivery-proofs;
+              echo "MinIO initialization completed successfully!";
+              exit 0;

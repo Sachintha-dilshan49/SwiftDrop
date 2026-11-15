@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dispatch-service
+  labels:
+    app.kubernetes.io/name: dispatch-service
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.dispatchService.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dispatch-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dispatch-service
+    spec:
+      containers:
+        - name: dispatch-service
+          image: "{{ .Values.dispatchService.image.repository }}:{{ .Values.dispatchService.image.tag | default .Values.global.image.tag }}"
+          imagePullPolicy: {{ .Values.dispatchService.image.pullPolicy | default .Values.global.image.pullPolicy }}
+          ports:
+            - containerPort: 8084
+              name: http
+          envFrom:
+            - configMapRef:
+                name: swiftdrop-config
+          env:
+            - name: DISPATCH_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: swiftdrop-secrets
+                  key: dispatch-db-password
+            - name: SPRING_RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: swiftdrop-secrets
+                  key: rabbitmq-password
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: swiftdrop-secrets
+                  key: minio-root-password
+            - name: INTERNAL_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: swiftdrop-secrets
+                  key: internal-api-token
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8084
+            initialDelaySeconds: 25
+            periodSeconds: 10
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8084
+            initialDelaySeconds: 50
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.dispatchService.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dispatch-service
+  labels:
+    app.kubernetes.io/name: dispatch-service
+    {{- include "swiftdrop.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8084
+      targetPort: 8084
+      name: http
+  selector:
+    app.kubernetes.io/name: dispatch-service

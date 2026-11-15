@@ -1,0 +1,103 @@
+# deploy/helm/swiftdrop/values-local.yaml
+# Override for local Minikube / lightweight Kubernetes clusters
+
+ingress:
+  enabled: true
+  className: nginx
+  host: swiftdrop.local
+
+secrets:
+  internalApiToken: "swiftdrop-internal-secret-token-change-in-production"
+  # Demo RS256 keys for local cluster runs
+  jwtPrivateKeyB64: "LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcFFJQkFBS0NBUUVBNXp6T...demo"
+  jwtPublicKeyB64: "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUlJQklqQU5CZ2txaGtpRzl3MEJBUUV...demo"
+  postgresPassword: "postgres"
+  authDbPassword: "auth_pass"
+  pricingDbPassword: "pricing_pass"
+  parcelDbPassword: "parcel_pass"
+  dispatchDbPassword: "dispatch_pass"
+  merchantDbPassword: "merchant_pass"
+  notifDbPassword: "notif_pass"
+  rabbitmqPassword: "guest"
+  minioRootPassword: "minioadmin"
+
+apiGateway:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+authService:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+pricingService:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+parcelService:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+dispatchService:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+merchantService:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+notificationService:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      cpu: 250m
+      memory: 384Mi
+
+aiAssistant:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+frontend:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
